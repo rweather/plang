@@ -22,23 +22,18 @@
 
 #include <plang/term.h>
 #include <limits.h>
+#include <config.h>
+#ifdef HAVE_GC_GC_H
+#include <gc/gc.h>
+#elif defined(HAVE_GC_H)
+#include <gc.h>
+#else
+#error "libgc is required to build plang"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-enum {
-    P_TERM_FUNCTOR,
-    P_TERM_LIST,
-    P_TERM_NIL,
-    P_TERM_ATOM,
-    P_TERM_STRING,
-    P_TERM_VARIABLE,
-    P_TERM_TYPED_VARIABLE,
-    P_TERM_INTEGER,
-    P_TERM_REAL,
-    P_TERM_OBJECT
-};
 
 #if defined(__WORDSIZE) && __WORDSIZE == 64
 #define P_TERM_64BIT    1
@@ -56,7 +51,7 @@ struct p_term_header {
 
 struct p_term_functor {
     struct p_term_header header;
-    p_term *functor_name;                 /* Must be an atom */
+    p_term *functor_name;               /* Must be an atom */
     p_term *arg[1];
 };
 
@@ -81,13 +76,22 @@ struct p_term_var {
 struct p_term_typed_var {
     struct p_term_header header;
     struct p_term_header constraint;
-    p_term *functor_name;                 /* Must be an atom or null */
+    p_term *functor_name;               /* Must be an atom or null */
+    p_term *value;
+};
+
+struct p_term_member_var {
+    struct p_term_header header;
+    p_term *object;
+    p_term *name;                       /* Must be an atom */
     p_term *value;
 };
 
 struct p_term_integer {
     struct p_term_header header;
+#if !defined(P_TERM_64BIT)
     int value;
+#endif
 };
 
 struct p_term_real {
@@ -100,24 +104,30 @@ struct p_term_property {
     p_term *value;
 };
 
+#define P_TERM_MAX_PROPS    8
+
 struct p_term_object {
     struct p_term_header header;
     p_term *next;
-    struct p_term_property properties[1];
+    struct p_term_property properties[P_TERM_MAX_PROPS];
 };
 
 union p_term {
-    struct p_term_header    header;
-    struct p_term_functor   functor;
-    struct p_term_list      list;
-    struct p_term_atom      atom;
-    struct p_term_atom      string;
-    struct p_term_var       var;
-    struct p_term_typed_var typed_var;
-    struct p_term_integer   integer;
-    struct p_term_real      real;
-    struct p_term_object    object;
+    struct p_term_header        header;
+    struct p_term_functor       functor;
+    struct p_term_list          list;
+    struct p_term_atom          atom;
+    struct p_term_atom          string;
+    struct p_term_var           var;
+    struct p_term_typed_var     typed_var;
+    struct p_term_member_var    member_var;
+    struct p_term_integer       integer;
+    struct p_term_real          real;
+    struct p_term_object        object;
 };
+
+#define p_term_malloc(context, type, size)  ((type *)GC_MALLOC((size)))
+#define p_term_new(context, type)           (GC_NEW(type))
 
 #ifdef __cplusplus
 };

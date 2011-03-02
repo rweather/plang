@@ -1,6 +1,8 @@
 lib_LTLIBRARIES = libplang.la
 
 libplang_la_SOURCES = \
+	context.c \
+	context-priv.h \
 	term.c \
 	term-priv.h
 
