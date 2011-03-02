@@ -17,4 +17,4 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-#include <plang/p-term.h>
+#include <plang/term.h>

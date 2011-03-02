@@ -17,8 +17,8 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PLANG_P_TERM_H
-#define PLANG_P_TERM_H
+#ifndef PLANG_TERM_H
+#define PLANG_TERM_H
 
 #include <limits.h>
 

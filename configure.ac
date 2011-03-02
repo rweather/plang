@@ -2,7 +2,7 @@ dnl Process this file with autoconf to produce a configure script.
 AC_PREREQ(2.61)
 
 AC_INIT([plang], [0.0.1], [rhys.weatherley@gmail.com])
-AC_CONFIG_SRCDIR([include/plang/p-term.h])
+AC_CONFIG_SRCDIR([include/plang/term.h])
 AC_CONFIG_HEADERS([config.h])
 
 dnl Determine the host system type.

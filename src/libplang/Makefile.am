@@ -1,7 +1,7 @@
 lib_LTLIBRARIES = libplang.la
 
 libplang_la_SOURCES = \
-	p-term.c
+	term.c
 
 AM_CFLAGS = -I$(top_srcdir)/include -I$(top_builddir)/include -I. -I$(srcdir)
 
