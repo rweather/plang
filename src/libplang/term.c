@@ -18,3 +18,4 @@
  */
 
 #include <plang/term.h>
+#include "term-priv.h"
