@@ -269,8 +269,40 @@ p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail)
  */
 p_term *p_term_create_atom(p_context *context, const char *name)
 {
-    /* TODO */
-    return 0;
+    unsigned int hash;
+    size_t len;
+    const char *n;
+    p_term *atom;
+
+    /* Look for the name in the context's atom hash */
+    hash = 0;
+    len = 0;
+    if (!name)
+        name = "";
+    n = name;
+    while (*n != '\0') {
+        hash = hash * 5 + (((unsigned int)(*n++)) & 0xFF);
+        ++len;
+    }
+    hash %= P_CONTEXT_HASH_SIZE;
+    atom = context->atom_hash[hash];
+    while (atom != 0) {
+        if (!strcmp(atom->atom.name, name))
+            return atom;
+        atom = atom->atom.next;
+    }
+
+    /* Create a new atom and add it to the hash */
+    atom = p_term_malloc
+        (context, p_term, sizeof(struct p_term_atom) + len);
+    if (!atom)
+        return 0;
+    atom->header.type = P_TERM_ATOM;
+    atom->header.size = (unsigned int)len;
+    atom->atom.next = context->atom_hash[hash];
+    strcpy(atom->atom.name, name);
+    context->atom_hash[hash] = atom;
+    return atom;
 }
 
 /**
@@ -292,8 +324,8 @@ p_term *p_term_create_atom(p_context *context, const char *name)
 p_term *p_term_create_string(p_context *context, const char *str)
 {
     size_t len = str ? strlen(str) : 0;
-    struct p_term_atom *term = p_term_malloc
-        (context, struct p_term_atom, sizeof(struct p_term_atom) + len);
+    struct p_term_string *term = p_term_malloc
+        (context, struct p_term_string, sizeof(struct p_term_string) + len);
     if (!term)
         return 0;
     term->header.type = P_TERM_STRING;

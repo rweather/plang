@@ -28,6 +28,7 @@
 
 p_context *p_context_create(void)
 {
+    GC_INIT();
     p_context *context = GC_NEW_UNCOLLECTABLE(struct p_context);
     if (!context)
         return 0;

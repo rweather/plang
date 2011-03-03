@@ -27,11 +27,14 @@
 extern "C" {
 #endif
 
+#define P_CONTEXT_HASH_SIZE     511
+
 struct p_context
 {
     p_term *nil_atom;
     p_term *prototype_atom;
     p_term *class_name_atom;
+    p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 };
 
 #ifdef __cplusplus

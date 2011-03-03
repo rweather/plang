@@ -63,6 +63,12 @@ struct p_term_list {
 
 struct p_term_atom {
     struct p_term_header header;
+    p_term *next;
+    char name[1];
+};
+
+struct p_term_string {
+    struct p_term_header header;
     char name[1];
 };
 
@@ -117,7 +123,7 @@ union p_term {
     struct p_term_functor       functor;
     struct p_term_list          list;
     struct p_term_atom          atom;
-    struct p_term_atom          string;
+    struct p_term_string        string;
     struct p_term_var           var;
     struct p_term_typed_var     typed_var;
     struct p_term_member_var    member_var;
