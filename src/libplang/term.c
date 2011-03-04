@@ -426,13 +426,18 @@ p_term *p_term_create_typed_variable(p_context *context, int type, p_term *funct
  */
 p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term *name)
 {
-    struct p_term_member_var *term =
-        p_term_new(context, struct p_term_member_var);
+    struct p_term_member_var *term;
+    if (!name || !object)
+        return 0;
+    name = p_term_deref_non_null(name);
+    if (name->header.type != P_TERM_ATOM)
+        return 0;
+    term = p_term_new(context, struct p_term_member_var);
     if (!term)
         return 0;
     term->header.type = P_TERM_MEMBER_VARIABLE;
     term->object = object;
-    term->name = p_term_deref(name);
+    term->name = name;
     return (p_term *)term;
 }
 

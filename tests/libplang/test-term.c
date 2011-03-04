@@ -238,6 +238,98 @@ static void test_list()
     P_VERIFY(p_term_tail(var) == nil);
 }
 
+static void test_variable()
+{
+    p_term *var1;
+    p_term *var2;
+    p_term *var3;
+    p_term *var4;
+
+    var1 = p_term_create_variable(context);
+    P_VERIFY(p_term_name(var1) == 0);
+    P_COMPARE(p_term_type(var1), P_TERM_VARIABLE);
+
+    var2 = p_term_create_named_variable(context, "foo");
+    P_VERIFY(strcmp(p_term_name(var2), "foo") == 0);
+    P_COMPARE(p_term_type(var2), P_TERM_VARIABLE);
+
+    var3 = p_term_create_named_variable(context, "");
+    P_VERIFY(p_term_name(var3) == 0);
+    P_COMPARE(p_term_type(var3), P_TERM_VARIABLE);
+
+    var4 = p_term_create_named_variable(context, 0);
+    P_VERIFY(p_term_name(var4) == 0);
+    P_COMPARE(p_term_type(var4), P_TERM_VARIABLE);
+
+    P_VERIFY(p_term_deref(var1) == var1);
+
+    P_VERIFY(p_term_bind_variable(context, var1, var2, P_BIND_DEFAULT));
+    P_VERIFY(strcmp(p_term_name(var1), "foo") == 0);
+    P_COMPARE(p_term_type(var1), P_TERM_VARIABLE);
+
+    /* Occurs check fail */
+    P_VERIFY(!p_term_bind_variable(context, var2, var1, P_BIND_DEFAULT));
+    P_VERIFY(strcmp(p_term_name(var1), "foo") == 0);
+    P_COMPARE(p_term_type(var1), P_TERM_VARIABLE);
+
+    P_VERIFY(p_term_bind_variable(context, var1, var3, P_BIND_DEFAULT));
+    P_VERIFY(p_term_name(var1) == 0);
+    P_COMPARE(p_term_type(var1), P_TERM_VARIABLE);
+    P_VERIFY(p_term_name(var2) == 0);
+    P_COMPARE(p_term_type(var2), P_TERM_VARIABLE);
+
+    P_VERIFY(p_term_deref(var1) == var3);
+    P_VERIFY(p_term_deref(0) == 0);
+}
+
+static void test_typed_variable()
+{
+    p_term *var1;
+    p_term *var2;
+    p_term *var3;
+    p_term *var4;
+    p_term *atom;
+
+    var1 = p_term_create_typed_variable(context, P_TERM_ATOM, 0, 0, 0);
+    P_VERIFY(p_term_name(var1) == 0);
+    P_COMPARE(p_term_type(var1), P_TERM_TYPED_VARIABLE);
+
+    var2 = p_term_create_typed_variable(context, P_TERM_ATOM, 0, 0, "");
+    P_VERIFY(p_term_name(var2) == 0);
+    P_COMPARE(p_term_type(var2), P_TERM_TYPED_VARIABLE);
+
+    atom = p_term_create_atom(context, "bar");
+    var3 = p_term_create_typed_variable
+        (context, P_TERM_FUNCTOR, atom, 2, "foo");
+    P_VERIFY(strcmp(p_term_name(var3), "foo") == 0);
+    P_COMPARE(p_term_type(var3), P_TERM_TYPED_VARIABLE);
+    P_VERIFY(p_term_deref(var3) == var3);
+
+    var4 = p_term_create_variable(context);
+    P_VERIFY(p_term_bind_variable(context, var4, var3, P_BIND_DEFAULT));
+
+    P_VERIFY(p_term_deref(var4) == var3);
+}
+
+static void test_member_variable()
+{
+    p_term *object;
+    p_term *name;
+    p_term *var1;
+
+    object = p_term_create_variable(context);
+    name = p_term_create_atom(context, "foo");
+
+    P_VERIFY(!p_term_create_member_variable(context, object, 0));
+    P_VERIFY(!p_term_create_member_variable(context, 0, name));
+    P_VERIFY(!p_term_create_member_variable(context, object, object));
+
+    var1 = p_term_create_member_variable(context, object, name);
+    P_COMPARE(p_term_type(var1), P_TERM_MEMBER_VARIABLE);
+    P_VERIFY(strcmp(p_term_name(var1), p_term_name(name)) == 0);
+    P_VERIFY(p_term_object(var1) == object);
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -249,6 +341,9 @@ int main(int argc, char *argv[])
     P_TEST_RUN(integer);
     P_TEST_RUN(real);
     P_TEST_RUN(list);
+    P_TEST_RUN(variable);
+    P_TEST_RUN(typed_variable);
+    P_TEST_RUN(member_variable);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();
