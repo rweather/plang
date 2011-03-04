@@ -35,18 +35,10 @@
 P_INLINE p_term *p_term_deref_non_null(const p_term *term)
 {
     for(;;) {
-        if (term->header.type == P_TERM_VARIABLE) {
+        if (term->header.type & P_TERM_VARIABLE) {
             if (!term->var.value)
                 break;
             term = term->var.value;
-        } else if (term->header.type == P_TERM_TYPED_VARIABLE) {
-            if (!term->typed_var.value)
-                break;
-            term = term->typed_var.value;
-        } else if (term->header.type == P_TERM_MEMBER_VARIABLE) {
-            if (!term->member_var.value)
-                break;
-            term = term->member_var.value;
         } else {
             break;
         }
@@ -1058,6 +1050,122 @@ int p_term_is_instance(p_context *context, const p_term *term, const p_term *cla
         term = term->object.properties[0].value;
     }
     return 0;
+}
+
+/* Perform an occurs check */
+static int p_term_occurs_in(const p_term *var, const p_term *value)
+{
+    unsigned int index;
+    if (!value)
+        return 0;
+    value = p_term_deref_non_null(value);
+    if (var == value)
+        return 1;
+    switch (value->header.type) {
+    case P_TERM_FUNCTOR:
+        /* Scan the functor arguments */
+        for (index = 0; index < value->header.size; ++index) {
+            if (p_term_occurs_in(var, value->functor.arg[index]))
+                return 1;
+        }
+        break;
+    case P_TERM_LIST:
+        /* Try to reduce depth of recursion issues with long lists */
+        do {
+            if (p_term_occurs_in(var, value->list.head))
+                return 1;
+            value = value->list.tail;
+            if (!value)
+                return 0;
+            value = p_term_deref_non_null(value);
+        } while (value->header.type == P_TERM_LIST);
+        if (value->header.type != P_TERM_ATOM)
+            return p_term_occurs_in(var, value);
+        break;
+    case P_TERM_OBJECT:
+        /* Scan the object's property values */
+        do {
+            for (index = 0; index < value->header.size; ++index) {
+                if (p_term_occurs_in
+                        (var, value->object.properties[index].value))
+                    return 1;
+            }
+            value = value->object.next;
+        }
+        while (value);
+        break;
+    case P_TERM_MEMBER_VARIABLE:
+        return p_term_occurs_in(var, value->member_var.object);
+    default: break;
+    }
+    return 0;
+}
+
+/* Record a variable binding within the trace.  The variable
+ * will be set back to null upon back-tracking */
+static int p_term_record_binding(p_context *context, p_term *var)
+{
+    /* TODO */
+    return 1;
+}
+
+/**
+ * \var P_BIND_DEFAULT
+ * \ingroup term
+ * Default variable binding flags, which performs occurs checking
+ * and recording of bindings for back-tracking.
+ */
+
+/**
+ * \var P_BIND_NO_OCCURS_CHECK
+ * \ingroup term
+ * Flag indicating that the occurs check should not be performed.
+ * This flag should be provided only when the caller is absolutely
+ * certain that the variable will not occur in the term it is being
+ * bound to; e.g. because it is a new variable that was created
+ * after the term.
+ */
+
+/**
+ * \var P_BIND_NO_RECORD
+ * \ingroup term
+ * Do not record the binding to be undone during back-tracking.
+ */
+
+/**
+ * \brief Binds the variable \a var to \a value.
+ *
+ * Returns non-zero if the bind was successful, or zero if \a var
+ * is already bound, if \a var is not a variable, or if creating
+ * the binding would introduce a circularity into \a value.
+ *
+ * If \a flags does not contain P_BIND_NO_OCCURS_CHECK, then the
+ * bind will fail if \a var occurs within \a value as performing
+ * the binding will create a circularity.
+ *
+ * If \a flags does not contain P_BIND_NO_RECORD, then the binding
+ * will be recorded in \a context for back-tracking purposes.
+ *
+ * \ingroup term
+ * \sa p_term_create_variable()
+ */
+int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags)
+{
+    if (!var)
+        return 0;
+    var = p_term_deref_non_null(var);
+    if ((var->header.type & P_TERM_VARIABLE) == 0)
+        return 0;
+    if ((flags & P_BIND_NO_OCCURS_CHECK) == 0) {
+        if (p_term_occurs_in(var, value))
+            return 0;
+    }
+    if ((flags & P_BIND_NO_RECORD) == 0) {
+        if (!p_term_record_binding(context, var))
+            return 0;
+    }
+    var->var.value = value;
+    return 1;
 }
 
 /*\@}*/

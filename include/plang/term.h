@@ -34,12 +34,19 @@ enum {
     P_TERM_LIST,
     P_TERM_ATOM,
     P_TERM_STRING,
-    P_TERM_VARIABLE,
-    P_TERM_TYPED_VARIABLE,
-    P_TERM_MEMBER_VARIABLE,
     P_TERM_INTEGER,
     P_TERM_REAL,
-    P_TERM_OBJECT
+    P_TERM_OBJECT,
+
+    P_TERM_VARIABLE         = 16,   /* Used as a flag for all vars */
+    P_TERM_TYPED_VARIABLE,
+    P_TERM_MEMBER_VARIABLE,
+};
+
+enum {
+    P_BIND_DEFAULT          = 0x0000,
+    P_BIND_NO_OCCURS_CHECK  = 0x0001,
+    P_BIND_NO_RECORD        = 0x0002
 };
 
 p_term *p_term_create_functor(p_context *context, p_term *name, int arg_count);
@@ -79,6 +86,8 @@ p_term *p_term_property(p_context *context, const p_term *term, const p_term *na
 p_term *p_term_own_property(p_context *context, const p_term *term, const p_term *name);
 p_term *p_term_class_name(p_context *context, const p_term *term);
 int p_term_is_instance(p_context *context, const p_term *term, const p_term *class_name);
+
+int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
 
 #ifdef __cplusplus
 };

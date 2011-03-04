@@ -123,6 +123,7 @@ static void test_integer()
     p_term *int3;
     p_term *int4;
     p_term *int5;
+    p_term *var;
 
     int1 = p_term_create_integer(context, 0);
     P_VERIFY(int1 != 0);
@@ -146,6 +147,14 @@ static void test_integer()
     P_COMPARE(p_term_integer_value(int3), -124);
     P_COMPARE(p_term_integer_value(int4), 0x7fffffff);
     P_COMPARE(p_term_integer_value(int5), (int)(-0x7fffffff - 1));
+
+    P_COMPARE(p_term_integer_value(0), 0);
+
+    var = p_term_create_variable(context);
+    P_COMPARE(p_term_integer_value(var), 0);
+
+    P_VERIFY(p_term_bind_variable(context, var, int2, P_BIND_DEFAULT));
+    P_COMPARE(p_term_integer_value(var), 124);
 }
 
 static void test_real()
@@ -155,6 +164,7 @@ static void test_real()
     p_term *real3;
     p_term *real4;
     p_term *real5;
+    p_term *var;
 
     real1 = p_term_create_real(context, 0.0);
     P_VERIFY(real1 != 0);
@@ -178,6 +188,14 @@ static void test_real()
     P_COMPARE(p_term_real_value(real3), -124.5);
     P_COMPARE(p_term_real_value(real4), 1e12);
     P_COMPARE(p_term_real_value(real5), 1e-12)
+
+    P_COMPARE(p_term_real_value(0), 0.0);
+
+    var = p_term_create_variable(context);
+    P_COMPARE(p_term_real_value(var), 0.0);
+
+    P_VERIFY(p_term_bind_variable(context, var, real2, P_BIND_DEFAULT));
+    P_COMPARE(p_term_real_value(var), 124.0);
 }
 
 static void test_list()
@@ -188,6 +206,7 @@ static void test_list()
     p_term *nil;
     p_term *list1;
     p_term *list2;
+    p_term *var;
 
     member1 = p_term_create_atom(context, "foo");
     member2 = p_term_create_string(context, "bar");
@@ -206,6 +225,17 @@ static void test_list()
     P_VERIFY(p_term_head(p_term_tail(list2)) == member2);
     P_VERIFY(p_term_head(p_term_tail(p_term_tail(list2))) == member3);
     P_VERIFY(p_term_tail(p_term_tail(p_term_tail(list2))) == nil);
+
+    P_VERIFY(p_term_head(0) == 0);
+    P_VERIFY(p_term_tail(0) == 0);
+
+    var = p_term_create_variable(context);
+    P_VERIFY(p_term_head(var) == 0);
+    P_VERIFY(p_term_tail(var) == 0);
+
+    P_VERIFY(p_term_bind_variable(context, var, list1, P_BIND_DEFAULT));
+    P_VERIFY(p_term_head(var) == member1);
+    P_VERIFY(p_term_tail(var) == nil);
 }
 
 int main(int argc, char *argv[])

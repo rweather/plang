@@ -81,16 +81,16 @@ struct p_term_var {
    information in "constraint" and "functor_name" */
 struct p_term_typed_var {
     struct p_term_header header;
+    p_term *value;
     struct p_term_header constraint;
     p_term *functor_name;               /* Must be an atom or null */
-    p_term *value;
 };
 
 struct p_term_member_var {
     struct p_term_header header;
+    p_term *value;
     p_term *object;
     p_term *name;                       /* Must be an atom */
-    p_term *value;
 };
 
 struct p_term_integer {
