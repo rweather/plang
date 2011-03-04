@@ -330,6 +330,80 @@ static void test_member_variable()
     P_VERIFY(p_term_object(var1) == object);
 }
 
+static void test_functor()
+{
+    p_term *functor1;
+    p_term *functor2;
+    p_term *name;
+    p_term *vars[5];
+
+    name = p_term_create_atom(context, "foo");
+    vars[0] = p_term_create_variable(context);
+    vars[1] = p_term_create_variable(context);
+    vars[2] = p_term_create_variable(context);
+    vars[3] = p_term_create_variable(context);
+    vars[4] = p_term_create_variable(context);
+
+    P_VERIFY(p_term_create_functor(context, 0, 0) == 0);
+    P_VERIFY(p_term_create_functor(context, name, -1) == 0);
+    P_VERIFY(p_term_create_functor(context, vars[0], 0) == 0);
+
+    P_VERIFY(p_term_create_functor(context, name, 0) == name);
+
+    functor1 = p_term_create_functor(context, name, 5);
+    P_COMPARE(p_term_type(functor1), P_TERM_FUNCTOR);
+    P_VERIFY(p_term_functor(functor1) == name);
+    P_COMPARE(p_term_arg_count(functor1), 5);
+    P_VERIFY(strcmp(p_term_name(functor1), "foo") == 0);
+
+    P_VERIFY(p_term_arg(functor1, -1) == 0);
+    P_VERIFY(p_term_arg(functor1, 0) == 0);
+    P_VERIFY(p_term_arg(functor1, 1) == 0);
+    P_VERIFY(p_term_arg(functor1, 2) == 0);
+    P_VERIFY(p_term_arg(functor1, 3) == 0);
+    P_VERIFY(p_term_arg(functor1, 4) == 0);
+    P_VERIFY(p_term_arg(functor1, 5) == 0);
+
+    P_VERIFY(!p_term_bind_functor_arg(0, 0, vars[0]));
+    P_VERIFY(!p_term_bind_functor_arg(vars[0], 0, vars[1]));
+    P_VERIFY(!p_term_bind_functor_arg(functor1, 0, 0));
+
+    P_VERIFY(!p_term_bind_functor_arg(functor1, -1, vars[0]));
+    P_VERIFY(p_term_bind_functor_arg(functor1, 0, vars[0]));
+    P_VERIFY(p_term_bind_functor_arg(functor1, 1, vars[1]));
+    P_VERIFY(p_term_bind_functor_arg(functor1, 2, vars[2]));
+    P_VERIFY(p_term_bind_functor_arg(functor1, 3, vars[3]));
+    P_VERIFY(p_term_bind_functor_arg(functor1, 4, vars[4]));
+    P_VERIFY(!p_term_bind_functor_arg(functor1, 5, vars[4]));
+
+    P_VERIFY(!p_term_bind_functor_arg(functor1, 3, vars[3]));
+
+    P_VERIFY(p_term_arg(functor1, -1) == 0);
+    P_VERIFY(p_term_arg(functor1, 0) == vars[0]);
+    P_VERIFY(p_term_arg(functor1, 1) == vars[1]);
+    P_VERIFY(p_term_arg(functor1, 2) == vars[2]);
+    P_VERIFY(p_term_arg(functor1, 3) == vars[3]);
+    P_VERIFY(p_term_arg(functor1, 4) == vars[4]);
+    P_VERIFY(p_term_arg(functor1, 5) == 0);
+
+    functor2 = p_term_create_functor_with_args(context, name, vars, 5);
+    P_COMPARE(p_term_type(functor2), P_TERM_FUNCTOR);
+    P_VERIFY(p_term_functor(functor2) == name);
+    P_COMPARE(p_term_arg_count(functor2), 5);
+    P_VERIFY(strcmp(p_term_name(functor2), "foo") == 0);
+
+    P_VERIFY(p_term_arg(functor2, -1) == 0);
+    P_VERIFY(p_term_arg(functor2, 0) == vars[0]);
+    P_VERIFY(p_term_arg(functor2, 1) == vars[1]);
+    P_VERIFY(p_term_arg(functor2, 2) == vars[2]);
+    P_VERIFY(p_term_arg(functor2, 3) == vars[3]);
+    P_VERIFY(p_term_arg(functor2, 4) == vars[4]);
+    P_VERIFY(p_term_arg(functor2, 5) == 0);
+
+    P_VERIFY(p_term_create_functor_with_args(context, name, vars, 0) == name);
+    P_VERIFY(p_term_create_functor_with_args(context, vars[0], vars, 0) == 0);
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -344,6 +418,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(variable);
     P_TEST_RUN(typed_variable);
     P_TEST_RUN(member_variable);
+    P_TEST_RUN(functor);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

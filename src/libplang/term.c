@@ -149,6 +149,7 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  *
  * \ingroup term
  * \sa p_term_create_functor_with_args(), p_term_bind_functor_arg()
+ * \sa p_term_functor(), p_term_arg()
  */
 p_term *p_term_create_functor(p_context *context, p_term *name, int arg_count)
 {
@@ -577,7 +578,7 @@ int p_term_type(const p_term *term)
  * The \a term is automatically dereferenced.
  *
  * \ingroup term
- * \sa p_term_create_functor(), p_term_deref()
+ * \sa p_term_create_functor(), p_term_deref(), p_term_arg()
  */
 int p_term_arg_count(const p_term *term)
 {
@@ -629,6 +630,28 @@ const char *p_term_name(const p_term *term)
 }
 
 /**
+ * \brief Returns the atom name of the functor \a term, or null
+ * if \a term is not a functor.
+ *
+ * The \a term is automatically dereferenced.
+ *
+ * \ingroup term
+ * \sa p_term_create_functor(), p_term_arg()
+ */
+p_term *p_term_functor(const p_term *term)
+{
+    if (!term)
+        return 0;
+    /* Short-cut: avoid the dereference if already a functor */
+    if (term->header.type != P_TERM_FUNCTOR) {
+        term = p_term_deref_non_null(term);
+        if (term->header.type != P_TERM_FUNCTOR)
+            return 0;
+    }
+    return term->functor.functor_name;
+}
+
+/**
  * \brief Returns the argument at position \a index within the
  * functor \a term, or null if \a term is not a functor or
  * \a index is out of range.
@@ -636,7 +659,7 @@ const char *p_term_name(const p_term *term)
  * The \a term is automatically dereferenced.
  *
  * \ingroup term
- * \sa p_term_create_functor()
+ * \sa p_term_create_functor(), p_term_functor()
  */
 p_term *p_term_arg(const p_term *term, int index)
 {
