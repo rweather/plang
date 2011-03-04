@@ -85,8 +85,10 @@ p_term *p_term_create_class_object(p_context *context, p_term *class_name, p_ter
 int p_term_add_property(p_context *context, p_term *term, p_term *name, p_term *value);
 p_term *p_term_property(p_context *context, const p_term *term, const p_term *name);
 p_term *p_term_own_property(p_context *context, const p_term *term, const p_term *name);
-p_term *p_term_class_name(p_context *context, const p_term *term);
-int p_term_is_instance(p_context *context, const p_term *term, const p_term *class_name);
+int p_term_is_instance_object(p_context *context, const p_term *term);
+int p_term_is_class_object(p_context *context, const p_term *term);
+int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2);
+int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2);
 
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
 

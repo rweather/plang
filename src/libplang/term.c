@@ -812,7 +812,7 @@ p_term *p_term_object(const p_term *term)
  *
  * \ingroup term
  * \sa p_term_create_class_object(), p_term_add_property()
- * \sa p_term_is_instance()
+ * \sa p_term_is_instance_object()
  */
 p_term *p_term_create_object(p_context *context, p_term *prototype)
 {
@@ -841,6 +841,7 @@ p_term *p_term_create_object(p_context *context, p_term *prototype)
  *
  * \ingroup term
  * \sa p_term_create_object(), p_term_add_property()
+ * \sa p_term_is_class_object()
  */
 p_term *p_term_create_class_object(p_context *context, p_term *class_name, p_term *prototype)
 {
@@ -1006,78 +1007,102 @@ p_term *p_term_own_property(p_context *context, const p_term *term, const p_term
 }
 
 /**
- * \brief Returns the name of the class \a term is an instance of.
- * If \a term is a class object, then the class name is returned.
+ * \brief Returns non-zero if \a term is an object within \a context
+ * and \a term is not a class object, zero otherwise.
  *
- * This function is equivalent to fetching the "className"
- * property from \a term or its prototype.
+ * The \a term is automatically dereferenced.
  *
  * \ingroup term
- * \sa p_term_create_object(), p_term_is_instance()
+ * \sa p_term_create_object(), p_term_is_class_object()
+ * \sa p_term_inherits()
  */
-p_term *p_term_class_name(p_context *context, const p_term *term)
+int p_term_is_instance_object(p_context *context, const p_term *term)
 {
-    p_term *name = context->class_name_atom;
-    p_term *pname = context->prototype_atom;
-    while (term) {
-        /* The class name will be either the first or second
-         * property in the object, and the prototype will always
-         * be the first property in the object if it is present */
+    p_term *name;
+    if (!term)
+        return 0;
+    if (term->header.type != P_TERM_OBJECT) {
         term = p_term_deref_non_null(term);
         if (term->header.type != P_TERM_OBJECT)
-            break;
-        if (term->object.properties[0].name == name)
-            return term->object.properties[0].value;
-        if (term->object.properties[1].name == name)
-            return term->object.properties[1].value;
-        if (term->object.properties[0].name != pname)
-            break;
-        term = term->object.properties[0].value;
+            return 0;
     }
+    name = context->class_name_atom;
+    return term->object.properties[0].name != name &&
+           term->object.properties[1].name != name;
+}
+
+/**
+ * \brief Returns non-zero if \a term is a class object within
+ * \a context, zero otherwise.
+ *
+ * The \a term is automatically dereferenced.
+ *
+ * \ingroup term
+ * \sa p_term_create_object(), p_term_inherits()
+ * \sa p_term_is_instance_object()
+ */
+int p_term_is_class_object(p_context *context, const p_term *term)
+{
+    p_term *name;
+    if (!term)
+        return 0;
+    if (term->header.type != P_TERM_OBJECT) {
+        term = p_term_deref_non_null(term);
+        if (term->header.type != P_TERM_OBJECT)
+            return 0;
+    }
+    name = context->class_name_atom;
+    return term->object.properties[0].name == name ||
+           term->object.properties[1].name == name;
+}
+
+/**
+ * \brief Returns non-zero if \a term1 inherits from \a term2
+ * within \a context, zero otherwise.
+ *
+ * The terms are automatically dereferenced.
+ *
+ * \ingroup term
+ * \sa p_term_is_class_object(), p_term_is_instance_of()
+ */
+int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2)
+{
+    p_term *pname = context->prototype_atom;
+    if (!term1 || !term2)
+        return 0;
+    term2 = p_term_deref_non_null(term2);
+    if (term2->header.type != P_TERM_OBJECT)
+        return 0;
+    do {
+        term1 = p_term_deref_non_null(term1);
+        if (term1 == term2)
+            return 1;
+        if (term1->header.type != P_TERM_OBJECT)
+            break;
+        if (term1->object.properties[0].name != pname)
+            break;
+        term1 = term1->object.properties[0].value;
+    } while (term1 != 0);
     return 0;
 }
 
 /**
- * \brief Returns non-zero if \a term is an instance of
- * \a class_name; zero otherwise.
+ * \brief Returns non-zero if \a term1 is an instance of \a term2,
+ * zero otherwise.
  *
- * The \a class_name can be an atom, the class object for the class
- * being tested, or another object instance of the same class.
+ * The terms are automatically dereferenced.  The \a term1 must be
+ * an instance object, and \a term2 must be a class object.
  *
  * \ingroup term
- * \sa p_term_create_object(), p_term_class_name()
+ * \sa p_term_is_class_object(), p_term_is_instance_of()
  */
-int p_term_is_instance(p_context *context, const p_term *term, const p_term *class_name)
+int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2)
 {
-    p_term *name = context->class_name_atom;
-    p_term *pname = context->prototype_atom;
-    if (!class_name)
+    if (!p_term_is_instance_object(context, term1))
         return 0;
-    class_name = p_term_deref_non_null(class_name);
-    if (class_name->header.type == P_TERM_OBJECT) {
-        class_name = p_term_class_name(context, class_name);
-        if (!class_name)
-            return 0;
-    }
-    while (term) {
-        /* The class name will be either the first or second
-         * property in the object, and the prototype will always
-         * be the first property in the object if it is present */
-        term = p_term_deref_non_null(term);
-        if (term->header.type != P_TERM_OBJECT)
-            break;
-        if (term->object.properties[0].name == name) {
-            if (term->object.properties[0].value == class_name)
-                return 1;
-        } else if (term->object.properties[1].name == name) {
-            if (term->object.properties[1].value == class_name)
-                return 1;
-        }
-        if (term->object.properties[0].name != pname)
-            break;
-        term = term->object.properties[0].value;
-    }
-    return 0;
+    if (!p_term_is_class_object(context, term2))
+        return 0;
+    return p_term_inherits(context, term1, term2);
 }
 
 /* Perform an occurs check */

@@ -404,6 +404,119 @@ static void test_functor()
     P_VERIFY(p_term_create_functor_with_args(context, vars[0], vars, 0) == 0);
 }
 
+static void test_object()
+{
+    p_term *base_atom;
+    p_term *base_class;
+    p_term *sub_atom;
+    p_term *sub_class;
+    p_term *obj1;
+    p_term *obj2;
+    p_term *prop_atom;
+    p_term *prop_value;
+    int index;
+    char namebuf[64];
+
+    base_atom = p_term_create_atom(context, "Base");
+    sub_atom = p_term_create_atom(context, "Sub");
+
+    base_class = p_term_create_class_object(context, base_atom, 0);
+    P_COMPARE(p_term_type(base_class), P_TERM_OBJECT);
+    P_VERIFY(p_term_is_class_object(context, base_class));
+    P_VERIFY(!p_term_is_instance_object(context, base_class));
+    P_VERIFY(p_term_inherits(context, base_class, base_class));
+
+    P_VERIFY(p_term_property(context, base_class, p_term_prototype_atom(context)) == 0);
+    P_VERIFY(p_term_property(context, base_class, p_term_class_name_atom(context)) == base_atom);
+
+    P_VERIFY(p_term_own_property(context, base_class, p_term_prototype_atom(context)) == 0);
+    P_VERIFY(p_term_own_property(context, base_class, p_term_class_name_atom(context)) == base_atom);
+
+    sub_class = p_term_create_class_object(context, sub_atom, base_class);
+    P_COMPARE(p_term_type(sub_class), P_TERM_OBJECT);
+    P_VERIFY(p_term_is_class_object(context, sub_class));
+    P_VERIFY(!p_term_is_instance_object(context, sub_class));
+    P_VERIFY(p_term_inherits(context, sub_class, base_class));
+    P_VERIFY(p_term_inherits(context, sub_class, sub_class));
+    P_VERIFY(!p_term_inherits(context, base_class, sub_class));
+    P_VERIFY(!p_term_is_instance_of(context, sub_class, base_class));
+
+    P_VERIFY(p_term_property(context, sub_class, p_term_prototype_atom(context)) == base_class);
+    P_VERIFY(p_term_property(context, sub_class, p_term_class_name_atom(context)) == sub_atom);
+
+    P_VERIFY(p_term_own_property(context, sub_class, p_term_prototype_atom(context)) == base_class);
+    P_VERIFY(p_term_own_property(context, sub_class, p_term_class_name_atom(context)) == sub_atom);
+
+    obj1 = p_term_create_object(context, base_class);
+    P_COMPARE(p_term_type(obj1), P_TERM_OBJECT);
+    P_VERIFY(!p_term_is_class_object(context, obj1));
+    P_VERIFY(p_term_is_instance_object(context, obj1));
+    P_VERIFY(p_term_inherits(context, obj1, base_class));
+    P_VERIFY(p_term_is_instance_of(context, obj1, base_class));
+
+    P_VERIFY(p_term_property(context, obj1, p_term_prototype_atom(context)) == base_class);
+    P_VERIFY(p_term_property(context, obj1, p_term_class_name_atom(context)) == base_atom);
+
+    P_VERIFY(p_term_own_property(context, obj1, p_term_prototype_atom(context)) == base_class);
+    P_VERIFY(p_term_own_property(context, obj1, p_term_class_name_atom(context)) == 0);
+
+    obj2 = p_term_create_object(context, sub_class);
+    P_COMPARE(p_term_type(obj2), P_TERM_OBJECT);
+    P_VERIFY(!p_term_is_class_object(context, obj2));
+    P_VERIFY(p_term_is_instance_object(context, obj2));
+    P_VERIFY(p_term_inherits(context, obj2, base_class));
+    P_VERIFY(p_term_inherits(context, obj2, sub_class));
+    P_VERIFY(p_term_is_instance_of(context, obj2, base_class));
+    P_VERIFY(p_term_is_instance_of(context, obj2, sub_class));
+    P_VERIFY(!p_term_is_instance_of(context, obj2, obj2));
+
+    P_VERIFY(p_term_property(context, obj2, p_term_prototype_atom(context)) == sub_class);
+    P_VERIFY(p_term_property(context, obj2, p_term_class_name_atom(context)) == sub_atom);
+
+    P_VERIFY(p_term_own_property(context, obj2, p_term_prototype_atom(context)) == sub_class);
+    P_VERIFY(p_term_own_property(context, obj2, p_term_class_name_atom(context)) == 0);
+
+    for (index = 1; index < 100; ++index) {
+        sprintf(namebuf, "name%d", index);
+        prop_atom = p_term_create_atom(context, namebuf);
+        prop_value = p_term_create_integer(context, index);
+        P_VERIFY(p_term_add_property(context, obj2, prop_atom, prop_value));
+    }
+    for (index = 99; index >= 1; --index) {
+        sprintf(namebuf, "name%d", index);
+        prop_atom = p_term_create_atom(context, namebuf);
+        prop_value = p_term_property(context, obj2, prop_atom);
+        P_COMPARE(p_term_integer_value(prop_value), index);
+        prop_value = p_term_own_property(context, obj2, prop_atom);
+        P_COMPARE(p_term_integer_value(prop_value), index);
+        prop_value = p_term_own_property(context, sub_class, prop_atom);
+        P_VERIFY(prop_value == 0);
+    }
+
+    P_VERIFY(p_term_property(context, obj2, p_term_prototype_atom(context)) == sub_class);
+    P_VERIFY(p_term_property(context, obj2, p_term_class_name_atom(context)) == sub_atom);
+
+    P_VERIFY(p_term_own_property(context, obj2, p_term_prototype_atom(context)) == sub_class);
+    P_VERIFY(p_term_own_property(context, obj2, p_term_class_name_atom(context)) == 0);
+
+    P_VERIFY(!p_term_add_property(context, 0, 0, 0));
+    P_VERIFY(!p_term_add_property(context, obj2, 0, 0));
+    P_VERIFY(!p_term_add_property(context, sub_atom, sub_atom, 0));
+    P_VERIFY(!p_term_add_property(context, obj2, obj1, 0));
+    P_VERIFY(!p_term_add_property(context, obj2, p_term_prototype_atom(context), sub_atom));
+    P_VERIFY(!p_term_add_property(context, obj2, p_term_class_name_atom(context), sub_atom));
+
+    P_VERIFY(!p_term_property(context, 0, 0));
+    P_VERIFY(!p_term_property(context, sub_atom, sub_atom));
+    P_VERIFY(!p_term_property(context, obj2, 0));
+    P_VERIFY(!p_term_property(context, obj2, obj1));
+
+    P_VERIFY(!p_term_own_property(context, 0, 0));
+    P_VERIFY(!p_term_own_property(context, sub_atom, sub_atom));
+    P_VERIFY(!p_term_own_property(context, obj2, 0));
+    P_VERIFY(!p_term_own_property(context, obj2, obj1));
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -419,6 +532,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(typed_variable);
     P_TEST_RUN(member_variable);
     P_TEST_RUN(functor);
+    P_TEST_RUN(object);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();
