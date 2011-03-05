@@ -45,4 +45,44 @@ void p_context_free(p_context *context)
     GC_FREE(context);
 }
 
+/**
+ * \brief Marks the current position in the backtrack trace
+ * in \a context and returns a marker pointer.
+ *
+ * \ingroup context
+ * \sa p_context_backtrace_trace(), p_context_record_in_trace()
+ */
+void *p_context_mark_trace(p_context *context)
+{
+    if (context->trace)
+        return &(context->trace[context->trace_top]);
+    else
+        return 0;
+}
+
+/**
+ * \brief Backtracks the trace in \a context, undoing variable
+ * bindings until \a marker is reached.
+ *
+ * \ingroup context
+ * \sa p_context_mark_trace(), p_context_record_in_trace()
+ */
+void p_context_backtrack_trace(p_context *context, void *marker)
+{
+    /* TODO */
+}
+
+/**
+ * \brief Records \a var in the trace for \a context, as a variable
+ * binding to be undone when p_context_backtrack_trace() is called.
+ *
+ * \ingroup context
+ * \sa p_context_backtrack_trace(), p_context_record_in_trace()
+ */
+int p_context_record_in_trace(p_context *context, p_term *var)
+{
+    /* TODO */
+    return 1;
+}
+
 /*\@}*/

@@ -29,12 +29,25 @@ extern "C" {
 
 #define P_CONTEXT_HASH_SIZE     511
 
+typedef struct p_trace p_trace;
+
 struct p_context
 {
     p_term *nil_atom;
     p_term *prototype_atom;
     p_term *class_name_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
+
+    p_trace *trace;
+    int trace_top;
+};
+
+#define P_TRACE_SIZE 1020
+
+struct p_trace
+{
+    p_term *bindings[P_TRACE_SIZE];
+    p_trace *next;
 };
 
 #ifdef __cplusplus

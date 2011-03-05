@@ -26,8 +26,6 @@
 extern "C" {
 #endif
 
-typedef union p_term p_term;
-
 enum {
     P_TERM_INVALID,
     P_TERM_FUNCTOR,
@@ -46,7 +44,9 @@ enum {
 enum {
     P_BIND_DEFAULT          = 0x0000,
     P_BIND_NO_OCCURS_CHECK  = 0x0001,
-    P_BIND_NO_RECORD        = 0x0002
+    P_BIND_NO_RECORD        = 0x0002,
+    P_BIND_RECORD_ONE_WAY   = 0x0004,
+    P_BIND_EQUALITY         = 0x0008
 };
 
 p_term *p_term_create_functor(p_context *context, p_term *name, int arg_count);
@@ -54,6 +54,7 @@ int p_term_bind_functor_arg(p_term *term, int index, p_term *value);
 p_term *p_term_create_functor_with_args(p_context *context, p_term *name, p_term **args, int arg_count);
 
 p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail);
+void p_term_set_tail(p_term *list, p_term *tail);
 p_term *p_term_create_atom(p_context *context, const char *name);
 p_term *p_term_create_string(p_context *context, const char *str);
 p_term *p_term_create_variable(p_context *context);
@@ -91,6 +92,7 @@ int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2
 int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2);
 
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
+int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags);
 
 #ifdef __cplusplus
 };

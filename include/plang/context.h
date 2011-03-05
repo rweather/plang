@@ -25,9 +25,14 @@ extern "C" {
 #endif
 
 typedef struct p_context p_context;
+typedef union p_term p_term;
 
 p_context *p_context_create(void);
 void p_context_free(p_context *context);
+
+void *p_context_mark_trace(p_context *context);
+void p_context_backtrack_trace(p_context *context, void *marker);
+int p_context_record_in_trace(p_context *context, p_term *var);
 
 #ifdef __cplusplus
 };

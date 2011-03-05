@@ -228,7 +228,7 @@ p_term *p_term_create_functor_with_args(p_context *context, p_term *name, p_term
  * \a context.  Returns the new list.
  *
  * \ingroup term
- * \sa p_term_head(), p_term_tail()
+ * \sa p_term_head(), p_term_tail(), p_term_set_tail()
  */
 p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail)
 {
@@ -239,6 +239,23 @@ p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail)
     term->head = head;
     term->tail = tail;
     return (p_term *)term;
+}
+
+/**
+ * \brief Sets the tail of \a list to \a tail.
+ *
+ * This function is intended for use by parsers that build lists
+ * incrementally from the top down, where the tail of \a list
+ * had previously been set to null.
+ *
+ * \ingroup term
+ * \sa p_term_create_list(), p_term_tail()
+ */
+void p_term_set_tail(p_term *list, p_term *tail)
+{
+    if (!list || list->header.type != P_TERM_LIST)
+        return;
+    list->list.tail = tail;
 }
 
 /**
@@ -1154,14 +1171,6 @@ static int p_term_occurs_in(const p_term *var, const p_term *value)
     return 0;
 }
 
-/* Record a variable binding within the trace.  The variable
- * will be set back to null upon back-tracking */
-static int p_term_record_binding(p_context *context, p_term *var)
-{
-    /* TODO */
-    return 1;
-}
-
 /**
  * \var P_BIND_DEFAULT
  * \ingroup term
@@ -1186,6 +1195,25 @@ static int p_term_record_binding(p_context *context, p_term *var)
  */
 
 /**
+ * \var P_BIND_RECORD_ONE_WAY
+ * \ingroup term
+ * Variables bindings from the first term to the second are not
+ * recorded to be undone during back-tracking, but variable bindings
+ * from the second term to the first are.
+ *
+ * This is typically used when the first term is a newly formed
+ * predicate instance whose free variables will be discarded
+ * upon back-tracking without assistance from the trace.
+ */
+
+/**
+ * \var P_BIND_EQUALITY
+ * \ingroup term
+ * Check the terms for equality but do not perform destructive
+ * unification.
+ */
+
+/**
  * \brief Binds the variable \a var to \a value.
  *
  * Returns non-zero if the bind was successful, or zero if \a var
@@ -1200,7 +1228,7 @@ static int p_term_record_binding(p_context *context, p_term *var)
  * will be recorded in \a context for back-tracking purposes.
  *
  * \ingroup term
- * \sa p_term_create_variable()
+ * \sa p_term_create_variable(), p_term_unify()
  */
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags)
 {
@@ -1214,11 +1242,318 @@ int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int fla
             return 0;
     }
     if ((flags & P_BIND_NO_RECORD) == 0) {
-        if (!p_term_record_binding(context, var))
+        if (!p_context_record_in_trace(context, var))
             return 0;
     }
     var->var.value = value;
     return 1;
+}
+
+/* Internal variable binding where "var" is known to be unbound */
+P_INLINE int p_term_bind_var(p_context *context, p_term *var, p_term *value, int flags)
+{
+    if ((flags & P_BIND_NO_OCCURS_CHECK) == 0) {
+        if (p_term_occurs_in(var, value))
+            return 0;
+    }
+    if ((flags & P_BIND_NO_RECORD) == 0) {
+        if (!p_context_record_in_trace(context, var))
+            return 0;
+    }
+    var->var.value = value;
+    return 1;
+}
+
+/* Forward declaration */
+static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, int flags);
+
+/* Resolve a member variable reference */
+static p_term *p_term_resolve_member(p_context *context, p_term *term, int flags)
+{
+    p_term *object = term->member_var.object;
+    p_term *value;
+    if (!object)
+        return 0;
+    object = p_term_deref_non_null(object);
+    if (object->header.type == P_TERM_MEMBER_VARIABLE) {
+        /* Resolve a nested member reference */
+        object = p_term_resolve_member(context, object, flags);
+        if (!object)
+            return 0;
+        object = p_term_deref_non_null(object);
+    }
+    if (object->header.type != P_TERM_OBJECT)
+        return 0;
+    value = p_term_property(context, object, term->member_var.name);
+    if (!value && term->header.size && (flags & P_BIND_EQUALITY) == 0) {
+        /* Add a new property to the object */
+        value = p_term_create_variable(context);
+        if (!p_term_add_property(context, object,
+                                 term->member_var.name, value))
+            return 0;
+    }
+    return value;
+}
+
+/* Determine if an object is an instance of a specific class name */
+static int p_term_is_instance_of_name(p_context *context, p_term *term, p_term *name)
+{
+    p_term *cname = context->class_name_atom;
+    p_term *pname = context->prototype_atom;
+    if (term->object.properties[0].name == cname ||
+            term->object.properties[1].name == cname)
+        return 0;   /* Object is a class, not an instance */
+    if (term->object.properties[0].name != pname)
+        return 0;
+    term = term->object.properties[0].value;
+    while (term != 0) {
+        term = p_term_deref_non_null(term);
+        if (term->header.type != P_TERM_OBJECT)
+            break;
+        if (term->object.properties[0].name == cname) {
+            if (term->object.properties[0].value == name)
+                return 1;
+        } else if (term->object.properties[1].name == cname) {
+            if (term->object.properties[1].value == name)
+                return 1;
+        }
+        if (term->object.properties[0].name != pname)
+            break;
+        term = term->object.properties[0].value;
+    }
+    return 0;
+}
+
+/* Unify an unbound variable against a term */
+static int p_term_unify_variable(p_context *context, p_term *term1, p_term *term2, int flags)
+{
+    /* Resolve member variable references */
+    if (term1->header.type == P_TERM_MEMBER_VARIABLE) {
+        term1 = p_term_resolve_member(context, term1, flags);
+        return p_term_unify_inner(context, term1, term2, flags);
+    }
+    if (term2->header.type == P_TERM_MEMBER_VARIABLE) {
+        term2 = p_term_resolve_member(context, term2, flags);
+        return p_term_unify_inner(context, term1, term2, flags);
+    }
+
+    /* Bail out if unification is supposed to be non-destructive */
+    if (flags & P_BIND_EQUALITY)
+        return 0;
+
+    /* Handle typed variables */
+    if (term1->header.type == P_TERM_TYPED_VARIABLE) {
+        switch (term2->header.type) {
+        case P_TERM_FUNCTOR:
+            /* "X : functor" or "X : name/arity" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_FUNCTOR)
+                return 0;
+            if (term1->typed_var.constraint.size > 0) {
+                if (term2->header.size !=
+                        term1->typed_var.constraint.size)
+                    return 0;
+                if (term2->functor.functor_name !=
+                        term1->typed_var.functor_name)
+                    return 0;
+            }
+            break;
+        case P_TERM_LIST:
+            /* "X : list" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_LIST)
+                return 0;
+            break;
+        case P_TERM_ATOM:
+            /* "X : atom" or "X : list" constraint */
+            if (term1->typed_var.constraint.type == P_TERM_LIST) {
+                /* Can bind the nil atom to a list type constraint */
+                if (term2 == context->nil_atom)
+                    break;
+                return 0;
+            } else if (term1->typed_var.constraint.type != P_TERM_ATOM) {
+                /* Expecting something other than an atom */
+                return 0;
+            }
+            break;
+        case P_TERM_STRING:
+            /* "X : string" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_STRING)
+                return 0;
+            break;
+        case P_TERM_INTEGER:
+            /* "X : int" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_INTEGER)
+                return 0;
+            break;
+        case P_TERM_REAL:
+            /* "X : real" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_REAL)
+                return 0;
+            break;
+        case P_TERM_OBJECT:
+            /* "X : object" or "X : classname" constraint */
+            if (term1->typed_var.constraint.type != P_TERM_OBJECT)
+                return 0;
+            if (term1->typed_var.functor_name) {
+                /* Must be an instance of a specific class */
+                if (!p_term_is_instance_of_name
+                        (context, term2, term1->typed_var.functor_name))
+                    return 0;
+            }
+            break;
+        case P_TERM_VARIABLE:
+            /* Bind the free variable to the typed variable */
+            return p_term_bind_var(context, term2, term1, flags);
+        case P_TERM_TYPED_VARIABLE:
+            /* Bind the looser type contraint to the tighter */
+            if (term1->typed_var.constraint.type !=
+                    term2->typed_var.constraint.type)
+                return 0;
+            if (term1->typed_var.constraint.type == P_TERM_FUNCTOR) {
+                if (term1->typed_var.constraint.size > 0) {
+                    if (term2->typed_var.constraint.size > 0) {
+                        if (term1->typed_var.constraint.size !=
+                                term2->typed_var.constraint.size)
+                            return 0;
+                        if (term1->typed_var.functor_name !=
+                                term2->typed_var.functor_name)
+                            return 0;
+                    } else {
+                        return p_term_bind_var
+                            (context, term2, term1, flags);
+                    }
+                }
+            } else if (term1->typed_var.constraint.type == P_TERM_OBJECT) {
+                if (term1->typed_var.functor_name) {
+                    if (term2->typed_var.functor_name) {
+                        /* FIXME: because the class names are atoms,
+                         * not objects, it isn't possible to check
+                         * for inheritance relationships here.  Should
+                         * be able to fix this in the future once we
+                         * have a class database */
+                        if (term1->typed_var.functor_name !=
+                                term2->typed_var.functor_name)
+                            return 0;
+                    } else {
+                        return p_term_bind_var
+                            (context, term2, term1, flags);
+                    }
+                }
+            }
+            break;
+        default: return 0;
+        }
+    }
+
+    /* Bind the variable and return */
+    if (flags & P_BIND_RECORD_ONE_WAY)
+        flags |= P_BIND_NO_RECORD;
+    return p_term_bind_var(context, term1, term2, flags);
+}
+
+/* Inner implementation of unification */
+static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, int flags)
+{
+    if (!term1 || !term2)
+        return 0;
+    term1 = p_term_deref_non_null(term1);
+    term2 = p_term_deref_non_null(term2);
+    if (term1 == term2)
+        return 1;
+    if (term1->header.type & P_TERM_VARIABLE)
+        return p_term_unify_variable(context, term1, term2, flags);
+    if (term2->header.type & P_TERM_VARIABLE) {
+        return p_term_unify_variable
+            (context, term2, term1, flags & ~P_BIND_RECORD_ONE_WAY);
+    }
+    switch (term1->header.type) {
+    case P_TERM_FUNCTOR:
+        /* Functor must have the same name and number of arguments */
+        if (term2->header.type == P_TERM_FUNCTOR &&
+                term1->header.size == term2->header.size &&
+                term1->functor.functor_name ==
+                        term2->functor.functor_name) {
+            unsigned int index;
+            for (index = 0; index < term1->header.size; ++index) {
+                if (!p_term_unify_inner
+                        (context, term1->functor.arg[index],
+                         term2->functor.arg[index], flags))
+                    return 0;
+            }
+            return 1;
+        }
+        break;
+    case P_TERM_LIST:
+        /* Unify the head and tail components of the list,
+         * while trying to reduce recursion depth */
+        if (term2->header.type != P_TERM_LIST)
+            return 0;
+        for (;;) {
+            if (!p_term_unify_inner(context, term1->list.head,
+                                    term2->list.head, flags))
+                break;
+            term1 = term1->list.tail;
+            term2 = term2->list.tail;
+            if (!term1 || !term2)
+                break;
+            term1 = p_term_deref_non_null(term1);
+            term2 = p_term_deref_non_null(term2);
+            if (term1->header.type != P_TERM_LIST ||
+                    term2->header.type != P_TERM_LIST)
+                return p_term_unify_inner(context, term1, term2, flags);
+        }
+        break;
+    case P_TERM_ATOM:
+        /* Atoms can unify only if their pointers are identical.
+         * Identity has already been checked, so fail */
+        break;
+    case P_TERM_STRING:
+        /* Compare two strings */
+        if (term2->header.type == P_TERM_STRING &&
+                term1->header.size == term2->header.size &&
+                !strcmp(term1->string.name, term2->string.name))
+            return 1;
+        break;
+    case P_TERM_INTEGER:
+        /* Compare two integers */
+        if (term2->header.type == P_TERM_INTEGER) {
+#if defined(P_TERM_64BIT)
+            /* Value is packed into the header, to save memory */
+            return term1->header.size == term2->header.size;
+#else
+            return term1->integer.value == term2->integer.value;
+#endif
+        }
+        break;
+    case P_TERM_REAL:
+        /* Compare two reals */
+        if (term2->header.type == P_TERM_REAL)
+            return term1->real.value == term2->real.value;
+        break;
+    case P_TERM_OBJECT:
+        /* Objects can unify only if their pointers are identical.
+         * Identity has already been checked, so fail */
+        break;
+    default: break;
+    }
+    return 0;
+}
+
+/**
+ * \brief Unifies \a term1 with \a term2 within \a context.
+ *
+ * Returns non-zero if the unify was successful, or zero on failure.
+ * The \a flags control how variables are bound.
+ *
+ * \ingroup term
+ * \sa p_term_bind_variable()
+ */
+int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags)
+{
+    void *marker = p_context_mark_trace(context);
+    int result = p_term_unify_inner(context, term1, term2, flags);
+    if (!result && (flags & P_BIND_NO_RECORD) == 0)
+        p_context_backtrack_trace(context, marker);
+    return result;
 }
 
 /*\@}*/

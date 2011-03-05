@@ -19,8 +19,220 @@
 
 #include "testcase.h"
 #include <plang/term.h>
+#include <config.h>
+#ifdef HAVE_GC_GC_H
+#include <gc/gc.h>
+#elif defined(HAVE_GC_H)
+#include <gc.h>
+#else
+#error "libgc is required to build plang"
+#endif
 
 P_TEST_DECLARE();
+
+enum Token
+{
+    T_Eof,
+    T_Atom,
+    T_Variable,
+    T_LParen,
+    T_RParen,
+    T_LSquare,
+    T_RSquare,
+    T_Comma,
+    T_Bar
+};
+
+#define MAX_VARS    256
+
+struct parse_state
+{
+    p_term *name;
+    p_term *var_names[MAX_VARS];
+    p_term *var_values[MAX_VARS];
+    int num_vars;
+};
+
+static const char *buffer;
+static enum Token token;
+static struct parse_state *state = 0;
+
+static void next_token()
+{
+    int len, ch;
+    char *buf;
+    while (*buffer == ' ' || *buffer == '\t')
+        ++buffer;
+    if (*buffer == '\0') {
+        token = T_Eof;
+        return;
+    }
+    if (*buffer == '(') {
+        token = T_LParen;
+        ++buffer;
+    } else if (*buffer == ')') {
+        token = T_RParen;
+        ++buffer;
+    } else if (*buffer == '[') {
+        if (buffer[1] == ']') {
+            token = T_Atom;
+            state->name = p_term_nil_atom(context);
+            buffer += 2;
+        } else {
+            token = T_LSquare;
+            ++buffer;
+        }
+    } else if (*buffer == ']') {
+        token = T_RSquare;
+        ++buffer;
+    } else if (*buffer == ',') {
+        token = T_Comma;
+        ++buffer;
+    } else if (*buffer == '|') {
+        token = T_Bar;
+        ++buffer;
+    } else if (*buffer >= 'a' && *buffer <= 'z') {
+        len = 1;
+        while ((ch = buffer[len]) != '\0') {
+            if (ch >= 'a' && ch <= 'z')
+                ++len;
+            else if (ch >= 'A' && ch <= 'Z')
+                ++len;
+            else if (ch >= '0' && ch <= '9')
+                ++len;
+            else if (ch == '_')
+                ++len;
+            else
+                break;
+        }
+        buf = (char *)malloc(len + 1);
+        memcpy(buf, buffer, len);
+        buf[len] = '\0';
+        buffer += len;
+        state->name = p_term_create_atom(context, buf);
+        free(buf);
+        token = T_Atom;
+    } else if (*buffer >= 'A' && *buffer <= 'Z') {
+        len = 1;
+        while ((ch = buffer[len]) != '\0') {
+            if (ch >= 'a' && ch <= 'z')
+                ++len;
+            else if (ch >= 'A' && ch <= 'Z')
+                ++len;
+            else if (ch >= '0' && ch <= '9')
+                ++len;
+            else if (ch == '_')
+                ++len;
+            else
+                break;
+        }
+        buf = (char *)malloc(len + 1);
+        memcpy(buf, buffer, len);
+        buf[len] = '\0';
+        buffer += len;
+        state->name = p_term_create_atom(context, buf);
+        free(buf);
+        token = T_Variable;
+    } else {
+        P_FAIL("parse error - invalid token");
+    }
+}
+
+static p_term *parse_expression()
+{
+    p_term *result = 0;
+    switch (token) {
+    case T_Atom:
+        result = state->name;
+        next_token();
+        if (token == T_LParen) {
+            p_term *args[MAX_VARS];
+            int num_args = 0;
+            next_token();
+            while (token != T_RParen) {
+                P_VERIFY(num_args < MAX_VARS);
+                args[num_args++] = parse_expression();
+                if (token == T_Comma)
+                    next_token();
+            }
+            next_token();
+            result = p_term_create_functor_with_args
+                (context, result, args, num_args);
+        }
+        break;
+    case T_Variable: {
+        int index;
+        for (index = 0; index < state->num_vars; ++index) {
+            if (state->var_names[index] == state->name) {
+                result = state->var_values[index];
+                break;
+            }
+        }
+        if (!result) {
+            P_VERIFY(state->num_vars < MAX_VARS);
+            result = p_term_create_named_variable
+                (context, p_term_name(state->name));
+            state->var_names[state->num_vars] = state->name;
+            state->var_values[state->num_vars] = result;
+            ++(state->num_vars);
+        }
+        next_token();
+        break; }
+    case T_LSquare: {
+        p_term *head;
+        p_term *tail = 0;
+        while (token != T_RSquare && token != T_Bar) {
+            head = parse_expression();
+            if (token == T_Comma)
+                next_token();
+            if (tail) {
+                p_term_set_tail
+                    (tail, p_term_create_list(context, head, 0));
+                tail = p_term_tail(tail);
+            } else {
+                result = p_term_create_list(context, head, 0);
+                tail = result;
+            }
+        }
+        P_VERIFY(result != 0);
+        if (token == T_Bar) {
+            next_token();
+            p_term_set_tail(tail, parse_expression());
+        } else {
+            p_term_set_tail(tail, p_term_nil_atom(context));
+        }
+        P_VERIFY(token == T_RSquare);
+        next_token();
+        break; }
+    default:
+        P_FAIL("parse error - expecting an identifier or list");
+        break;
+    }
+    return result;
+}
+
+static void clear_parse_state()
+{
+    if (state) {
+        GC_FREE(state);
+        state = 0;
+    }
+}
+
+static p_term *parse_term(const char *str)
+{
+    p_term *result;
+    clear_parse_state();
+    state = GC_MALLOC_UNCOLLECTABLE(sizeof(struct parse_state));
+    buffer = str;
+    next_token();
+    if (token == T_Eof)
+        P_FAIL("parse error - missing expression");
+    result = parse_expression();
+    if (token != T_Eof)
+        P_FAIL("parse error - expecting eof");
+    return result;
+}
 
 static void test_atom()
 {
@@ -533,6 +745,8 @@ int main(int argc, char *argv[])
     P_TEST_RUN(member_variable);
     P_TEST_RUN(functor);
     P_TEST_RUN(object);
+
+    clear_parse_state();
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();
