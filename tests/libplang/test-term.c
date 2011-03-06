@@ -27,6 +27,7 @@
 #else
 #error "libgc is required to build plang"
 #endif
+#include <stdarg.h>
 
 P_TEST_DECLARE();
 
@@ -35,6 +36,9 @@ enum Token
     T_Eof,
     T_Atom,
     T_Variable,
+    T_String,
+    T_Integer,
+    T_Real,
     T_LParen,
     T_RParen,
     T_LSquare,
@@ -133,6 +137,42 @@ static void next_token()
         state->name = p_term_create_atom(context, buf);
         free(buf);
         token = T_Variable;
+    } else if (*buffer == '"') {
+        ++buffer;
+        len = 0;
+        while (buffer[len] != '\0' && buffer[len] != '"')
+            ++len;
+        buf = (char *)malloc(len + 1);
+        memcpy(buf, buffer, len);
+        buf[len] = '\0';
+        buffer += len;
+        if (*buffer == '"')
+            ++buffer;
+        state->name = p_term_create_string(context, buf);
+        free(buf);
+        token = T_String;
+    } else if (*buffer == '-' || (*buffer >= '0' && *buffer <= '9')) {
+        int is_real = 0;
+        len = 1;
+        while ((ch = buffer[len]) != '\0') {
+            if (ch == '.' || ch == 'e' || ch == 'E' || ch == '-')
+                is_real = 1;
+            else if (ch < '0' || ch > '9')
+                break;
+            ++len;
+        }
+        buf = (char *)malloc(len + 1);
+        memcpy(buf, buffer, len);
+        buf[len] = '\0';
+        buffer += len;
+        if (is_real) {
+            token = T_Real;
+            state->name = p_term_create_real(context, atof(buf));
+        } else {
+            token = T_Integer;
+            state->name = p_term_create_integer(context, atoi(buf));
+        }
+        free(buf);
     } else {
         P_FAIL("parse error - invalid token");
     }
@@ -178,9 +218,16 @@ static p_term *parse_expression()
         }
         next_token();
         break; }
+    case T_String:
+    case T_Integer:
+    case T_Real:
+        result = state->name;
+        next_token();
+        break;
     case T_LSquare: {
         p_term *head;
         p_term *tail = 0;
+        next_token();
         while (token != T_RSquare && token != T_Bar) {
             head = parse_expression();
             if (token == T_Comma)
@@ -222,8 +269,8 @@ static void clear_parse_state()
 static p_term *parse_term(const char *str)
 {
     p_term *result;
-    clear_parse_state();
-    state = GC_MALLOC_UNCOLLECTABLE(sizeof(struct parse_state));
+    if (!state)
+        state = GC_MALLOC_UNCOLLECTABLE(sizeof(struct parse_state));
     buffer = str;
     next_token();
     if (token == T_Eof)
@@ -232,6 +279,42 @@ static p_term *parse_term(const char *str)
     if (token != T_Eof)
         P_FAIL("parse error - expecting eof");
     return result;
+}
+
+struct print_string
+{
+    char *buf;
+    size_t len;
+    size_t max_len;
+};
+
+static void term_print(void *_data, const char *format, ...)
+{
+    struct print_string *data = (struct print_string *)_data;
+    va_list va;
+    int size;
+    va_start(va, format);
+    size = vsnprintf(data->buf + data->len, data->max_len - data->len,
+                     format, va);
+    if (((size_t)size) >= (data->max_len - data->len)) {
+        size_t new_len = (data->len + (size_t)size + 1024) & ~1023;
+        data->buf = (char *)GC_REALLOC(data->buf, new_len);
+        data->max_len = new_len;
+        size = vsnprintf(data->buf + data->len,
+                         data->max_len - data->len, format, va);
+    }
+    data->len += (size_t)size;
+    va_end(va);
+}
+
+static char *term_to_string(p_term *term)
+{
+    struct print_string data;
+    data.buf = (char *)GC_MALLOC(1024);;
+    data.len = 0;
+    data.max_len = 1024;
+    p_term_print(context, term, term_print, &data);
+    return data.buf;
 }
 
 static void test_atom()
@@ -729,6 +812,112 @@ static void test_object()
     P_VERIFY(!p_term_own_property(context, obj2, obj1));
 }
 
+#define P_BIND_FAIL     0x1000
+
+static void test_unify()
+{
+    struct unify_type
+    {
+        const char *row;
+        const char *term1;
+        const char *term2;
+        int flags;
+        const char *result;
+    };
+    static struct unify_type const unify_data[] = {
+        {"null_var", 0, "X", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"var_null", "X", 0, P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"var_atom", "X", "atom", P_BIND_DEFAULT, "atom"},
+        {"atom_var", "atom", "X", P_BIND_DEFAULT, "atom"},
+
+        {"var_var_1", "X", "X", P_BIND_DEFAULT, "X"},
+        {"var_var_2", "X", "Y", P_BIND_DEFAULT, "Y"},
+        {"var_var_3", "X", "Y", P_BIND_EQUALITY | P_BIND_FAIL, 0},
+        {"var_var_4", "X", "X", P_BIND_EQUALITY, "X"},
+
+        {"atom_atom_1", "atom", "mota", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"atom_atom_2", "atom", "atom", P_BIND_DEFAULT, "atom"},
+
+        {"atom_functor_2", "atom", "foo(a)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"atom_functor_3", "foo(a)", "atom", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"atom_functor_4", "atom", "atom()", P_BIND_DEFAULT, "atom"},
+
+        {"functor_functor_1", "foo(a)", "foo(a)", P_BIND_DEFAULT, "foo(a)"},
+        {"functor_functor_2", "foo(a,b)", "foo(a)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"functor_functor_3", "foo(a)", "foo(X)", P_BIND_DEFAULT, "foo(a)"},
+        {"functor_functor_4", "foo(X)", "foo(a)", P_BIND_DEFAULT, "foo(a)"},
+        {"functor_functor_5", "foo(X, Y)", "foo(Y, Z)", P_BIND_DEFAULT, "foo(Z, Z)"},
+        {"functor_functor_6", "foo(a)", "foo(b)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"list_atom_1", "[a]", "a", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"list_atom_2", "[a]", "[]", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"list_list_1", "[]", "[]", P_BIND_DEFAULT, "[]"},
+        {"list_list_2", "[a]", "[a]", P_BIND_DEFAULT, "[a]"},
+        {"list_list_3", "[a]", "[b]", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"list_list_4", "[a|T]", "[a|U]", P_BIND_DEFAULT, "[a|U]"},
+        {"list_list_5", "[a|T]", "[a, b, c]", P_BIND_DEFAULT, "[a, b, c]"},
+        {"list_list_6", "[a, b|T]", "[a, b, c]", P_BIND_DEFAULT, "[a, b, c]"},
+        {"list_list_7", "[a, b|[]]", "[a, b|T]", P_BIND_DEFAULT, "[a, b]"},
+
+        {"string_atom_1", "\"foo\"", "foo", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"string_var_1", "\"foo\"", "Foo", P_BIND_DEFAULT, "\"foo\""},
+        {"string_var_2", "Foo", "\"foo\"", P_BIND_DEFAULT, "\"foo\""},
+
+        {"string_string_1", "\"foo\"", "\"foo\"", P_BIND_DEFAULT, "\"foo\""},
+        {"string_string_2", "\"foo\"", "\"bar\"", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"string_string_3", "\"foo\"", "\"foobar\"", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"int_atom_1", "42", "foo", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"int_var_1", "42", "X", P_BIND_DEFAULT, "42"},
+        {"int_var_2", "X", "42", P_BIND_DEFAULT, "42"},
+
+        {"int_int_1", "42", "42", P_BIND_DEFAULT, "42"},
+        {"int_int_2", "42", "41", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"real_atom_1", "42", "foo", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"real_var_1", "42.5", "X", P_BIND_DEFAULT, "42.5"},
+        {"real_var_2", "X", "42.5", P_BIND_DEFAULT, "42.5"},
+
+        {"real_real_1", "42.5", "42.5", P_BIND_DEFAULT, "42.5"},
+        {"real_real_2", "42.5", "41.5", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+    };
+    #define unify_data_len (sizeof(unify_data) / sizeof(struct unify_type))
+
+    size_t index;
+    p_term *term1;
+    p_term *term2;
+    char *result1;
+    char *result2;
+    int flags, unify_result;
+    for (index = 0; index < unify_data_len; ++index) {
+        void *marker = p_context_mark_trace(context);
+        clear_parse_state();
+        P_TEST_SET_ROW(unify_data[index].row);
+        term1 = unify_data[index].term1
+                    ? parse_term(unify_data[index].term1) : 0;
+        term2 = unify_data[index].term2
+                    ? parse_term(unify_data[index].term2) : 0;
+        flags = unify_data[index].flags;
+        unify_result = p_term_unify(context, term1, term2, flags);
+        if (flags & P_BIND_FAIL) {
+            P_VERIFY(!unify_result);
+        } else {
+            P_VERIFY(unify_result);
+            result1 = term_to_string(term1);
+            result2 = term_to_string(term2);
+            P_VERIFY(!strcmp(result1, unify_data[index].result));
+            P_VERIFY(!strcmp(result2, unify_data[index].result));
+        }
+        p_context_backtrack_trace(context, marker);
+    }
+    clear_parse_state();
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -745,8 +934,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(member_variable);
     P_TEST_RUN(functor);
     P_TEST_RUN(object);
-
-    clear_parse_state();
+    P_TEST_RUN(unify);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();
