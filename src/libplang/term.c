@@ -21,6 +21,8 @@
 #include "term-priv.h"
 #include "context-priv.h"
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 
 #if defined(__cplusplus)
 #define P_INLINE inline
@@ -1554,6 +1556,230 @@ int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags)
     if (!result && (flags & P_BIND_NO_RECORD) == 0)
         p_context_backtrack_trace(context, marker);
     return result;
+}
+
+/**
+ * \typedef p_term_print_func
+ * \ingroup term
+ *
+ * The p_term_print_func function pointer type is used by
+ * p_term_print() to output printf-style formatted data
+ * to an output stream.
+ *
+ * \sa p_term_print(), p_term_stdio_print_func()
+ */
+
+/**
+ * \brief Prints formatted output according to \a format
+ * to the stdio FILE stream \a data.
+ *
+ * \ingroup term
+ * \sa p_term_print(), p_term_print_func
+ */
+void p_term_stdio_print_func(void *data, const char *format, ...)
+{
+    va_list va;
+    va_start(va, format);
+    vfprintf((FILE *)data, format, va);
+    va_end(va);
+}
+
+/* Limited dereference that avoids recursing too far */
+static const p_term *p_term_deref_limited(const p_term *term)
+{
+    int count = 32;
+    if (!term)
+        return 0;
+    while (count-- > 0) {
+        if (term->header.type & P_TERM_VARIABLE) {
+            if (!term->var.value)
+                break;
+            term = term->var.value;
+        } else {
+            break;
+        }
+    }
+    return term;
+}
+
+static void p_term_print_inner(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data, int level)
+{
+    /* Bail out if we have exceeded the maximum recursion depth */
+    if (level <= 0) {
+        (*print_func)(print_data, "...");
+        return;
+    }
+
+    /* Bail out if the term is invalid */
+    if (!term) {
+        (*print_func)(print_data, "NULL");
+        return;
+    }
+
+    /* Determine how to print this type of term */
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR: {
+        /* TODO: operators with precedence and associativity */
+        unsigned int index;
+        (*print_func)(print_data, "%s(",
+                      p_term_name(term->functor.functor_name));
+        for (index = 0; index < term->header.size; ++index) {
+            if (index)
+                (*print_func)(print_data, ", ");
+            p_term_print_inner
+                (context, term->functor.arg[index],
+                 print_func, print_data, level - 1);
+        }
+        (*print_func)(print_data, ")");
+        break; }
+    case P_TERM_LIST:
+        (*print_func)(print_data, "[");
+        p_term_print_inner(context, term->list.head,
+                           print_func, print_data, level - 1);
+        term = p_term_deref_limited(term->list.tail);
+        while (term && term->header.type == P_TERM_LIST && level > 0) {
+            (*print_func)(print_data, ", ");
+            p_term_print_inner(context, term->list.head,
+                               print_func, print_data, level - 1);
+            term = p_term_deref_limited(term->list.tail);
+            --level;
+        }
+        if (level <= 0) {
+            (*print_func)(print_data, "|...]");
+            break;
+        }
+        if (term != context->nil_atom) {
+            (*print_func)(print_data, "|");
+            p_term_print_inner(context, term, print_func,
+                               print_data, level - 1);
+        }
+        (*print_func)(print_data, "]");
+        break;
+    case P_TERM_ATOM:
+        (*print_func)(print_data, "%s", p_term_name(term));
+        break;
+    case P_TERM_STRING:
+        /* TODO: escape special characters */
+        (*print_func)(print_data, "\"%s\"", p_term_name(term));
+        break;
+    case P_TERM_INTEGER:
+        (*print_func)(print_data, "%d", p_term_integer_value(term));
+        break;
+    case P_TERM_REAL:
+        (*print_func)(print_data, "%g", p_term_real_value(term));
+        break;
+    case P_TERM_OBJECT: {
+        p_term *name = p_term_property
+            (context, term, context->class_name_atom);
+        unsigned int index;
+        int first = 1;
+        if (p_term_is_class_object(context, term))
+            (*print_func)(print_data, "class ");
+        if (name)
+            (*print_func)(print_data, "%s {", p_term_name(name));
+        else
+            (*print_func)(print_data, "unknown_class {");
+        do {
+            for (index = 0; index < term->header.size; ++index) {
+                name = term->object.properties[index].name;
+                if (name == context->class_name_atom)
+                    continue;
+                if (name == context->prototype_atom)
+                    continue;
+                if (!first)
+                    (*print_func)(print_data, ", ");
+                (*print_func)(print_data, "%s: ", p_term_name(name));
+                p_term_print_inner
+                    (context, term->object.properties[index].value,
+                     print_func, print_data, level - 1);
+                first = 0;
+            }
+            term = term->object.next;
+        } while (term != 0);
+        (*print_func)(print_data, "}");
+        break; }
+    case P_TERM_VARIABLE:
+        if (term->var.value) {
+            p_term_print_inner(context, term->var.value, print_func,
+                               print_data, level - 1);
+        } else if (term->header.size > 0) {
+            (*print_func)(print_data, "%s", p_term_name(term));
+        } else {
+            (*print_func)(print_data, "_%lx", (long)term);
+        }
+        break;
+    case P_TERM_TYPED_VARIABLE:
+        if (term->var.value) {
+            p_term_print_inner(context, term->var.value, print_func,
+                               print_data, level - 1);
+            break;
+        }
+        if (term->header.size > 0)
+            (*print_func)(print_data, "%s", p_term_name(term));
+        else
+            (*print_func)(print_data, "_%lx", (long)term);
+        switch (term->typed_var.constraint.type) {
+        case P_TERM_FUNCTOR:
+            if (term->typed_var.constraint.size > 0) {
+                (*print_func)(print_data, " : %s/%u",
+                              p_term_name(term->typed_var.functor_name),
+                              term->typed_var.constraint.size);
+            } else {
+                (*print_func)(print_data, " : functor");
+            }
+            break;
+        case P_TERM_LIST:
+            (*print_func)(print_data, " : list");
+            break;
+        case P_TERM_ATOM:
+            (*print_func)(print_data, " : atom");
+            break;
+        case P_TERM_STRING:
+            (*print_func)(print_data, " : string");
+            break;
+        case P_TERM_INTEGER:
+            (*print_func)(print_data, " : int");
+            break;
+        case P_TERM_REAL:
+            (*print_func)(print_data, " : real");
+            break;
+        case P_TERM_OBJECT:
+            if (term->typed_var.constraint.size > 0) {
+                (*print_func)(print_data, " : %s",
+                              p_term_name(term->typed_var.functor_name));
+            } else {
+                (*print_func)(print_data, " : object");
+            }
+            break;
+        }
+        break;
+    case P_TERM_MEMBER_VARIABLE:
+        if (term->var.value) {
+            p_term_print_inner(context, term->var.value, print_func,
+                               print_data, level - 1);
+            break;
+        }
+        p_term_print_inner(context, term->member_var.object, print_func,
+                           print_data, level - 1);
+        (*print_func)(print_data, ".%s", p_term_name(term->member_var.name));
+        break;
+    default: break;
+    }
+}
+
+/**
+ * \brief Prints \a term within \a context to the output stream
+ * defined by \a print_func and \a print_data.
+ *
+ * This function is intended for debugging purposes.  It may refuse
+ * to print some parts of \a term if the recursion depth is too high.
+ *
+ * \ingroup term
+ * \sa p_term_stdio_print_func(), p_term_print_func
+ */
+void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data)
+{
+    p_term_print_inner(context, term, print_func, print_data, 1000);
 }
 
 /*\@}*/

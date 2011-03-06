@@ -94,6 +94,11 @@ int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term 
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
 int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags);
 
+typedef void (*p_term_print_func)(void *data, const char *format, ...);
+void p_term_stdio_print_func(void *data, const char *format, ...);
+
+void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
+
 #ifdef __cplusplus
 };
 #endif
