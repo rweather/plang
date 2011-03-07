@@ -26,6 +26,12 @@
  */
 /*\@{*/
 
+/**
+ * \brief Creates and returns a new execution context.
+ *
+ * \ingroup context
+ * \sa p_context_free()
+ */
 p_context *p_context_create(void)
 {
     GC_INIT();
@@ -39,6 +45,12 @@ p_context *p_context_create(void)
     return context;
 }
 
+/**
+ * \brief Frees an execution \a context.
+ *
+ * \ingroup context
+ * \sa p_context_create()
+ */
 void p_context_free(p_context *context)
 {
     if (!context)
