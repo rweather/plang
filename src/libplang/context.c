@@ -20,6 +20,7 @@
 #include <plang/context.h>
 #include "context-priv.h"
 #include "term-priv.h"
+#include "database-priv.h"
 
 /**
  * \defgroup context Execution Contexts
@@ -42,6 +43,7 @@ p_context *p_context_create(void)
     context->prototype_atom = p_term_create_atom(context, "prototype");
     context->class_name_atom = p_term_create_atom(context, "className");
     context->trace_top = P_TRACE_SIZE;
+    _p_db_init(context);
     return context;
 }
 

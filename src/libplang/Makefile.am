@@ -3,6 +3,8 @@ lib_LTLIBRARIES = libplang.la
 libplang_la_SOURCES = \
 	context.c \
 	context-priv.h \
+	database.c \
+	database-priv.h \
 	term.c \
 	term-priv.h
 

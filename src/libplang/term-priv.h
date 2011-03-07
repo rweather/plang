@@ -71,9 +71,12 @@ struct p_term_list {
     p_term *tail;
 };
 
+typedef struct p_database_info p_database_info;
+
 struct p_term_atom {
     struct p_term_header header;
     p_term *next;
+    p_database_info *db_info;
     char name[1];
 };
 

@@ -1,5 +1,9 @@
 check_PROGRAMS = \
+	test-database \
 	test-term
+
+test_database_SOURCES = test-database.c
+test_database_LDADD   = $(top_builddir)/src/libplang/libplang.la
 
 test_term_SOURCES = test-term.c
 test_term_LDADD   = $(top_builddir)/src/libplang/libplang.la
