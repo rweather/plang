@@ -1,0 +1,107 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file mainpage.dox
+\mainpage
+
+Plang (pronounced "P lang") is a logic programming language,
+which borrows some concepts from
+<a href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>,
+but not all elements of its syntax.
+
+Plang's design differs from other logic programming languages
+in a number of ways.  The following concepts were followed
+when designing the syntax and semantics:
+
+\li Don't be cryptic.
+\li Use conventional syntax to peform conventional tasks.
+\li Context-free BNF grammar.
+\li Modern type concepts such as strings and objects are first-class
+    language features.
+
+Logic programming is a very powerful concept, able to express
+problems in artificial intelligence, theorem proving, and natural
+deduction very compactly.  It is unfortunate that new users are often
+turned off by the cryptic nature of the traditional logic programming
+languages.  The following are some examples (this list is not intended
+to be exhaustive):
+
+\li <a href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>: \c !, <tt>(A -> B ; C)</tt>
+\li <a href="http://www.sics.se/isl/sicstus/docs/latest/html/sicstus.html">SICStus Prolog</a>: <tt>PointObj &gt;&gt; x(InitX)</tt> to fetch the value of the property \c x.
+\li <a href="http://en.wikipedia.org/wiki/Cyc">Cyc</a>: <tt>(#\$capitalCity #\$France #\$Paris)</tt>
+
+A proficient user of these languages will no doubt see no problem
+with the above examples.  However, the learning curve for a new
+user of the language can be quite steep.  This brings us to the
+second concept: use conventional syntax to perform conventional tasks.
+The following are some examples from Plang:
+
+\li \c ! becomes \c stop, indicating that back-tracking search
+    should stop.
+\li <tt>(A -> B ; C)</tt> becomes <tt>if A then B else C</tt>.
+\li \c while, \c loop, and \c for constructs as alternatives to
+    tail recursion.
+\li <tt>X.name = Y</tt> to unify against an object property,
+    or <tt>X.name := Y</tt> to modify an object property.
+
+As an example, consider the traditional Prolog implementation of
+list member testing:
+
+\code
+member(X, [X|T]).
+member(X, [Y|T]) :- member(X, T).
+\endcode
+
+In Plang, this can be expressed as follows:
+
+\code
+member(X, Y) :-
+    loop
+        Y = [H|T],
+        accept if X = H,
+        Y := T
+    end.
+\endcode
+
+The \c accept statement tells the \c loop to accept the current goal
+if the supplied condition is true.  Upon back-tracking, the value of
+\c T is written to \c Y and the loop continues until \c Y no longer
+has the form <tt>[H|T]</tt>.
+
+If we wished to stop searching when the first matching element is
+found, we would instead write:
+
+\code
+member(X, Y) :-
+    loop
+        Y = [H|T],
+        stop if X = H,
+        Y := T
+    end.
+\endcode
+
+While this example may seem verbose compared to its Prolog counterpart,
+it is more obvious as to what it is doing, and closer to how a
+classical programmer thinks about solving the problem.
+Disk and memory space are no longer as constrained as they once were,
+so it isn't necessary to use terse syntax.  It is better to write
+clear code that is readable to the untrained or semi-trained eye.
+
+*/

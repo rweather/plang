@@ -39,6 +39,8 @@ extern "C" {
 #define P_TERM_64BIT    1
 #endif
 
+/** @cond */
+
 struct p_term_header {
 #if defined(P_TERM_64BIT)
     unsigned int type;
@@ -134,6 +136,8 @@ union p_term {
 
 #define p_term_malloc(context, type, size)  ((type *)GC_MALLOC((size)))
 #define p_term_new(context, type)           (GC_NEW(type))
+
+/** @endcond */
 
 #ifdef __cplusplus
 };

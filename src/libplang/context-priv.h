@@ -27,6 +27,8 @@
 extern "C" {
 #endif
 
+/** @cond */
+
 #define P_CONTEXT_HASH_SIZE     511
 
 typedef struct p_trace p_trace;
@@ -49,6 +51,8 @@ struct p_trace
     p_term *bindings[P_TRACE_SIZE];
     p_trace *next;
 };
+
+/** @endcond */
 
 #ifdef __cplusplus
 };
