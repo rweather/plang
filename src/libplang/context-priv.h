@@ -48,9 +48,12 @@ struct p_context
 
 struct p_trace
 {
-    p_term *bindings[P_TRACE_SIZE];
+    void **bindings[P_TRACE_SIZE];
     p_trace *next;
 };
+
+int _p_context_record_in_trace(p_context *context, p_term *var);
+int _p_context_record_contents_in_trace(p_context *context, void **location);
 
 /** @endcond */
 

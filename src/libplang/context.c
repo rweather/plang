@@ -35,6 +35,7 @@ p_context *p_context_create(void)
     context->nil_atom = p_term_create_atom(context, "[]");
     context->prototype_atom = p_term_create_atom(context, "prototype");
     context->class_name_atom = p_term_create_atom(context, "className");
+    context->trace_top = P_TRACE_SIZE;
     return context;
 }
 
@@ -45,17 +46,61 @@ void p_context_free(p_context *context)
     GC_FREE(context);
 }
 
+/* Push a word onto the trace */
+P_INLINE int p_context_push_trace(p_context *context, void **word)
+{
+    if (context->trace_top >= P_TRACE_SIZE) {
+        struct p_trace *trace = GC_NEW(struct p_trace);
+        if (!trace)
+            return 0;
+        trace->next = context->trace;
+        context->trace = trace;
+        context->trace_top = 0;
+    }
+    context->trace->bindings[(context->trace_top)++] = word;
+    return 1;
+}
+
+/* Pop a word from the trace */
+P_INLINE void **p_context_pop_trace(p_context *context, void *marker)
+{
+    void **word;
+    void ***wordp;
+
+    /* Have we reached the marker? */
+    if (!context->trace)
+        return 0;
+    wordp = &(context->trace->bindings[context->trace_top]);
+    if (wordp == (void ***)marker)
+        return 0;
+
+    /* Pop the word and zero it out so that the garbage collector
+     * will forget the reference to the popped word */
+    --(context->trace_top);
+    word = *(--wordp);
+    *wordp = 0;
+
+    /* Free the trace block if it is now empty */
+    if (context->trace_top <= 0) {
+        struct p_trace *trace = context->trace;
+        context->trace = trace->next;
+        context->trace_top = P_TRACE_SIZE;
+        GC_FREE(trace);
+    }
+    return word;
+}
+
 /**
  * \brief Marks the current position in the backtrack trace
  * in \a context and returns a marker pointer.
  *
  * \ingroup context
- * \sa p_context_backtrace_trace(), p_context_record_in_trace()
+ * \sa p_context_backtrace_trace()
  */
 void *p_context_mark_trace(p_context *context)
 {
     if (context->trace)
-        return &(context->trace[context->trace_top]);
+        return (void *)&(context->trace[context->trace_top]);
     else
         return 0;
 }
@@ -65,24 +110,38 @@ void *p_context_mark_trace(p_context *context)
  * bindings until \a marker is reached.
  *
  * \ingroup context
- * \sa p_context_mark_trace(), p_context_record_in_trace()
+ * \sa p_context_mark_trace()
  */
 void p_context_backtrack_trace(p_context *context, void *marker)
 {
-    /* TODO */
+    void **word;
+    while ((word = p_context_pop_trace(context, marker)) != 0) {
+        if (!(((long)word) & 1L)) {
+            /* Reset a regular variable to unbound */
+            *word = 0;
+        } else {
+            /* Restore a previous value from before an assignment */
+            void *value = (void *)p_context_pop_trace(context, marker);
+            word = (void **)(((long)word) & ~1L);
+            *word = value;
+        }
+    }
 }
 
-/**
- * \brief Records \a var in the trace for \a context, as a variable
- * binding to be undone when p_context_backtrack_trace() is called.
- *
- * \ingroup context
- * \sa p_context_backtrack_trace(), p_context_record_in_trace()
- */
-int p_context_record_in_trace(p_context *context, p_term *var)
+int _p_context_record_in_trace(p_context *context, p_term *var)
 {
-    /* TODO */
-    return 1;
+    return p_context_push_trace(context, (void **)&(var->var.value));
+}
+
+int _p_context_record_contents_in_trace(p_context *context, void **location)
+{
+    long loc = ((long)location) | 1L;
+    if (!p_context_push_trace(context, (void **)(*location)))
+        return 0;
+    if (p_context_push_trace(context, (void **)loc))
+        return 1;
+    p_context_pop_trace(context, 0);
+    return 0;
 }
 
 /*\@}*/

@@ -812,7 +812,8 @@ static void test_object()
     P_VERIFY(!p_term_own_property(context, obj2, obj1));
 }
 
-#define P_BIND_FAIL     0x1000
+#define P_BIND_FAIL         0x1000
+#define P_BIND_NO_REVERSE   0x2000
 
 static void test_unify()
 {
@@ -825,8 +826,8 @@ static void test_unify()
         const char *result;
     };
     static struct unify_type const unify_data[] = {
-        {"null_var", 0, "X", P_BIND_DEFAULT | P_BIND_FAIL, 0},
-        {"var_null", "X", 0, P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"null_var", 0, "X", P_BIND_DEFAULT | P_BIND_FAIL | P_BIND_NO_REVERSE, 0},
+        {"var_null", "X", 0, P_BIND_DEFAULT | P_BIND_FAIL | P_BIND_NO_REVERSE, 0},
 
         {"var_atom", "X", "atom", P_BIND_DEFAULT, "atom"},
         {"atom_var", "atom", "X", P_BIND_DEFAULT, "atom"},
@@ -841,10 +842,10 @@ static void test_unify()
 
         {"atom_functor_2", "atom", "foo(a)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
         {"atom_functor_3", "foo(a)", "atom", P_BIND_DEFAULT | P_BIND_FAIL, 0},
-        {"atom_functor_4", "atom", "atom()", P_BIND_DEFAULT, "atom"},
+        {"atom_functor_4", "atom", "atom()", P_BIND_DEFAULT | P_BIND_NO_REVERSE, "atom"},
 
         {"functor_functor_1", "foo(a)", "foo(a)", P_BIND_DEFAULT, "foo(a)"},
-        {"functor_functor_2", "foo(a,b)", "foo(a)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+        {"functor_functor_2", "foo(a, b)", "foo(a)", P_BIND_DEFAULT | P_BIND_FAIL, 0},
         {"functor_functor_3", "foo(a)", "foo(X)", P_BIND_DEFAULT, "foo(a)"},
         {"functor_functor_4", "foo(X)", "foo(a)", P_BIND_DEFAULT, "foo(a)"},
         {"functor_functor_5", "foo(X, Y)", "foo(Y, Z)", P_BIND_DEFAULT, "foo(Z, Z)"},
@@ -859,7 +860,7 @@ static void test_unify()
         {"list_list_4", "[a|T]", "[a|U]", P_BIND_DEFAULT, "[a|U]"},
         {"list_list_5", "[a|T]", "[a, b, c]", P_BIND_DEFAULT, "[a, b, c]"},
         {"list_list_6", "[a, b|T]", "[a, b, c]", P_BIND_DEFAULT, "[a, b, c]"},
-        {"list_list_7", "[a, b|[]]", "[a, b|T]", P_BIND_DEFAULT, "[a, b]"},
+        {"list_list_7", "[a, b|[]]", "[a, b|T]", P_BIND_DEFAULT | P_BIND_NO_REVERSE, "[a, b]"},
 
         {"string_atom_1", "\"foo\"", "foo", P_BIND_DEFAULT | P_BIND_FAIL, 0},
 
@@ -912,8 +913,15 @@ static void test_unify()
             result2 = term_to_string(term2);
             P_VERIFY(!strcmp(result1, unify_data[index].result));
             P_VERIFY(!strcmp(result2, unify_data[index].result));
+            p_context_backtrack_trace(context, marker);
         }
-        p_context_backtrack_trace(context, marker);
+        /* Did the backtrack return to the original state? */
+        if (flags & P_BIND_NO_REVERSE)
+            continue;
+        result1 = term_to_string(term1);
+        result2 = term_to_string(term2);
+        P_VERIFY(!strcmp(result1, unify_data[index].term1));
+        P_VERIFY(!strcmp(result2, unify_data[index].term2));
     }
     clear_parse_state();
 }

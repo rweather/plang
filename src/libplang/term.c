@@ -24,14 +24,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#if defined(__cplusplus)
-#define P_INLINE inline
-#elif defined(__GNUC_GNU_INLINE__) && !defined(__NO_INLINE__)
-#define P_INLINE extern __inline__
-#else
-#define P_INLINE static
-#endif
-
 /* Internal dereference algorithm, which we inline for maximum
  * performance in the functions that use it */
 P_INLINE p_term *p_term_deref_non_null(const p_term *term)
@@ -1244,7 +1236,7 @@ int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int fla
             return 0;
     }
     if ((flags & P_BIND_NO_RECORD) == 0) {
-        if (!p_context_record_in_trace(context, var))
+        if (!_p_context_record_in_trace(context, var))
             return 0;
     }
     var->var.value = value;
@@ -1259,7 +1251,7 @@ P_INLINE int p_term_bind_var(p_context *context, p_term *var, p_term *value, int
             return 0;
     }
     if ((flags & P_BIND_NO_RECORD) == 0) {
-        if (!p_context_record_in_trace(context, var))
+        if (!_p_context_record_in_trace(context, var))
             return 0;
     }
     var->var.value = value;

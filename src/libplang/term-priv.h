@@ -35,6 +35,14 @@
 extern "C" {
 #endif
 
+#if defined(__cplusplus)
+#define P_INLINE inline
+#elif defined(__GNUC_GNU_INLINE__) && !defined(__NO_INLINE__)
+#define P_INLINE extern __inline__
+#else
+#define P_INLINE static
+#endif
+
 #if defined(__WORDSIZE) && __WORDSIZE == 64
 #define P_TERM_64BIT    1
 #endif
