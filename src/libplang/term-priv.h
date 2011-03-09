@@ -49,6 +49,10 @@ extern "C" {
 
 /** @cond */
 
+enum {
+    P_TERM_RENAME       = P_TERM_INVALID
+};
+
 struct p_term_header {
 #if defined(P_TERM_64BIT)
     unsigned int type;
@@ -131,6 +135,11 @@ struct p_term_object {
     struct p_term_property properties[P_TERM_MAX_PROPS];
 };
 
+struct p_term_rename {
+    struct p_term_header header;
+    p_term *var;
+};
+
 union p_term {
     struct p_term_header        header;
     struct p_term_functor       functor;
@@ -143,6 +152,7 @@ union p_term {
     struct p_term_integer       integer;
     struct p_term_real          real;
     struct p_term_object        object;
+    struct p_term_rename        rename;
 };
 
 #define p_term_malloc(context, type, size)  ((type *)GC_MALLOC((size)))

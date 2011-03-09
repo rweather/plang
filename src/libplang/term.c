@@ -1540,7 +1540,7 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
  * The \a flags control how variables are bound.
  *
  * \ingroup term
- * \sa p_term_bind_variable()
+ * \sa p_term_bind_variable(), p_term_clone()
  */
 int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags)
 {
@@ -1916,6 +1916,232 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
     case P_TERM_MEMBER_VARIABLE:
         return (term1 < term2) ? -1 : 1;
     default: break;
+    }
+    return 0;
+}
+
+/**
+ * \brief Returns non-zero if \a term is a ground term without
+ * any unbound variables; zero otherwise.
+ *
+ * Note: objects are considered ground terms, even if their
+ * properties contain unbound variables.
+ *
+ * \ingroup term
+ */
+int p_term_is_ground(const p_term *term)
+{
+    if (!term)
+        return 0;
+    term = p_term_deref_non_null(term);
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR: {
+        unsigned int index;
+        for (index = 0; index < term->header.size; ++index) {
+            if (!p_term_is_ground(term->functor.arg[index]))
+                return 0;
+        }
+        return 1; }
+    case P_TERM_LIST:
+        do {
+            if (!p_term_is_ground(term->list.head))
+                return 0;
+            term = term->list.tail;
+            if (!term)
+                return 0;
+            term = p_term_deref_non_null(term);
+        }
+        while (term->header.type == P_TERM_LIST);
+        return p_term_is_ground(term);
+    case P_TERM_ATOM:
+    case P_TERM_STRING:
+    case P_TERM_INTEGER:
+    case P_TERM_REAL:
+    case P_TERM_OBJECT:
+        return 1;
+    case P_TERM_VARIABLE:
+    case P_TERM_TYPED_VARIABLE:
+    case P_TERM_MEMBER_VARIABLE:
+    case P_TERM_RENAME:
+        return 0;
+    default: break;
+    }
+    return 0;
+}
+
+static p_term *p_term_clone_inner(p_context *context, p_term *term)
+{
+    p_term *clone;
+    p_term *rename;
+    if (!term)
+        return 0;
+    term = p_term_deref_non_null(term);
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR: {
+        /* Clone a functor term */
+        unsigned int index;
+        if (p_term_is_ground(term))
+            break;
+        clone = p_term_create_functor
+            (context, term->functor.functor_name,
+             (int)(term->header.size));
+        if (!clone)
+            return 0;
+        for (index = 0; index < term->header.size; ++index) {
+            p_term *arg = p_term_clone_inner
+                (context, term->functor.arg[index]);
+            if (!arg)
+                return 0;
+            p_term_bind_functor_arg(clone, (int)index, arg);
+        }
+        return clone; }
+    case P_TERM_LIST: {
+        /* Clone a list term */
+        p_term *head;
+        p_term *tail = 0;
+        if (p_term_is_ground(term))
+            break;
+        clone = 0;
+        do {
+            head = p_term_clone_inner(context, term->list.head);
+            if (!head)
+                return 0;
+            head = p_term_create_list(context, head, 0);
+            if (tail)
+                tail->list.tail = head;
+            else
+                clone = head;
+            tail = head;
+            term = term->list.tail;
+            if (!term)
+                return 0;
+            term = p_term_deref_non_null(term);
+        }
+        while (term->header.type == P_TERM_LIST);
+        head = p_term_clone_inner(context, term);
+        if (!head)
+            return 0;
+        tail->list.tail = head;
+        return clone; }
+    case P_TERM_ATOM:
+    case P_TERM_STRING:
+    case P_TERM_INTEGER:
+    case P_TERM_REAL:
+    case P_TERM_OBJECT:
+        /* Constant and object terms are cloned as themselves */
+        break;
+    case P_TERM_VARIABLE:
+        /* Create a new variable and bind the current one
+         * to a rename term so that future references can
+         * quickly reuse the cloned variable */
+        if (term->header.size > 0)
+            clone = p_term_create_named_variable(context, p_term_name(term));
+        else
+            clone = p_term_create_variable(context);
+        if (!clone)
+            return 0;
+        _p_context_record_in_trace(context, term);
+        rename = p_term_malloc
+            (context, p_term, sizeof(struct p_term_rename));
+        if (!rename)
+            return 0;
+        rename->header.type = P_TERM_RENAME;
+        rename->rename.var = clone;
+        term->var.value = rename;
+        return clone;
+    case P_TERM_TYPED_VARIABLE:
+        /* Clone a typed variable */
+        clone = p_term_create_typed_variable
+            (context, (int)(term->typed_var.constraint.type),
+             term->typed_var.functor_name,
+             (int)(term->typed_var.constraint.size),
+             p_term_name(term));
+        if (!clone)
+            return 0;
+        _p_context_record_in_trace(context, term);
+        rename = p_term_malloc
+            (context, p_term, sizeof(struct p_term_rename));
+        if (!rename)
+            return 0;
+        rename->header.type = P_TERM_RENAME;
+        rename->rename.var = clone;
+        term->var.value = rename;
+        return clone;
+    case P_TERM_MEMBER_VARIABLE:
+        /* Clone a member variable reference */
+        clone = p_term_clone_inner(context, term->member_var.object);
+        if (!clone)
+            return 0;
+        clone = p_term_create_member_variable
+            (context, clone, term->member_var.name);
+        if (!clone)
+            return 0;
+        _p_context_record_in_trace(context, term);
+        rename = p_term_malloc
+            (context, p_term, sizeof(struct p_term_rename));
+        if (!rename)
+            return 0;
+        rename->header.type = P_TERM_RENAME;
+        rename->rename.var = clone;
+        term->var.value = rename;
+        return clone;
+    case P_TERM_RENAME:
+        /* Variable that has already been renamed */
+        return term->rename.var;
+    default: break;
+    }
+    return term;
+}
+
+/**
+ * \brief Clones \a term within \a context to create a new
+ * term that has freshly renamed versions of the variables
+ * within \a term.
+ *
+ * \ingroup term
+ * \sa p_term_unify(), p_term_unify_clause()
+ */
+p_term *p_term_clone(p_context *context, p_term *term)
+{
+    /* We use the trace to record temporary bindings of variables
+     * to P_TERM_RENAME terms, and then back them out at the end.
+     * This won't be safe in concurrent environments, so we will
+     * need to come up with a better solution later */
+    void *marker = p_context_mark_trace(context);
+    p_term *clone = p_term_clone_inner(context, term);
+    p_context_backtrack_trace(context, marker);
+    return clone;
+}
+
+/**
+ * \brief Unifies \a term with the renamed head of \a clause.
+ *
+ * If the unification succeeds, then this function returns the
+ * renamed body of \a clause.  Returns null if the unification fails.
+ *
+ * The special value P_TERM_TRUE_BODY is returned if \a clause
+ * does not have a body and \a clause unifies with \a term.
+ *
+ * \ingroup term
+ * \sa p_term_unify(), p_term_clone()
+ */
+p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
+{
+    /* This implementation is currently inefficient.  We should change
+     * this to an alternative that only clones the body if the head
+     * could be successfully unified with the term */
+    p_term *clone = p_term_clone(context, clause);
+    if (!clone)
+        return 0;
+    if (clone->header.type == P_TERM_FUNCTOR &&
+            clone->header.size == 2 &&
+            clone->functor.functor_name == context->clause_atom) {
+        if (p_term_unify(context, term, clone->functor.arg[0],
+                         P_BIND_DEFAULT))
+            return clone->functor.arg[1];
+    } else {
+        if (p_term_unify(context, term, clone, P_BIND_DEFAULT))
+            return P_TERM_TRUE_BODY;
     }
     return 0;
 }

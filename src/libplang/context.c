@@ -42,6 +42,7 @@ p_context *p_context_create(void)
     context->nil_atom = p_term_create_atom(context, "[]");
     context->prototype_atom = p_term_create_atom(context, "prototype");
     context->class_name_atom = p_term_create_atom(context, "className");
+    context->clause_atom = p_term_create_atom(context, ":-");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     return context;

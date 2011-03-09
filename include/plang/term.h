@@ -102,6 +102,12 @@ void p_term_print(p_context *context, const p_term *term, p_term_print_func prin
 
 int p_term_precedes(const p_term *term1, const p_term *term2);
 
+#define P_TERM_TRUE_BODY    ((p_term *)~0L)
+
+int p_term_is_ground(const p_term *term);
+p_term *p_term_clone(p_context *context, p_term *term);
+p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause);
+
 #ifdef __cplusplus
 };
 #endif

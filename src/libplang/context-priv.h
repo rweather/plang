@@ -38,6 +38,7 @@ struct p_context
     p_term *nil_atom;
     p_term *prototype_atom;
     p_term *class_name_atom;
+    p_term *clause_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trace *trace;
