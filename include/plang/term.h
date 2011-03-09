@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+/* Update precedes_ordering in p_term_precedes if this list changes */
 enum {
     P_TERM_INVALID,
     P_TERM_FUNCTOR,
@@ -98,6 +99,8 @@ typedef void (*p_term_print_func)(void *data, const char *format, ...);
 void p_term_stdio_print_func(void *data, const char *format, ...);
 
 void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
+
+int p_term_precedes(const p_term *term1, const p_term *term2);
 
 #ifdef __cplusplus
 };

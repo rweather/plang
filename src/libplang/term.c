@@ -230,6 +230,7 @@ p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail)
     if (!term)
         return 0;
     term->header.type = P_TERM_LIST;
+    term->header.size = 2;  /* Arity indication for p_term_precedes */
     term->head = head;
     term->tail = tail;
     return (p_term *)term;
@@ -1772,6 +1773,151 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
 void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data)
 {
     p_term_print_inner(context, term, print_func, print_data, 1000);
+}
+
+/**
+ * \brief Returns -1, 0, or 1 depending upon whether \a term1 is
+ * less than, equal to, or greater than \a term2 using the
+ * "precedes" relationship.
+ *
+ * Variables precede all floating-point reals, which precede
+ * all integers, which precede all strings, which precede all
+ * atoms, which precede all functors (including lists), which
+ * precede all objects.
+ *
+ * Variables and objects are compared by pointer.  Reals, integers,
+ * strings, and atoms are compared by value.  Functors order on
+ * arity, then name, and then the arguments from left-to-right.
+ * Lists are assumed to have arity 2 and "." as their functor name.
+ *
+ * \ingroup term
+ */
+int p_term_precedes(const p_term *term1, const p_term *term2)
+{
+    int group1, group2, cmp;
+    static unsigned char const precedes_ordering[] = {
+        0, /* 0: P_TERM_INVALID */
+        6, /* 1: P_TERM_FUNCTOR */
+        6, /* 2: P_TERM_LIST */
+        5, /* 3: P_TERM_ATOM */
+        4, /* 4: P_TERM_STRING */
+        3, /* 5: P_TERM_INTEGER */
+        2, /* 6: P_TERM_REAL */
+        7, /* 7: P_TERM_OBJECT */
+        0, 0, 0, 0, 0, 0, 0, 0,
+        1, /* 16: P_TERM_VARIABLE */
+        1, /* 17: P_TERM_TYPED_VARIABLE */
+        1  /* 18: P_TERM_MEMBER_VARIABLE */
+    };
+
+    /* Dereference the terms */
+    if (!term1)
+        return term2 ? -1 : 0;
+    if (!term2)
+        return 1;
+    term1 = p_term_deref_non_null(term1);
+    term2 = p_term_deref_non_null(term2);
+    if (term1 == term2)
+        return 0;
+
+    /* Determine which groups the terms fall within */
+    group1 = precedes_ordering[term1->header.type];
+    group2 = precedes_ordering[term2->header.type];
+    if (group1 < group2)
+        return -1;
+    else if (group1 > group2)
+        return 1;
+
+    /* Compare based on the term type */
+    switch (term1->header.type) {
+    case P_TERM_FUNCTOR:
+    case P_TERM_LIST: {
+        const char *name1;
+        const char *name2;
+        unsigned int index;
+        if (term1->header.size < term2->header.size)
+            return -1;
+        else if (term1->header.size > term2->header.size)
+            return 1;
+        if (term1->header.type == P_TERM_FUNCTOR)
+            name1 = p_term_name(term1->functor.functor_name);
+        else
+            name1 = ".";
+        if (term2->header.type == P_TERM_FUNCTOR)
+            name2 = p_term_name(term2->functor.functor_name);
+        else
+            name2 = ".";
+        cmp = strcmp(name1, name2);
+        if (cmp < 0)
+            return -1;
+        else if (cmp > 0)
+            return 1;
+        if (term1->header.type == P_TERM_FUNCTOR &&
+                term2->header.type == P_TERM_FUNCTOR) {
+            for (index = 0; index < term1->header.size; ++index) {
+                cmp = p_term_precedes(term1->functor.arg[index],
+                                      term2->functor.arg[index]);
+                if (cmp != 0)
+                    return cmp;
+            }
+        } else if (term1->header.type == P_TERM_LIST &&
+                   term2->header.type == P_TERM_LIST) {
+            do {
+                cmp = p_term_precedes
+                    (term1->list.head, term2->list.head);
+                if (cmp != 0)
+                    return cmp;
+                term1 = term1->list.tail;
+                term2 = term2->list.tail;
+                if (!term1 || !term2)
+                    break;
+                term1 = p_term_deref_non_null(term1);
+                term2 = p_term_deref_non_null(term2);
+            } while (term1->header.type == P_TERM_LIST &&
+                     term2->header.type == P_TERM_LIST);
+            return p_term_precedes(term1, term2);
+        } else {
+            /* Shouldn't get here, because parsers will normally
+             * convert '.' functors into list terms.  Have to do
+             * something, so order the terms on pointer */
+            return (term1 < term2) ? -1 : 1;
+        }
+        break; }
+    case P_TERM_ATOM:
+    case P_TERM_STRING:
+        cmp = strcmp(p_term_name(term1), p_term_name(term2));
+        if (cmp < 0)
+            return -1;
+        else if (cmp > 0)
+            return 1;
+        break;
+    case P_TERM_INTEGER:
+#if defined(P_TERM_64BIT)
+        if (((int)(term1->header.size)) < ((int)(term2->header.size)))
+            return -1;
+        else if (((int)(term1->header.size)) > ((int)(term2->header.size)))
+            return 1;
+#else
+        if (term1->integer.value < term2->integer.value)
+            return -1;
+        else if (term1->integer.value > term2->integer.value)
+            return 1;
+#endif
+        break;
+    case P_TERM_REAL:
+        if (term1->real.value < term2->real.value)
+            return -1;
+        else if (term1->real.value > term2->real.value)
+            return 1;
+        break;
+    case P_TERM_OBJECT:
+    case P_TERM_VARIABLE:
+    case P_TERM_TYPED_VARIABLE:
+    case P_TERM_MEMBER_VARIABLE:
+        return (term1 < term2) ? -1 : 1;
+    default: break;
+    }
+    return 0;
 }
 
 /*\@}*/

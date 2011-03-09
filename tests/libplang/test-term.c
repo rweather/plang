@@ -926,6 +926,114 @@ static void test_unify()
     clear_parse_state();
 }
 
+static void test_precedes()
+{
+    struct precedes_type
+    {
+        const char *row;
+        const char *term1;
+        const char *term2;
+        int result;
+    };
+    static struct precedes_type const precedes_data[] = {
+        {"null_var", 0, "X", -1},
+        {"var_null", "X", 0, 1},
+
+        {"var_1", "X", "X", 0},
+        {"var_2", "X", "Y", 2},
+        {"var_real_1", "X", "42.5", -1},
+        {"var_real_2", "42.5", "X", 1},
+        {"var_int_1", "X", "42", -1},
+        {"var_int_2", "42", "X", 1},
+        {"var_string_1", "X", "\"foo\"", -1},
+        {"var_string_2", "\"foo\"", "X", 1},
+        {"var_atom_1", "X", "foo", -1},
+        {"var_atom_2", "foo", "X", 1},
+        {"var_functor_1", "X", "f(a)", -1},
+        {"var_functor_2", "f(a)", "X", 1},
+
+        {"real_1", "42.5", "42.0", 1},
+        {"real_2", "42.0", "42.5", -1},
+        {"real_3", "42.5", "42.5", 0},
+        {"real_int_1", "42.5", "42", -1},
+        {"real_int_2", "42", "42.5", 1},
+        {"real_string_1", "42.5", "\"foo\"", -1},
+        {"real_string_2", "\"foo\"", "42.5", 1},
+        {"real_atom_1", "42.5", "foo", -1},
+        {"real_atom_2", "foo", "42.5", 1},
+        {"real_functor_1", "42.5", "f(a)", -1},
+        {"real_functor_1", "f(a)", "42.5", 1},
+
+        {"int_1", "42", "40", 1},
+        {"int_2", "40", "42", -1},
+        {"int_3", "42", "42", 0},
+        {"int_4", "-42", "42", -1},
+        {"int_5", "42", "-42", 1},
+        {"int_string_1", "42", "\"foo\"", -1},
+        {"int_string_2", "\"foo\"", "42", 1},
+        {"int_atom_1", "42", "foo", -1},
+        {"int_atom_2", "foo", "42", 1},
+        {"int_functor_1", "42", "f(a)", -1},
+        {"int_functor_1", "f(a)", "42", 1},
+
+        {"string_1", "\"foo\"", "\"bar\"", 1},
+        {"string_2", "\"bar\"", "\"foo\"", -1},
+        {"string_3", "\"foo\"", "\"foo\"", 0},
+        {"string_4", "\"foo\"", "\"foox\"", -1},
+        {"string_atom_1", "\"foo\"", "foo", -1},
+        {"string_atom_2", "foo", "\"foo\"", 1},
+        {"string_functor_1", "\"foo\"", "f(a)", -1},
+        {"string_functor_1", "f(a)", "\"foo\"", 1},
+
+        {"atom_1", "foo", "bar", 1},
+        {"atom_2", "bar", "foo", -1},
+        {"atom_3", "foo", "foo", 0},
+        {"atom_4", "foo", "foox", -1},
+        {"atom_functor_1", "foo", "f(a)", -1},
+        {"atom_functor_1", "f(a)", "foo", 1},
+
+        {"functor_1", "f(a)", "f(a,b)", -1},
+        {"functor_2", "f(a,b)", "f(a)", 1},
+        {"functor_3", "f(a,b)", "[a|b]", 1},    // "f" > "."
+        {"functor_4", "[a|b]", "f(a,b)", -1},
+        {"functor_5", "f(a)", "[a|b]", -1},
+        {"functor_6", "[a|b]", "f(a)", 1},
+        {"functor_7", "f(a,b,X)", "f(a,b,X)", 0},
+        {"functor_8", "f(a,b,X)", "f(a,b,Y)", 2},
+        {"functor_9", "[a,b,X]", "[a,b,X]", 0},
+        {"functor_10", "[a,b,X]", "[a,b,Y]", 2},
+        {"functor_11", "[a,b]", "[a,b,c]", -1},
+        {"functor_12", "[a,b|X]", "[a,b|Y]", 2},
+    };
+    #define precedes_data_len (sizeof(precedes_data) / sizeof(struct precedes_type))
+
+    size_t index;
+    p_term *term1;
+    p_term *term2;
+    int expected;
+    int precedes_result;
+    for (index = 0; index < precedes_data_len; ++index) {
+        clear_parse_state();
+        P_TEST_SET_ROW(precedes_data[index].row);
+        term1 = precedes_data[index].term1
+                    ? parse_term(precedes_data[index].term1) : 0;
+        term2 = precedes_data[index].term2
+                    ? parse_term(precedes_data[index].term2) : 0;
+        expected = precedes_data[index].result;
+        precedes_result = p_term_precedes(term1, term2);
+        if (expected != 2) {
+            P_COMPARE(precedes_result, expected);
+        } else {
+            /* Ordering is dependent upon ordering of X and Y vars */
+            term1 = parse_term("X");
+            term2 = parse_term("Y");
+            expected = (term1 < term2) ? -1 : 1;
+            P_COMPARE(precedes_result, expected);
+        }
+    }
+    clear_parse_state();
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -943,6 +1051,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(functor);
     P_TEST_RUN(object);
     P_TEST_RUN(unify);
+    P_TEST_RUN(precedes);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();
