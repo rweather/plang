@@ -55,53 +55,34 @@ The following are some examples from Plang:
 
 \li \c ! becomes \c stop, indicating that back-tracking search
     should stop.
-\li <tt>(A -> B ; C)</tt> becomes <tt>if A then B else C</tt>.
+\li <tt>(A -> B ; C)</tt> becomes <tt>if (A) B else C</tt>.
 \li \c while, \c loop, and \c for constructs as alternatives to
     tail recursion.
 \li <tt>X.name = Y</tt> to unify against an object property,
     or <tt>X.name := Y</tt> to modify an object property.
 
-As an example, consider the traditional Prolog implementation of
-list member testing:
+The following example performs an action on every element of a list
+in traditional Prolog:
 
 \code
-member(X, [X|T]).
-member(X, [Y|T]) :- member(X, T).
+perform_action(List) :- var(List), !, fail.
+perform_action([]) :- !.
+perform_action([Head|Tail]) :- !, action(Head), perform_action(Tail).
+perform_action([_|Tail]) :- perform_action(Tail).
 \endcode
 
 In Plang, this can be expressed as follows:
 
 \code
-member(X, Y) :-
-    loop
-        Y = [H|T],
-        accept if X = H,
-        Y := T
-    end.
+perform_action(List)
+{
+    for (X in List) action(X);
+}
 \endcode
 
-The \c accept statement tells the \c loop to accept the current goal
-if the supplied condition is true.  Upon back-tracking, the value of
-\c T is written to \c Y and the loop continues until \c Y no longer
-has the form <tt>[H|T]</tt>.
-
-If we wished to stop searching when the first matching element is
-found, we would instead write:
-
-\code
-member(X, Y) :-
-    loop
-        Y = [H|T],
-        stop if X = H,
-        Y := T
-    end.
-\endcode
-
-While this example may seem verbose compared to its Prolog counterpart,
-it is more obvious as to what it is doing, and closer to how a
-classical programmer thinks about solving the problem.
-Disk and memory space are no longer as constrained as they once were,
-so it isn't necessary to use terse syntax.  It is better to write
-clear code that is readable to the untrained or semi-trained eye.
+This version is more obvious as to what it is doing, and closer to
+how a classical programmer thinks about solving the problem.
+The Plang parser internally expands the \c for loop to a hidden
+predicate similar in structure to the traditional version.
 
 */

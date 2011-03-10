@@ -17,24 +17,51 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PLANG_CONTEXT_H
-#define PLANG_CONTEXT_H
+#ifndef PLANG_PARSER_PRIV_H
+#define PLANG_PARSER_PRIV_H
+
+#include <plang/context.h>
+#include <plang/term.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-typedef struct p_context p_context;
-typedef union p_term p_term;
+/** @cond */
 
-p_context *p_context_create(void);
-void p_context_free(p_context *context);
+#ifndef YY_TYPEDEF_YY_SCANNER_T
+#define YY_TYPEDEF_YY_SCANNER_T
+typedef void *yyscan_t;
+#endif
 
-void *p_context_mark_trace(p_context *context);
-void p_context_backtrack_trace(p_context *context, void *marker);
+struct p_input_var
+{
+    p_term *var;
+    unsigned int count;
+};
 
-int p_context_consult_file(p_context *context, const char *filename);
-int p_context_consult_string(p_context *context, const char *str);
+typedef struct p_input_stream p_input_stream;
+struct p_input_stream
+{
+    FILE *stream;
+    const char *filename;
+    const char *buffer;
+    size_t buffer_len;
+    int close_stream;
+    int error_count;
+    int warning_count;
+    p_term *declarations;
+    struct p_input_var *variables;
+    size_t num_variables;
+    size_t max_variables;
+};
+
+#ifndef YY_EXTRA_TYPE
+#define YY_EXTRA_TYPE p_input_stream *
+#endif
+
+/** @endcond */
 
 #ifdef __cplusplus
 };

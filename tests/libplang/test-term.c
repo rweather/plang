@@ -615,11 +615,11 @@ static void test_member_variable()
     object = p_term_create_variable(context);
     name = p_term_create_atom(context, "foo");
 
-    P_VERIFY(!p_term_create_member_variable(context, object, 0));
-    P_VERIFY(!p_term_create_member_variable(context, 0, name));
-    P_VERIFY(!p_term_create_member_variable(context, object, object));
+    P_VERIFY(!p_term_create_member_variable(context, object, 0, 0));
+    P_VERIFY(!p_term_create_member_variable(context, 0, name, 0));
+    P_VERIFY(!p_term_create_member_variable(context, object, object, 0));
 
-    var1 = p_term_create_member_variable(context, object, name);
+    var1 = p_term_create_member_variable(context, object, name, 0);
     P_COMPARE(p_term_type(var1), P_TERM_MEMBER_VARIABLE);
     P_VERIFY(strcmp(p_term_name(var1), p_term_name(name)) == 0);
     P_VERIFY(p_term_object(var1) == object);

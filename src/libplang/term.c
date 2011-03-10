@@ -434,10 +434,15 @@ p_term *p_term_create_typed_variable(p_context *context, int type, p_term *funct
  *
  * Returns the member variable term.  The \a name must be an atom.
  *
+ * If \a auto_create is non-zero, then the member \a name will be
+ * added to the object during unification if it doesn't exist.
+ * If \a auto_create is zero, then unification will fail if
+ * the member \a name does not exist.
+ *
  * \ingroup term
  * \sa p_term_object(), p_term_name()
  */
-p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term *name)
+p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term *name, int auto_create)
 {
     struct p_term_member_var *term;
     if (!name || !object)
@@ -449,6 +454,7 @@ p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term
     if (!term)
         return 0;
     term->header.type = P_TERM_MEMBER_VARIABLE;
+    term->header.size = (auto_create ? 1 : 0);
     term->object = object;
     term->name = name;
     return (p_term *)term;
@@ -2073,7 +2079,8 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
         if (!clone)
             return 0;
         clone = p_term_create_member_variable
-            (context, clone, term->member_var.name);
+            (context, clone, term->member_var.name,
+             (int)(term->header.size));
         if (!clone)
             return 0;
         _p_context_record_in_trace(context, term);

@@ -21,6 +21,9 @@
 #include "context-priv.h"
 #include "term-priv.h"
 #include "database-priv.h"
+#include "parser-priv.h"
+#include <errno.h>
+#include <string.h>
 
 /**
  * \defgroup context Execution Contexts
@@ -157,6 +160,102 @@ int _p_context_record_contents_in_trace(p_context *context, void **location)
         return 1;
     p_context_pop_trace(context, 0);
     return 0;
+}
+
+/* Imports from the flex-generated lexer and bison-generated parser */
+int p_term_lex_init_extra(p_input_stream *extra, yyscan_t *scanner);
+int p_term_lex_destroy(yyscan_t scanner);
+int p_term_parse(p_context *context, yyscan_t scanner);
+
+static int p_context_consult(p_context *context, p_input_stream *stream)
+{
+    yyscan_t scanner;
+    int error, ok;
+
+    /* Initialize the lexer */
+    if (p_term_lex_init_extra(stream, &scanner) != 0) {
+        error = errno;
+        if (stream->close_stream)
+            fclose(stream->stream);
+        return error;
+    }
+
+    /* Parse and evaluate the contents of the input stream */
+    ok = (p_term_parse(context, scanner) == 0);
+    if (stream->error_count != 0)
+        ok = 0;
+
+    /* Close the input stream */
+    if (stream->variables)
+        GC_FREE(stream->variables);
+    if (stream->close_stream)
+        fclose(stream->stream);
+    p_term_lex_destroy(scanner);
+
+    /* Process the declarations from the file */
+    if (ok && stream->declarations) {
+        /* TODO */
+    }
+    return ok ? 0 : EINVAL;
+}
+
+/**
+ * \brief Loads and consults the contents of \a filename as
+ * predicates and directives to be executed within \a context.
+ *
+ * Returns zero if the file was successfully consulted, or an
+ * errno code otherwise.  EINVAL indicates that the contents of
+ * \a filename could not be completely parsed.  Other errno codes
+ * indicate errors in opening or reading from \a filename.
+ *
+ * The special \a filename \c - can be used to read from
+ * standard input.
+ *
+ * \ingroup context
+ * \sa p_context_consult_string()
+ */
+int p_context_consult_file(p_context *context, const char *filename)
+{
+    p_input_stream stream;
+    memset(&stream, 0, sizeof(stream));
+    if (!strcmp(filename, "-")) {
+        stream.stream = stdin;
+        stream.filename = "(standard-input)";
+        stream.close_stream = 0;
+    } else {
+        stream.stream = fopen(filename, "r");
+        if (!stream.stream)
+            return errno;
+        stream.filename = filename;
+        stream.close_stream = 1;
+    }
+    return p_context_consult(context, &stream);
+}
+
+/**
+ * \brief Loads and consults the contents of \a str as
+ * predicates and directives to be executed within \a context.
+ *
+ * Returns zero if the contents of \a str were successfully
+ * consulted, or an errno code otherwise.  EINVAL indicates that
+ * the contents of \a str could not be completely parsed.
+ *
+ * This function is intended for parsing small snippets of source
+ * code that have been embedded in a larger native application.
+ * Use p_context_consult_file() for parsing external files.
+ *
+ * \ingroup context
+ * \sa p_context_consult_file()
+ */
+int p_context_consult_string(p_context *context, const char *str)
+{
+    p_input_stream stream;
+    if (!str)
+        return ENOENT;
+    memset(&stream, 0, sizeof(stream));
+    stream.buffer = str;
+    stream.buffer_len = strlen(str);
+    return p_context_consult(context, &stream);
 }
 
 /*\@}*/

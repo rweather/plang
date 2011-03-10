@@ -5,11 +5,16 @@ libplang_la_SOURCES = \
 	context-priv.h \
 	database.c \
 	database-priv.h \
+	lexer.l \
+	parser.y \
 	term.c \
 	term-priv.h
 
 AM_CFLAGS = -I$(top_srcdir)/include -I$(top_builddir)/include -I. -I$(srcdir)
+AM_YFLAGS = -d
 
 libplang_la_LDFLAGS = -version-info $(PLANG_VERSION) -no-undefined -lm
 
-CLEANFILES = *.gcov *.gcda *.gcno
+CLEANFILES = *.gcov *.gcda *.gcno \
+	parser.h parser.c parser.output \
+	parser.tab.h parser.tab.c lexer.c
