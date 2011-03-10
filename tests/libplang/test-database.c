@@ -56,6 +56,7 @@ static void test_operators()
         { 700, P_OP_XFX, 2, "@>="},
         { 700, P_OP_XFX, 2, "=.."},
         { 700, P_OP_XFX, 2, "is"},
+        { 700, P_OP_XFX, 2, "in"},
         { 700, P_OP_XFX, 2, "=:="},
         { 700, P_OP_XFX, 2, "=\\="},
         { 700, P_OP_XFX, 2, "=!="},
