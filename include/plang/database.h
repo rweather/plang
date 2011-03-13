@@ -40,6 +40,16 @@ typedef enum {
 p_op_specifier p_db_operator_info(const p_term *name, int arity, int *priority);
 void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority);
 
+typedef enum {
+    P_RESULT_FAIL  = 0,
+    P_RESULT_TRUE  = 1,
+    P_RESULT_ERROR = 2
+} p_db_result;
+
+typedef p_db_result (*p_db_builtin)(p_context *context, p_term **args, p_term **error);
+p_db_builtin p_db_builtin_predicate(const p_term *name, int arity);
+void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin);
+
 #ifdef __cplusplus
 };
 #endif

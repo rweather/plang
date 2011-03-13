@@ -183,7 +183,6 @@ DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
 "loop"          { RETURNTOK(K_LOOP); }
 "mod"           { RETURNTOK(K_MOD); }
 "new"           { RETURNTOK(K_NEW); }
-"object"        { RETURNTOK(K_OBJECT); }
 "rem"           { RETURNTOK(K_REM); }
 "step"          { RETURNTOK(K_STEP); }
 "stop"          { RETURNTOK(K_STOP); }

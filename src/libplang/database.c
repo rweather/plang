@@ -195,7 +195,7 @@ P_INLINE p_database_info *p_db_create_arity(p_term *atom, unsigned int arity)
  * Returns the operator prefix/infix/postfix specifier from the
  * function, and return the operator priority in \a priority.
  *
- * \ingroup context
+ * \ingroup database
  * \sa p_db_set_operator_info()
  */
 p_op_specifier p_db_operator_info(const p_term *name, int arity, int *priority)
@@ -228,7 +228,7 @@ p_op_specifier p_db_operator_info(const p_term *name, int arity, int *priority)
  * If \a priority is zero, then the operator details for \a specifier
  * will be removed.
  *
- * \ingroup context
+ * \ingroup database
  * \sa p_db_operator_info()
  */
 void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority)
@@ -265,6 +265,82 @@ void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority
     /* Set the operator details */
     info->op_specifier = (unsigned int)specifier;
     info->op_priority = (unsigned int)priority;
+}
+
+/**
+ * \enum p_db_result
+ * \ingroup database
+ * This enum defines the result from a builtin predicate.
+ * \sa p_db_builtin
+ */
+
+/**
+ * \typedef p_db_builtin
+ * \ingroup database
+ * This type defines the function prototype of a builtin predicate.
+ *
+ * The arguments are the execution context, a pointer to the terms
+ * that define the predicates arguments, and a return pointer for
+ * error terms.
+ *
+ * The return value should be one of P_RESULT_FAIL, P_RESULT_TRUE,
+ * or P_RESULT_ERROR.
+ *
+ * Builtin predicates must be deterministic; they cannot backtrack.
+ *
+ * \sa p_db_set_builtin_predicate()
+ */
+
+/**
+ * \brief Returns the builtin predicate function for \a name and
+ * \a arity, or null if there is no builtin predicate function.
+ *
+ * \ingroup database
+ * \sa p_db_builtin, p_db_set_builtin_predicate()
+ */
+p_db_builtin p_db_builtin_predicate(const p_term *name, int arity)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 0;
+
+    /* Search for the arity's information block */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (info)
+        return info->builtin_func;
+    else
+        return 0;
+}
+
+/**
+ * \brief Sets the \a builtin predicate function for \a name and
+ * \a arity.
+ *
+ * If \a builtin is null, then the previous builtin function
+ * association is removed.
+ *
+ * \ingroup database
+ * \sa p_db_builtin, p_db_builtin_predicate()
+ */
+void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return;
+
+    /* Find or create an information block for the arity */
+    info = p_db_create_arity(name, (unsigned int)arity);
+    if (!info)
+        return;
+
+    /* Set the builtin */
+    info->builtin_func = builtin;
 }
 
 /*\@}*/

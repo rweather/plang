@@ -48,6 +48,7 @@ p_context *p_context_create(void)
     context->clause_atom = p_term_create_atom(context, ":-");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
+    _p_db_init_builtins(context);
     return context;
 }
 

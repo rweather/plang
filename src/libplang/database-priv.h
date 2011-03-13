@@ -20,6 +20,7 @@
 #ifndef PLANG_DATABASE_PRIV_H
 #define PLANG_DATABASE_PRIV_H
 
+#include <plang/database.h>
 #include "term-priv.h"
 
 #ifdef __cplusplus
@@ -27,6 +28,16 @@ extern "C" {
 #endif
 
 /** @cond */
+
+/* Information about a class */
+typedef struct p_class_info p_class_info;
+struct p_class_info
+{
+    p_term *class_object;
+    p_term *parent;
+    p_term *var_list;
+    p_term *clause_list;
+};
 
 /* Information that is attached to an atom to provide information
  * about the operators and predicates with that name */
@@ -36,9 +47,12 @@ struct p_database_info
     unsigned int arity;
     unsigned int op_specifier : 16;
     unsigned int op_priority : 16;
+    p_db_builtin builtin_func;
+    p_class_info *class_info;
 };
 
 void _p_db_init(p_context *context);
+void _p_db_init_builtins(p_context *context);
 
 /** @endcond */
 

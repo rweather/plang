@@ -269,18 +269,18 @@ static p_term *make_class_declaration
 %token K_OR             "`||'"
 %token K_AND            "`&&'"
 %token K_NOT            "`\\+'"
-%token K_NE             "`\\='"
+%token K_NE             "`!='"
 %token K_TERM_EQ        "`=='"
-%token K_TERM_NE        "`\\=='"
+%token K_TERM_NE        "`!=='"
 %token K_TERM_LT        "`@<'"
-%token K_TERM_LE        "`@=<'"
+%token K_TERM_LE        "`@<='"
 %token K_TERM_GT        "`@>'"
 %token K_TERM_GE        "`@>='"
 %token K_UNIV           "`=..'"
 %token K_NUM_EQ         "`=:='"
-%token K_NUM_NE         "`=\\='"
+%token K_NUM_NE         "`=!='"
 %token K_NUM_LT         "`<'"
-%token K_NUM_LE         "`=<'"
+%token K_NUM_LE         "`<='"
 %token K_NUM_GT         "`>'"
 %token K_NUM_GE         "`>='"
 %token K_NUM_GETS       "`::='"
@@ -305,7 +305,6 @@ static p_term *make_class_declaration
 %token K_LOOP           "`loop'"
 %token K_MOD            "`mod'"
 %token K_NEW            "`new'"
-%token K_OBJECT         "`object'"
 %token K_REM            "`rem'"
 %token K_STEP           "`step'"
 %token K_STOP           "`stop'"
@@ -472,19 +471,19 @@ compare_term
             $$ = binary_term("=", $1, $3);
         }
     | additive_term K_NE additive_term  {
-            $$ = binary_term("\\=", $1, $3);
+            $$ = binary_term("!=", $1, $3);
         }
     | additive_term K_TERM_EQ additive_term {
             $$ = binary_term("==", $1, $3);
         }
     | additive_term K_TERM_NE additive_term {
-            $$ = binary_term("\\==", $1, $3);
+            $$ = binary_term("!==", $1, $3);
         }
     | additive_term K_TERM_LT additive_term {
             $$ = binary_term("@<", $1, $3);
         }
     | additive_term K_TERM_LE additive_term {
-            $$ = binary_term("@=<", $1, $3);
+            $$ = binary_term("@<=", $1, $3);
         }
     | additive_term K_TERM_GT additive_term {
             $$ = binary_term("@>", $1, $3);
@@ -502,13 +501,13 @@ compare_term
             $$ = binary_term("=:=", $1, $3);
         }
     | additive_term K_NUM_NE additive_term {
-            $$ = binary_term("=\\=", $1, $3);
+            $$ = binary_term("=!=", $1, $3);
         }
     | additive_term K_NUM_LT additive_term {
             $$ = binary_term("<", $1, $3);
         }
     | additive_term K_NUM_LE additive_term {
-            $$ = binary_term("=<", $1, $3);
+            $$ = binary_term("<=", $1, $3);
         }
     | additive_term K_NUM_GT additive_term {
             $$ = binary_term(">", $1, $3);
@@ -698,12 +697,6 @@ type_constraint
             $$.name = $1;
             $$.arity = p_term_integer_value($3);
             $$.type = P_TERM_FUNCTOR;
-        }
-    | K_OBJECT {
-            $$.atom_name = 0;
-            $$.name = 0;
-            $$.arity = 0;
-            $$.type = P_TERM_OBJECT;
         }
     ;
 
@@ -909,7 +902,7 @@ member_var
     ;
 
 object_declaration
-    : K_OBJECT K_ATOM property_bindings opt_semi    {
+    : K_NEW K_ATOM property_bindings opt_semi    {
             /* An object declaration is equivalent to:
              * ?- new class_name (X) { properties }, assertz(X). */
             p_term *var;
