@@ -22,6 +22,7 @@
 #include <plang/context.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "parser.h"
 #include "parser-priv.h"
 #include "term-priv.h"
@@ -31,7 +32,13 @@
     { \
         if (yyextra->stream) { \
             /* Read from a stdio-based file stream */ \
-            result = fread((buf), 1, (maxSize), yyextra->stream); \
+            errno = 0; \
+            while ((result = fread((buf), 1, (maxSize), yyextra->stream)) == 0 && ferror(yyextra->stream)) { \
+                if (errno != EINTR) \
+                    break; \
+                errno = 0; \
+                clearerr(yyextra->stream); \
+            } \
         } else { \
             /* Read from a memory buffer */ \
             size_t len = (maxSize); \
@@ -137,6 +144,7 @@ DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
 
 ":-"            { RETURNTOK(K_COLON_DASH); }
 "?-"            { RETURNTOK(K_QUEST_DASH); }
+"??--"          { RETURNTOK(K_TEST_GOAL); }
 "->"            { RETURNTOK(K_ARROW); }
 "."/{AFTERDOT}  { RETURNTOK(K_DOT_TERMINATOR); }
 "||"            { RETURNTOK(K_OR); }

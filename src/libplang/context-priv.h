@@ -39,10 +39,21 @@ struct p_context
     p_term *prototype_atom;
     p_term *class_name_atom;
     p_term *clause_atom;
+    p_term *comma_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trace *trace;
     int trace_top;
+
+    int fail_on_unknown;
+
+    int goal_active;
+    p_term *goal;
+    p_term *error;
+    void *goal_marker;
+
+    int allow_test_goals;
+    p_term *test_goal;
 };
 
 #define P_TRACE_SIZE 1020

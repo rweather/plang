@@ -109,7 +109,7 @@
  * \par See Also
  * \ref true_0 "true/0"
  */
-static p_db_result p_builtin_fail
+static p_goal_result p_builtin_fail
     (p_context *context, p_term **args, p_term **error)
 {
     return P_RESULT_FAIL;
@@ -138,7 +138,7 @@ static p_db_result p_builtin_fail
  * \par See Also
  * \ref fail_0 "fail/0"
  */
-static p_db_result p_builtin_true
+static p_goal_result p_builtin_true
     (p_context *context, p_term **args, p_term **error)
 {
     return P_RESULT_TRUE;
@@ -210,7 +210,7 @@ static p_db_result p_builtin_true
  * \ref term_gt_2 "(\@>)/2",
  * \ref term_ge_2 "(\@>=)/2"
  */
-static p_db_result p_builtin_term_eq
+static p_goal_result p_builtin_term_eq
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_unify(context, args[0], args[1], P_BIND_EQUALITY))
@@ -254,7 +254,7 @@ static p_db_result p_builtin_term_eq
  * \ref term_gt_2 "(\@>)/2",
  * \ref term_ge_2 "(\@>=)/2"
  */
-static p_db_result p_builtin_term_ne
+static p_goal_result p_builtin_term_ne
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_unify(context, args[0], args[1], P_BIND_EQUALITY))
@@ -296,7 +296,7 @@ static p_db_result p_builtin_term_ne
  * \ref term_ge_2 "(\@>=)/2",
  * \ref term_precedes "term-precedes"
  */
-static p_db_result p_builtin_term_lt
+static p_goal_result p_builtin_term_lt
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_precedes(args[0], args[1]) < 0)
@@ -342,7 +342,7 @@ static p_db_result p_builtin_term_lt
  * \ref term_ge_2 "(\@>=)/2",
  * \ref term_precedes "term-precedes"
  */
-static p_db_result p_builtin_term_le
+static p_goal_result p_builtin_term_le
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_precedes(args[0], args[1]) <= 0)
@@ -384,7 +384,7 @@ static p_db_result p_builtin_term_le
  * \ref term_ge_2 "(\@>=)/2",
  * \ref term_precedes "term-precedes"
  */
-static p_db_result p_builtin_term_gt
+static p_goal_result p_builtin_term_gt
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_precedes(args[0], args[1]) > 0)
@@ -427,7 +427,7 @@ static p_db_result p_builtin_term_gt
  * \ref term_gt_2 "(\@>)/2",
  * \ref term_precedes "term-precedes"
  */
-static p_db_result p_builtin_term_ge
+static p_goal_result p_builtin_term_ge
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_precedes(args[0], args[1]) >= 0)
@@ -482,7 +482,7 @@ static p_db_result p_builtin_term_ge
  * \par See Also
  * \ref not_unifiable_2 "(!=)/2"
  */
-static p_db_result p_builtin_unify
+static p_goal_result p_builtin_unify
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_unify(context, args[0], args[1], P_BIND_DEFAULT))
@@ -519,7 +519,7 @@ static p_db_result p_builtin_unify
  * \par See Also
  * \ref unify_2 "(=)/2"
  */
-static p_db_result p_builtin_not_unifiable
+static p_goal_result p_builtin_not_unifiable
     (p_context *context, p_term **args, p_term **error)
 {
     void *marker = p_context_mark_trace(context);
@@ -590,7 +590,7 @@ static p_db_result p_builtin_not_unifiable
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_atom
+static p_goal_result p_builtin_atom
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) == P_TERM_ATOM)
@@ -633,7 +633,7 @@ static p_db_result p_builtin_atom
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_atomic
+static p_goal_result p_builtin_atomic
     (p_context *context, p_term **args, p_term **error)
 {
     int type = p_term_type(args[0]);
@@ -675,7 +675,7 @@ static p_db_result p_builtin_atomic
  * \ref class_object_2 "class_object/2",
  * \ref object_1 "object/1"
  */
-static p_db_result p_builtin_class_object_1
+static p_goal_result p_builtin_class_object_1
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *term = p_term_deref(args[0]);
@@ -729,7 +729,7 @@ static p_db_result p_builtin_class_object_1
  * \ref class_object_1 "class_object/1",
  * \ref object_1 "object/1"
  */
-static p_db_result p_builtin_class_object_2
+static p_goal_result p_builtin_class_object_2
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *name = p_term_deref(args[0]);
@@ -782,7 +782,7 @@ static p_db_result p_builtin_class_object_2
  * \par See Also
  * \ref atom_1 "atom/1", \ref var_1 "var/1"
  */
-static p_db_result p_builtin_compound
+static p_goal_result p_builtin_compound
     (p_context *context, p_term **args, p_term **error)
 {
     int type = p_term_type(args[0]);
@@ -823,7 +823,7 @@ static p_db_result p_builtin_compound
  * \ref number_1 "number/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_float
+static p_goal_result p_builtin_float
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) == P_TERM_REAL)
@@ -863,7 +863,7 @@ static p_db_result p_builtin_float
  * \ref number_1 "number/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_integer
+static p_goal_result p_builtin_integer
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) == P_TERM_INTEGER)
@@ -903,7 +903,7 @@ static p_db_result p_builtin_integer
  * \ref compound_1 "compound/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_nonvar
+static p_goal_result p_builtin_nonvar
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) & P_TERM_VARIABLE)
@@ -944,7 +944,7 @@ static p_db_result p_builtin_nonvar
  * \ref integer_1 "integer/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_number
+static p_goal_result p_builtin_number
     (p_context *context, p_term **args, p_term **error)
 {
     int type = p_term_type(args[0]);
@@ -984,7 +984,7 @@ static p_db_result p_builtin_number
  * \ref class_object_1 "class_object/1",
  * \ref object_2 "object/2"
  */
-static p_db_result p_builtin_object_1
+static p_goal_result p_builtin_object_1
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_is_instance_object(context, args[0]))
@@ -1028,7 +1028,7 @@ static p_db_result p_builtin_object_1
  * \ref class_object_1 "class_object/1",
  * \ref object_1 "object/1"
  */
-static p_db_result p_builtin_object_2
+static p_goal_result p_builtin_object_2
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *class_object = p_term_deref(args[1]);
@@ -1071,7 +1071,7 @@ static p_db_result p_builtin_object_2
  * \ref compound_1 "compound/1",
  * \ref var_1 "var/1"
  */
-static p_db_result p_builtin_string
+static p_goal_result p_builtin_string
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) == P_TERM_STRING)
@@ -1110,7 +1110,7 @@ static p_db_result p_builtin_string
  * \ref compound_1 "compound/1",
  * \ref nonvar_1 "nonvar/1"
  */
-static p_db_result p_builtin_var
+static p_goal_result p_builtin_var
     (p_context *context, p_term **args, p_term **error)
 {
     if (p_term_type(args[0]) & P_TERM_VARIABLE)

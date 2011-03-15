@@ -268,13 +268,6 @@ void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority
 }
 
 /**
- * \enum p_db_result
- * \ingroup database
- * This enum defines the result from a builtin predicate.
- * \sa p_db_builtin
- */
-
-/**
  * \typedef p_db_builtin
  * \ingroup database
  * This type defines the function prototype of a builtin predicate.

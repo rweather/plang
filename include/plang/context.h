@@ -36,6 +36,17 @@ void p_context_backtrack_trace(p_context *context, void *marker);
 int p_context_consult_file(p_context *context, const char *filename);
 int p_context_consult_string(p_context *context, const char *str);
 
+typedef enum {
+    P_RESULT_FAIL  = 0,
+    P_RESULT_TRUE  = 1,
+    P_RESULT_ERROR = 2
+} p_goal_result;
+
+p_goal_result p_context_execute_goal(p_context *context, p_term *goal);
+p_goal_result p_context_reexecute_goal(p_context *context);
+void p_context_abandon_goal(p_context *context);
+p_term *p_context_uncaught_error(p_context *context);
+
 #ifdef __cplusplus
 };
 #endif

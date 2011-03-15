@@ -46,6 +46,7 @@ p_context *p_context_create(void)
     context->prototype_atom = p_term_create_atom(context, "prototype");
     context->class_name_atom = p_term_create_atom(context, "className");
     context->clause_atom = p_term_create_atom(context, ":-");
+    context->comma_atom = p_term_create_atom(context, ",");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -195,7 +196,27 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
 
     /* Process the declarations from the file */
     if (ok && stream->declarations) {
-        /* TODO */
+        p_term *list = stream->declarations;
+        p_term *clause_atom = context->clause_atom;
+        p_term *goal_atom = p_term_create_atom(context, "?-");
+        p_term *test_goal_atom = p_term_create_atom(context, "\?\?--");
+        p_term *decl;
+        while (list->header.type == P_TERM_LIST) {
+            decl = list->list.head;
+            if (decl && decl->header.type == P_TERM_FUNCTOR) {
+                if (decl->functor.functor_name == clause_atom) {
+                    /* TODO */
+                } else if (decl->functor.functor_name == goal_atom) {
+                    /* TODO */
+                } else if (decl->functor.functor_name == test_goal_atom) {
+                    /* Special goal that is used by unit tests.
+                     * Ignored if unit testing is not active */
+                    if (context->allow_test_goals)
+                        context->test_goal = p_term_arg(decl, 0);
+                }
+            }
+            list = list->list.tail;
+        }
     }
     return ok ? 0 : EINVAL;
 }
@@ -257,6 +278,193 @@ int p_context_consult_string(p_context *context, const char *str)
     stream.buffer = str;
     stream.buffer_len = strlen(str);
     return p_context_consult(context, &stream);
+}
+
+/**
+ * \enum p_goal_result
+ * \ingroup context
+ * This enum defines the result from a goal or builtin predicate.
+ * \sa p_context_execute_goal()
+ */
+
+/**
+ * \var P_RESULT_FAIL
+ * \ingroup context
+ * The goal failed and further back-tracking is not possible.
+ */
+
+/**
+ * \var P_RESULT_TRUE
+ * \ingroup context
+ * The goal succeeded and further back-tracking may be possible.
+ */
+
+/**
+ * \var P_RESULT_ERROR
+ * \ingroup context
+ * The goal resulted in a thrown error that has not been caught.
+ * Further back-tracking may be possible.
+ */
+
+/* Deterministic execution of goals - FIXME: non-determinism */
+static p_goal_result p_goal_call(p_context *context, p_term *goal)
+{
+    p_goal_result result;
+    p_term *pred;
+    p_term *name;
+    int arity;
+    p_db_builtin builtin;
+
+    /* Bail out if the goal is a variable */
+    goal = p_term_deref(goal);
+    if (!goal || (goal->header.type & P_TERM_VARIABLE) != 0) {
+        context->error =
+            p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+
+    /* Get the name and arity of the predicate to be called */
+    if (goal->header.type == P_TERM_ATOM) {
+        name = goal;
+        arity = 0;
+    } else if (goal->header.type == P_TERM_FUNCTOR) {
+        /* Handle comma terms, assumed to be right-recursive */
+        if (goal->header.size == 2 &&
+                goal->functor.functor_name == context->comma_atom) {
+            do {
+                result = p_goal_call(context, goal->functor.arg[0]);
+                if (result != P_RESULT_TRUE)
+                    return result;
+                goal = p_term_deref(goal->functor.arg[1]);
+                if (!goal || goal->header.type != P_TERM_FUNCTOR)
+                    break;
+                if (goal->header.size != 2)
+                    break;
+            } while (goal->functor.functor_name != context->comma_atom);
+            return p_goal_call(context, goal);
+        }
+        name = goal->functor.functor_name;
+        arity = (int)(goal->header.size);
+    } else {
+        /* Not an atom or functor, so not a callable term */
+        context->error = p_term_create_functor
+            (context, p_term_create_atom(context, "type_error"), 2);
+        p_term_bind_functor_arg
+            (context->error, 0, p_term_create_atom(context, "callable"));
+        p_term_bind_functor_arg(context->error, 1, goal);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find a builtin to handle the functor */
+    builtin = p_db_builtin_predicate(name, arity);
+    if (builtin) {
+        if (arity != 0) {
+            return (*builtin)
+                (context, goal->functor.arg, &(context->error));
+        } else {
+            return (*builtin)(context, 0, &(context->error));
+        }
+    }
+
+    /* TODO: look for a user-defined predicate to handle the functor */
+
+    /* The predicate does not exist - throw an error or fail */
+    if (context->fail_on_unknown)
+        return P_RESULT_FAIL;
+    context->error = p_term_create_functor
+        (context, p_term_create_atom(context, "existence_error"), 2);
+    p_term_bind_functor_arg
+        (context->error, 0, p_term_create_atom(context, "procedure"));
+    pred = p_term_create_functor
+        (context, p_term_create_atom(context, "/"), 2);
+    p_term_bind_functor_arg(pred, 0, name);
+    p_term_bind_functor_arg
+        (pred, 1, p_term_create_integer(context, arity));
+    p_term_bind_functor_arg(context->error, 1, pred);
+    return P_RESULT_ERROR;
+}
+
+/**
+ * \brief Executes \a goal against the current database state
+ * of \a context.
+ *
+ * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE, or
+ * P_RESULT_ERROR.  The previous goal, if any, will be abandoned
+ * before execution of \a goal starts.
+ *
+ * \ingroup context
+ * \sa p_context_reexecute_goal(), p_context_abandon_goal()
+ * \sa p_context_uncaught_error()
+ */
+p_goal_result p_context_execute_goal(p_context *context, p_term *goal)
+{
+    p_context_abandon_goal(context);
+    context->goal_active = 1;
+    context->goal = goal;
+    context->goal_marker = p_context_mark_trace(context);
+    return p_goal_call(context, goal);
+}
+
+/**
+ * \brief Re-executes the current goal on \a context by forcing a
+ * back-track to find a new solution.
+ *
+ * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE, or
+ * P_RESULT_ERROR reporting the status of the new solution found.
+ * Once P_RESULT_FAIL is reported, no further solutions are possible.
+ *
+ * \ingroup context
+ * \sa p_context_execute_goal(), p_context_abandon_goal()
+ * \sa p_context_uncaught_error()
+ */
+p_goal_result p_context_reexecute_goal(p_context *context)
+{
+    /* TODO */
+    return P_RESULT_FAIL;
+}
+
+/**
+ * \brief Abandons the current goal on \a context.
+ *
+ * All variable bindings that were made as part of the current goal
+ * are removed.  The \a context returns to its original conditions,
+ * except for any side-effects that were performed by the goal.
+ *
+ * \ingroup context
+ * \sa p_context_execute_goal(), p_context_reexecute_goal()
+ * \sa p_context_uncaught_error()
+ */
+void p_context_abandon_goal(p_context *context)
+{
+    if (context->goal_active) {
+        p_context_backtrack_trace(context, context->goal_marker);
+        context->goal_active = 0;
+        context->goal = 0;
+        context->error = 0;
+        context->goal_marker = 0;
+    }
+}
+
+/**
+ * \brief Returns the uncaught error term from the last goal
+ * executed (or re-executed) on \a context; null if no error term.
+ *
+ * \ingroup context
+ * \sa p_context_execute_goal(), p_context_reexecute_goal()
+ * \sa p_context_abandon_goal()
+ */
+p_term *p_context_uncaught_error(p_context *context)
+{
+    return context->error;
+}
+
+/* Used by the unit test framework, not part of the normal API */
+p_term *_p_context_test_goal(p_context *context)
+{
+    p_term *goal = context->test_goal;
+    context->allow_test_goals = 1;
+    context->test_goal = 0;
+    return goal;
 }
 
 /*\@}*/

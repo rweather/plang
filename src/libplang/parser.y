@@ -264,6 +264,7 @@ static p_term *make_class_declaration
 %token K_VARIABLE       "a variable"
 %token K_COLON_DASH     "`:-'"
 %token K_QUEST_DASH     "`?-'"
+%token K_TEST_GOAL      "`??--'"
 %token K_ARROW          "`->'"
 %token K_DOT_TERMINATOR "`.'"
 %token K_OR             "`||'"
@@ -386,6 +387,11 @@ directive
 goal
     : K_QUEST_DASH term K_DOT_TERMINATOR    {
             $$ = unary_term("?-", $2);
+        }
+    | K_TEST_GOAL term K_DOT_TERMINATOR    {
+            /* Goal that is not executed during the consult but
+             * which is saved for unit tests to execute separately */
+            $$ = unary_term("\?\?--", $2);
         }
     ;
 
