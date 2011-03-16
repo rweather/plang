@@ -1,6 +1,10 @@
 check_PROGRAMS = \
+	test-builtins \
 	test-database \
 	test-term
+
+test_builtins_SOURCES = test-builtins.c
+test_builtins_LDADD   = $(top_builddir)/src/libplang/libplang.la
 
 test_database_SOURCES = test-database.c
 test_database_LDADD   = $(top_builddir)/src/libplang/libplang.la

@@ -340,7 +340,7 @@ static p_goal_result p_goal_call(p_context *context, p_term *goal)
                     break;
                 if (goal->header.size != 2)
                     break;
-            } while (goal->functor.functor_name != context->comma_atom);
+            } while (goal->functor.functor_name == context->comma_atom);
             return p_goal_call(context, goal);
         }
         name = goal->functor.functor_name;

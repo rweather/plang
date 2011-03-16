@@ -69,8 +69,6 @@
 #define YY_DECL int yylex(YYSTYPE *lval, YYLTYPE *loc, \
                           p_context *context, yyscan_t *yyscanner)
 
-#define YY_NO_INPUT 1
-
 /* Create a named variable, reusing an existing variable if available */
 p_term *p_term_lex_create_variable
     (p_context *context, p_input_stream *stream, const char *name)
@@ -117,6 +115,8 @@ unsigned int p_term_lex_variable_count(p_input_stream *stream, p_term *var)
     return 0;
 }
 
+static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, int type, int quote);
+
 %}
 
 %option outfile="lex.yy.c"
@@ -137,8 +137,6 @@ IDENTCHAR       ([a-zA-Z_0-9]|"::")
 EXPONENT        [Ee][+-]?{DIGIT}+
 WHITE           [ \t\r\f\v\032]
 AFTERDOT        ({WHITE}|[\n%]|"/*")
-SQCHAR          ("''"|[^'\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
-DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
 
 %%
 
@@ -214,12 +212,16 @@ DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
         RETURNTOK(K_VARIABLE);
     }
 
-{DIGIT}+"."{DIGIT}+({EXPONENT}) {
+{DIGIT}+"."{DIGIT}+({EXPONENT}?) {
         lval->term = p_term_create_real(context, atof(yytext));
         RETURNTOK(K_REAL);
     }
 
-"0'"{SQCHAR}    { /* TODO */ }
+"0'"        {
+        lval->term = p_term_read_quoted_string
+            (context, yyscanner, K_INTEGER, '\'');
+        RETURNTOK(K_INTEGER);
+    }
 
 "0x"{HEX}+      {
         lval->term = p_term_create_integer
@@ -242,8 +244,16 @@ DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
         RETURNTOK(K_INTEGER);
     }
 
-"'"{SQCHAR}*"'"         { /* TODO */ }
-"\""{DQCHAR}*"\""       { /* TODO */ }
+"'"         {
+        lval->term = p_term_read_quoted_string
+            (context, yyscanner, K_ATOM, '\'');
+        RETURNTOK(K_ATOM);
+    }
+"\""        {
+        lval->term = p_term_read_quoted_string
+            (context, yyscanner, K_STRING, '"');
+        RETURNTOK(K_STRING);
+    }
 
 {WHITE}+        ;
 \n              { ++yylineno; }
@@ -260,3 +270,55 @@ DQCHAR          ("\"\""|[^"\\]|\\{OCT}+\\|\\x{HEX}+\\|\\[abrftnv]|\\)
 <MULTI_LINE_COMMENT>\n          { ++yylineno; }
 
 %%
+
+#define BUF_ADD_CHAR(ch)    \
+    do { \
+        if (buflen >= bufmax) { \
+            char *temp_buf = (char *)malloc(bufmax * 2); \
+            memcpy(temp_buf, buf, buflen); \
+            if (buf != static_buf) \
+                free(buf); \
+            buf = temp_buf; \
+            bufmax *= 2; \
+        } \
+        buf[buflen++] = (ch); \
+    } while (0)
+
+/* Read a quoted string from the input stream */
+static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, int type, int quote)
+{
+    struct yyguts_t *yyg = (struct yyguts_t *)scanner;
+    char static_buf[128];
+    char *buf = static_buf;
+    size_t buflen = 0;
+    size_t bufmax = sizeof(buf);
+    int ch;
+    p_term *term;
+    while ((ch = input(scanner)) >= 0 && ch != quote) {
+        if (ch == '\\') {
+            /* TODO: escape sequences */
+        } else if (ch == '\r' || ch == '\n') {
+            /* TODO: report an error for unexpected end of line */
+            if (ch == '\n')
+                ++yylineno;
+            break;
+        } else if (ch != '\0') {
+            BUF_ADD_CHAR(ch);
+        }
+    }
+    if (ch < 0) {
+        /* TODO: report an error for unexpected EOF */
+    }
+    BUF_ADD_CHAR('\0');
+    if (type == K_ATOM) {
+        term = p_term_create_atom(context, buf);
+    } else if (type == K_STRING) {
+        term = p_term_create_string(context, buf);
+    } else {
+        /* TODO: character constants */
+        term = p_term_create_integer(context, 0);
+    }
+    if (buf != static_buf)
+        free(buf);
+    return term;
+}

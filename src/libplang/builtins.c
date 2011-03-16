@@ -26,6 +26,7 @@
  *
  * \par Logic and control
  * \ref fail_0 "fail/0",
+ * \ref false_0 "false/0",
  * \ref true_0 "true/0"
  *
  * \par Term comparison
@@ -39,6 +40,7 @@
  * \par Term unification
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
+ * \ref unifiable_2 "unifiable/2",
  * \ref unify_2 "unify_with_occurs_check/2"
  *
  * \par Type testing
@@ -81,6 +83,7 @@
  * execution through a Plang program.
  *
  * \ref fail_0 "fail/0",
+ * \ref false_0 "false/0",
  * \ref true_0 "true/0"
  */
 /*\@{*/
@@ -89,10 +92,13 @@
  * \addtogroup logic_and_control
  * <hr>
  * \anchor fail_0
- * <b>fail/0</b> - always fail.
+ * \anchor false_0
+ * <b>fail/0</b>, <b>false/0</b> - always fail.
  *
  * \par Usage
  * \b fail
+ * \par
+ * \b false
  *
  * \par Description
  * The \b fail predicate always fails execution of the current goal.
@@ -100,11 +106,15 @@
  * \par Examples
  * \code
  * fail                 fails
- * repeat, f(a), fail   executes f(a) an infinite number of times
+ * false                fails
+ * repeat; f(a); fail   executes f(a) an infinite number of times
  * \endcode
  *
  * \par Compatibility
- * \ref standard "Standard Prolog"
+ * The <b>fail/0</b> predicate is part of
+ * \ref standard "Standard Prolog".  The <b>false/0</b> predicate
+ * exists as an alias in Plang because it is a more natural
+ * opposite to \ref true_0 "true/0".
  *
  * \par See Also
  * \ref true_0 "true/0"
@@ -282,6 +292,7 @@ static p_goal_result p_builtin_term_ne
  * \code
  * f(j) @< f(k)         succeeds
  * f(k) @< f(j)         fails
+ * f(j) @< f(j)         fails
  * 2.0 @< 1             succeeds
  * \endcode
  *
@@ -370,6 +381,7 @@ static p_goal_result p_builtin_term_le
  * \code
  * f(j) @> f(k)         fails
  * f(k) @> f(j)         succeeds
+ * f(j) @> f(j)         fails
  * 2.0 @> 1             fails
  * \endcode
  *
@@ -446,6 +458,7 @@ static p_goal_result p_builtin_term_ge
  *
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
+ * \ref unifiable_2 "unifiable/2",
  * \ref unify_2 "unify_with_occurs_check/2"
  */
 /*\@{*/
@@ -474,13 +487,15 @@ static p_goal_result p_builtin_term_ge
  * \code
  * f(X,b) = f(a,Y)      succeeds with X = a, Y = b
  * f(X,b) = g(X,b)      fails
+ * X = f(X)             fails due to occurs check
  * \endcode
  *
  * \par Compatibility
  * \ref standard "Standard Prolog"
  *
  * \par See Also
- * \ref not_unifiable_2 "(!=)/2"
+ * \ref not_unifiable_2 "(!=)/2",
+ * \ref unifiable_2 "unifiable/2"
  */
 static p_goal_result p_builtin_unify
     (p_context *context, p_term **args, p_term **error)
@@ -510,6 +525,7 @@ static p_goal_result p_builtin_unify
  * \code
  * f(X,b) != f(a,Y)     fails
  * f(X,b) != g(X,b)     succeeds
+ * X != f(X)            succeeds
  * \endcode
  *
  * \par Compatibility
@@ -517,7 +533,8 @@ static p_goal_result p_builtin_unify
  * The new name <b>(!=)/2</b> is the recommended spelling.
  *
  * \par See Also
- * \ref unify_2 "(=)/2"
+ * \ref unify_2 "(=)/2",
+ * \ref unifiable_2 "unifiable/2"
  */
 static p_goal_result p_builtin_not_unifiable
     (p_context *context, p_term **args, p_term **error)
@@ -528,6 +545,42 @@ static p_goal_result p_builtin_not_unifiable
         return P_RESULT_FAIL;
     } else {
         return P_RESULT_TRUE;
+    }
+}
+
+/**
+ * \addtogroup unification
+ * <hr>
+ * \anchor unifiable_2
+ * <b>unifiable/2</b> - tests if two terms are unifiable.
+ *
+ * \par Usage
+ * \b unifiable(\em Term1, \em Term2)
+ *
+ * \par Description
+ * If \em Term1 and \em Term2 can be unified, then succeed
+ * without modifying \em Term1 or \em Term2.  Fails otherwise.
+ *
+ * \par Examples
+ * \code
+ * unifiable(f(X,b), f(a,Y))    succeeds without modifying X or Y
+ * unifiable(f(X,b), g(X,b))    fails
+ * unifiable(X, f(X))           fails due to occurs check
+ * \endcode
+ *
+ * \par See Also
+ * \ref unify_2 "(=)/2",
+ * \ref not_unifiable_2 "(!=)/2"
+ */
+static p_goal_result p_builtin_unifiable
+    (p_context *context, p_term **args, p_term **error)
+{
+    void *marker = p_context_mark_trace(context);
+    if (p_term_unify(context, args[0], args[1], P_BIND_DEFAULT)) {
+        p_context_backtrack_trace(context, marker);
+        return P_RESULT_TRUE;
+    } else {
+        return P_RESULT_FAIL;
     }
 }
 
@@ -847,11 +900,11 @@ static p_goal_result p_builtin_float
  *
  * \par Examples
  * \code
- * float(fred)          fails
- * float(f(X))          fails
- * float(1.5)           fails
- * float(2)             succeeds
- * float("mary")        fails
+ * integer(fred)        fails
+ * integer(f(X))        fails
+ * integer(1.5)         fails
+ * integer(2)           succeeds
+ * integer("mary")      fails
  * \endcode
  *
  * \par Compatibility
@@ -1131,6 +1184,7 @@ void _p_db_init_builtins(p_context *context)
     };
     static struct p_builtin const builtins[] = {
         {"=", 2, p_builtin_unify},
+        {"!=", 2, p_builtin_not_unifiable},
         {"\\=", 2, p_builtin_not_unifiable},
         {"==", 2, p_builtin_term_eq},
         {"!==", 2, p_builtin_term_ne},
@@ -1146,6 +1200,7 @@ void _p_db_init_builtins(p_context *context)
         {"class_object", 2, p_builtin_class_object_2},
         {"compound", 1, p_builtin_compound},
         {"fail", 0, p_builtin_fail},
+        {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
         {"integer", 1, p_builtin_integer},
         {"nonvar", 1, p_builtin_nonvar},
@@ -1154,6 +1209,7 @@ void _p_db_init_builtins(p_context *context)
         {"object", 2, p_builtin_object_2},
         {"string", 1, p_builtin_string},
         {"true", 0, p_builtin_true},
+        {"unifiable", 2, p_builtin_unifiable},
         {"unify_with_occurs_check", 2, p_builtin_unify},
         {"var", 1, p_builtin_var},
         {0, 0, 0}

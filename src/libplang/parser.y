@@ -317,7 +317,7 @@ static p_term *make_class_declaration
 %type <term>        K_ATOM K_INTEGER K_REAL K_STRING K_VARIABLE
 
 %type <term>        declaration directive goal clause callable_term
-%type <term>        class_declaration object_declaration
+%type <term>        class_declaration object_declaration atom
 
 %type <term>        term not_term compare_term additive_term
 %type <term>        multiplicative_term power_term unary_term
@@ -409,13 +409,18 @@ clause
     ;
 
 callable_term
-    : K_ATOM                        { $$ = $1; }
-    | K_ATOM '(' ')'                { $$ = $1; }
-    | K_ATOM '(' arguments ')'      {
+    : atom                          { $$ = $1; }
+    | atom '(' ')'                  { $$ = $1; }
+    | atom '(' arguments ')'        {
             $$ = p_term_create_functor_with_args
                 (context, $1, $3.args, (int)($3.num_args));
             GC_FREE($3.args);
         }
+    ;
+
+atom
+    : K_ATOM                { $$ = $1; }
+    | K_VAR                 { $$ = p_term_create_atom(context, "var"); }
     ;
 
 arguments
@@ -592,7 +597,7 @@ unary_term
     ;
 
 primary_term
-    : K_ATOM                    { $$ = $1; }
+    : atom                      { $$ = $1; }
     | K_INTEGER                 { $$ = $1; }
     | K_REAL                    { $$ = $1; }
     | K_STRING                  { $$ = $1; }
@@ -607,12 +612,12 @@ primary_term
     | '!'    {
             $$ = p_term_create_atom(context, "!");
         }
-    | K_ATOM '(' arguments ')'  {
+    | atom '(' arguments ')'  {
             $$ = p_term_create_functor_with_args
                 (context, $1, $3.args, (int)($3.num_args));
             GC_FREE($3.args);
         }
-    | K_ATOM '(' ')'            { $$ = $1; }
+    | atom '(' ')'              { $$ = $1; }
     | '[' ']'                   { $$ = p_term_nil_atom(context); }
     | '[' list_members ']'      { $$ = finalize_list($2); }
     | '[' list_members '|' term ']' { $$ = finalize_list_tail($2, $4); }
@@ -649,23 +654,23 @@ list_members
     ;
 
 member_reference
-    : K_VARIABLE '.' K_ATOM     {
+    : K_VARIABLE '.' atom     {
             $$.object = $1;
             $$.name = $3;
             $$.auto_create = 0;
         }
-    | K_VARIABLE K_DOT_DOT K_ATOM   {
+    | K_VARIABLE K_DOT_DOT atom   {
             $$.object = $1;
             $$.name = $3;
             $$.auto_create = 1;
         }
-    | member_reference '.' K_ATOM   {
+    | member_reference '.' atom   {
             $$.object = p_term_create_member_variable
                 (context, $1.object, $1.name, $1.auto_create);
             $$.name = $3;
             $$.auto_create = 0;
         }
-    | member_reference K_DOT_DOT K_ATOM {
+    | member_reference K_DOT_DOT atom {
             $$.object = p_term_create_member_variable
                 (context, $1.object, $1.name, $1.auto_create);
             $$.name = $3;
@@ -674,7 +679,7 @@ member_reference
     ;
 
 type_constraint
-    : K_ATOM    {
+    : atom    {
             const char *name = p_term_name($1);
             $$.atom_name = $1;
             $$.name = 0;
@@ -698,7 +703,7 @@ type_constraint
                 $$.name = $1;
             }
         }
-    | K_ATOM '/' K_INTEGER  {
+    | atom '/' K_INTEGER  {
             $$.atom_name = $1;
             $$.name = $1;
             $$.arity = p_term_integer_value($3);
@@ -707,7 +712,7 @@ type_constraint
     ;
 
 new_term
-    : K_NEW K_ATOM '(' K_VARIABLE ')' opt_property_bindings {
+    : K_NEW atom '(' K_VARIABLE ')' opt_property_bindings {
             /* Convert the object construction into a predicate
              * call on new/2 or new/3, passing the property
              * bindings as a list to new/3 */
@@ -736,7 +741,7 @@ properties
     ;
 
 property
-    : K_ATOM ':' argument_term  { $$ = binary_term(":", $1, $3); }
+    : atom ':' argument_term    { $$ = binary_term(":", $1, $3); }
     ;
 
 statements
@@ -826,12 +831,12 @@ jump_statement
     ;
 
 class_declaration
-    : K_CLASS K_ATOM class_body opt_semi    {
+    : K_CLASS atom class_body opt_semi    {
             $$ = make_class_declaration
                 (context, $2, p_term_nil_atom(context),
                  $3.vars, $3.clauses);
         }
-    | K_CLASS K_ATOM ':' K_ATOM class_body opt_semi {
+    | K_CLASS atom ':' atom class_body opt_semi {
             $$ = make_class_declaration
                 (context, $2, $4, $5.vars, $5.clauses);
         }
@@ -893,8 +898,8 @@ member_vars
     ;
 
 member_var
-    : K_ATOM                        { $$ = $1; }
-    | K_ATOM ':' type_constraint    {
+    : atom                          { $$ = $1; }
+    | atom ':' type_constraint      {
             p_term *constraint = $3.atom_name;
             if (!constraint)
                 constraint = p_term_create_atom(context, "object");
@@ -908,7 +913,7 @@ member_var
     ;
 
 object_declaration
-    : K_NEW K_ATOM property_bindings opt_semi    {
+    : K_NEW atom property_bindings opt_semi     {
             /* An object declaration is equivalent to:
              * ?- new class_name (X) { properties }, assertz(X). */
             p_term *var;
