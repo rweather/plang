@@ -177,22 +177,16 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "**"            { RETURNTOK(K_EXP); }
 ".."            { RETURNTOK(K_DOT_DOT); }
 ":="            { RETURNTOK(K_GETS); }
-"accept"        { RETURNTOK(K_ACCEPT); }
 "class"         { RETURNTOK(K_CLASS); }
 "do"            { RETURNTOK(K_DO); }
 "else"          { RETURNTOK(K_ELSE); }
-"fail"          { RETURNTOK(K_FAIL); }
 "for"           { RETURNTOK(K_FOR); }
 "if"            { RETURNTOK(K_IF); }
 "in"            { RETURNTOK(K_IN); }
 "is"            { RETURNTOK(K_IS); }
-"loop"          { RETURNTOK(K_LOOP); }
 "mod"           { RETURNTOK(K_MOD); }
 "new"           { RETURNTOK(K_NEW); }
 "rem"           { RETURNTOK(K_REM); }
-"step"          { RETURNTOK(K_STEP); }
-"stop"          { RETURNTOK(K_STOP); }
-"to"            { RETURNTOK(K_TO); }
 "while"         { RETURNTOK(K_WHILE); }
 "var"           { RETURNTOK(K_VAR); }
 

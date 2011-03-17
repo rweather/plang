@@ -294,22 +294,16 @@ static p_term *make_class_declaration
 %token K_EXP            "`**'"
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
-%token K_ACCEPT         "`accept'"
 %token K_CLASS          "`class'"
 %token K_DO             "`do'"
 %token K_ELSE           "`else'"
-%token K_FAIL           "`fail'"
 %token K_FOR            "`for'"
 %token K_IF             "`if'"
 %token K_IN             "`in'"
 %token K_IS             "`is'"
-%token K_LOOP           "`loop'"
 %token K_MOD            "`mod'"
 %token K_NEW            "`new'"
 %token K_REM            "`rem'"
-%token K_STEP           "`step'"
-%token K_STOP           "`stop'"
-%token K_TO             "`to'"
 %token K_WHILE          "`while'"
 %token K_VAR            "`var'"
 
@@ -326,7 +320,7 @@ static p_term *make_class_declaration
 %type <term>        opt_property_bindings member_var
 
 %type <term>        statement if_statement compound_statement
-%type <term>        loop_statement jump_statement
+%type <term>        loop_statement
 
 %type <list>        list_members properties declaration_list
 %type <list>        member_vars
@@ -418,9 +412,11 @@ callable_term
         }
     ;
 
+/* "var" is a keyword in some limited circumstances, but most
+ * of the time it is an atom */
 atom
-    : K_ATOM                { $$ = $1; }
-    | K_VAR                 { $$ = p_term_create_atom(context, "var"); }
+    : K_ATOM        { $$ = $1; }
+    | K_VAR         { $$ = p_term_create_atom(context, "var"); }
     ;
 
 arguments
@@ -606,9 +602,6 @@ primary_term
             $$ = p_term_create_typed_variable
                 (context, $3.type, $3.name, $3.arity, p_term_name($1));
         }
-    | K_FAIL    {
-            $$ = p_term_create_atom(context, "fail");
-        }
     | '!'    {
             $$ = p_term_create_atom(context, "!");
         }
@@ -754,7 +747,6 @@ statement
     | if_statement          { $$ = $1; }
     | compound_statement    { $$ = $1; }
     | loop_statement        { $$ = $1; }
-    | jump_statement        { $$ = $1; }
     | ';'       {
             $$ = p_term_create_atom(context, "true");
         }
@@ -793,10 +785,7 @@ compound_statement
     ;
 
 loop_statement
-    : K_LOOP compound_statement     {
-            $$ = unary_term("$$loop", $2);
-        }
-    | K_WHILE condition statement   {
+    : K_WHILE condition statement   {
             $$ = binary_term("$$while", $2, $3);
         }
     | K_DO compound_statement K_WHILE condition {
@@ -815,18 +804,6 @@ loop_statement
         }
       K_IN primary_term ')' statement  {
             $$ = ternary_term("$$for", $3, $6, $8);
-        }
-    ;
-
-jump_statement
-    : K_ACCEPT K_IF argument_term ';'   {
-            $$ = unary_term("$$accept_if", $3);
-        }
-    | K_STOP K_IF argument_term ';'     {
-            $$ = unary_term("$$stop_if", $3);
-        }
-    | K_FAIL K_IF argument_term ';'     {
-            $$ = unary_term("$$fail_if", $3);
         }
     ;
 
