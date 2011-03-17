@@ -217,19 +217,14 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
         RETURNTOK(K_INTEGER);
     }
 
-"0x"{HEX}+      {
+"0"[xX]{HEX}+      {
         lval->term = p_term_create_integer
             (context, strtol(yytext + 2, (char **)0, 16));
         RETURNTOK(K_INTEGER);
     }
-"0o"{OCT}+      {
+"0"{OCT}+      {
         lval->term = p_term_create_integer
-            (context, strtol(yytext + 2, (char **)0, 8));
-        RETURNTOK(K_INTEGER);
-    }
-"0b"{BIN}+      {
-        lval->term = p_term_create_integer
-            (context, strtol(yytext + 2, (char **)0, 2));
+            (context, strtol(yytext + 1, (char **)0, 8));
         RETURNTOK(K_INTEGER);
     }
 {DIGIT}+        {
