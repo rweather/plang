@@ -282,7 +282,6 @@ static p_term *make_class_declaration
 %token K_BITWISE_AND    "`/\\'"
 %token K_BITWISE_OR     "`\\/'"
 %token K_BITWISE_NOT    "`\\'"
-%token K_INT_DIV        "`//'"
 %token K_SHIFT_LEFT     "`<<'"
 %token K_SHIFT_RIGHT    "`>>'"
 %token K_EXP            "`**'"
@@ -295,9 +294,7 @@ static p_term *make_class_declaration
 %token K_IF             "`if'"
 %token K_IN             "`in'"
 %token K_IS             "`is'"
-%token K_MOD            "`mod'"
 %token K_NEW            "`new'"
-%token K_REM            "`rem'"
 %token K_WHILE          "`while'"
 %token K_VAR            "`var'"
 
@@ -549,14 +546,8 @@ multiplicative_term
     | multiplicative_term '/' power_term {
             $$ = binary_term("/", $1, $3);
         }
-    | multiplicative_term K_INT_DIV power_term {
-            $$ = binary_term("//", $1, $3);
-        }
-    | multiplicative_term K_REM power_term {
-            $$ = binary_term("rem", $1, $3);
-        }
-    | multiplicative_term K_MOD power_term {
-            $$ = binary_term("mod", $1, $3);
+    | multiplicative_term '%' power_term {
+            $$ = binary_term("%", $1, $3);
         }
     | multiplicative_term K_SHIFT_LEFT power_term {
             $$ = binary_term("<<", $1, $3);

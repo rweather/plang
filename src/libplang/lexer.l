@@ -171,7 +171,6 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "/\\"           { RETURNTOK(K_BITWISE_AND); }
 "\\/"           { RETURNTOK(K_BITWISE_OR); }
 "\\"            { RETURNTOK(K_BITWISE_NOT); }
-"//"            { RETURNTOK(K_INT_DIV); }
 "<<"            { RETURNTOK(K_SHIFT_LEFT); }
 ">>"            { RETURNTOK(K_SHIFT_RIGHT); }
 "**"            { RETURNTOK(K_EXP); }
@@ -184,9 +183,7 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "if"            { RETURNTOK(K_IF); }
 "in"            { RETURNTOK(K_IN); }
 "is"            { RETURNTOK(K_IS); }
-"mod"           { RETURNTOK(K_MOD); }
 "new"           { RETURNTOK(K_NEW); }
-"rem"           { RETURNTOK(K_REM); }
 "while"         { RETURNTOK(K_WHILE); }
 "var"           { RETURNTOK(K_VAR); }
 
@@ -246,7 +243,7 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 
 {WHITE}+        ;
 \n              { ++yylineno; }
-"%".*\n         { ++yylineno; }
+"//".*\n        { ++yylineno; }
 "#!".*\n        { ++yylineno; }
 
 "/*"            { BEGIN(MULTI_LINE_COMMENT); }
