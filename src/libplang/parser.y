@@ -320,10 +320,10 @@ static p_term *make_class_declaration
 %type <term>        opt_property_bindings member_var
 
 %type <term>        statement if_statement compound_statement
-%type <term>        loop_statement
+%type <term>        loop_statement unbind_vars unbind_var
 
 %type <list>        list_members properties declaration_list
-%type <list>        member_vars
+%type <list>        member_vars unbind_var_list
 
 %type <arg_list>    arguments
 %type <r_list>      statements and_term argument_and_term
@@ -785,25 +785,49 @@ compound_statement
     ;
 
 loop_statement
-    : K_WHILE condition statement   {
-            $$ = binary_term("$$while", $2, $3);
+    : K_WHILE unbind_vars condition statement   {
+            $$ = ternary_term("$$while", $2, $3, $4);
         }
-    | K_DO compound_statement K_WHILE condition {
-            $$ = binary_term("$$do", $2, $4);
+    | K_DO unbind_vars compound_statement K_WHILE condition {
+            $$ = ternary_term("$$do", $2, $3, $5);
         }
-    | K_FOR '(' K_VARIABLE  {
+    | K_FOR unbind_vars '(' K_VARIABLE  {
             if (p_term_lex_variable_count
-                    (p_term_get_extra(yyscanner), $3) > 1) {
+                    (p_term_get_extra(yyscanner), $4) > 1) {
                 /* The loop variable cannot appear previously
                  * in the clause; it must be a new variable */
                 yyerror_printf
-                    (&(@3), context, yyscanner,
+                    (&(@4), context, yyscanner,
                      "for loop variable `%s' has been referenced previously",
-                     p_term_name($3));
+                     p_term_name($4));
             }
         }
       K_IN primary_term ')' statement  {
-            $$ = ternary_term("$$for", $3, $6, $8);
+            $$ = p_term_create_functor
+                (context, p_term_create_atom(context, "$$for"), 4);
+            p_term_bind_functor_arg($$, 0, $2);
+            p_term_bind_functor_arg($$, 1, $4);
+            p_term_bind_functor_arg($$, 2, $7);
+            p_term_bind_functor_arg($$, 3, $9);
+        }
+    ;
+
+unbind_vars
+    : '[' unbind_var_list ']'   { $$ = finalize_list($2); }
+    | '[' ']'                   { $$ = p_term_nil_atom(context); }
+    | /* empty */               { $$ = p_term_nil_atom(context); }
+    ;
+
+unbind_var_list
+    : unbind_var_list ',' unbind_var    { append_list($$, $1, $3); }
+    | unbind_var                        { create_list($$, $1); }
+    ;
+
+unbind_var
+    : K_VARIABLE                        { $$ = $1; }
+    | K_VARIABLE ':' type_constraint    {
+            $$ = p_term_create_typed_variable
+                (context, $3.type, $3.name, $3.arity, p_term_name($1));
         }
     ;
 
