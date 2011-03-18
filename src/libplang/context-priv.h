@@ -40,12 +40,14 @@ struct p_context
     p_term *class_name_atom;
     p_term *clause_atom;
     p_term *comma_atom;
+    p_term *line_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trace *trace;
     int trace_top;
 
-    int fail_on_unknown;
+    int fail_on_unknown : 1;
+    int debug : 1;
 
     int goal_active;
     p_term *goal;

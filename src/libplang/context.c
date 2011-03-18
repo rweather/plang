@@ -47,6 +47,7 @@ p_context *p_context_create(void)
     context->class_name_atom = p_term_create_atom(context, "className");
     context->clause_atom = p_term_create_atom(context, ":-");
     context->comma_atom = p_term_create_atom(context, ",");
+    context->line_atom = p_term_create_atom(context, "$$line");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -169,6 +170,22 @@ int p_term_lex_init_extra(p_input_stream *extra, yyscan_t *scanner);
 int p_term_lex_destroy(yyscan_t scanner);
 int p_term_parse(p_context *context, yyscan_t scanner);
 
+/* Dereference a term and strip out "$$line()" declarations */
+P_INLINE p_term *p_term_deref_line(p_context *context, p_term *term)
+{
+    for (;;) {
+        term = p_term_deref(term);
+        if (!term || term->header.type != P_TERM_FUNCTOR)
+            break;
+        if (term->functor.functor_name != context->line_atom)
+            break;
+        if (term->header.size != 3)
+            break;
+        term = p_term_arg(term, 2);
+    }
+    return term;
+}
+
 static int p_context_consult(p_context *context, p_input_stream *stream)
 {
     yyscan_t scanner;
@@ -202,7 +219,7 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
         p_term *test_goal_atom = p_term_create_atom(context, "\?\?--");
         p_term *decl;
         while (list->header.type == P_TERM_LIST) {
-            decl = list->list.head;
+            decl = p_term_deref_line(context, list->list.head);
             if (decl && decl->header.type == P_TERM_FUNCTOR) {
                 if (decl->functor.functor_name == clause_atom) {
                     /* TODO */
@@ -316,7 +333,7 @@ static p_goal_result p_goal_call(p_context *context, p_term *goal)
     p_db_builtin builtin;
 
     /* Bail out if the goal is a variable */
-    goal = p_term_deref(goal);
+    goal = p_term_deref_line(context, goal);
     if (!goal || (goal->header.type & P_TERM_VARIABLE) != 0) {
         context->error =
             p_term_create_atom(context, "instantiation_error");
@@ -465,6 +482,28 @@ p_term *_p_context_test_goal(p_context *context)
     context->allow_test_goals = 1;
     context->test_goal = 0;
     return goal;
+}
+
+/**
+ * \brief Returns the current debug state for \a context.
+ *
+ * \ingroup context
+ * \sa p_context_set_debug()
+ */
+int p_context_is_debug(p_context *context)
+{
+    return context->debug ? 1 : 0;
+}
+
+/**
+ * \brief Sets the current \a debug state for \a context.
+ *
+ * \ingroup context
+ * \sa p_context_is_debug()
+ */
+void p_context_set_debug(p_context *context, int debug)
+{
+    context->debug = debug;
 }
 
 /*\@}*/

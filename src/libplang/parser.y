@@ -26,6 +26,7 @@
 #include "parser.h"
 #include "term-priv.h"
 #include "parser-priv.h"
+#include "context-priv.h"
 
 extern int yylex(YYSTYPE *lval, YYLTYPE *loc, p_context *context, yyscan_t yyscanner);
 extern p_input_stream *p_term_get_extra(yyscan_t yyscanner);
@@ -200,6 +201,28 @@ static p_term *make_class_declaration
 #define clear_variables()   \
     (p_term_get_extra(yyscanner)->num_variables = 0)
 
+/* Add debug line number information to a term */
+static p_term *add_debug_line
+    (p_context *context, p_input_stream *stream,
+     YYLTYPE *loc, p_term *term)
+{
+    p_term *line;
+    if (!context->debug)
+        return term;
+    if (!stream->filename_string) {
+        stream->filename_string =
+            p_term_create_string(context, stream->filename);
+    }
+    line = p_term_create_functor(context, context->line_atom, 3);
+    p_term_bind_functor_arg(line, 0, stream->filename_string);
+    p_term_bind_functor_arg
+        (line, 1, p_term_create_integer(context, loc->first_line));
+    p_term_bind_functor_arg(line, 2, term);
+    return line;
+}
+#define add_debug(loc, term) \
+    (add_debug_line(context, p_term_get_extra(yyscanner), &(loc), term))
+
 %}
 
 /* Bison options */
@@ -339,11 +362,13 @@ file
 
 declaration_list
     : declaration_list declaration  {
-            append_list($$, $1, $2);
+            p_term *decl = add_debug(@2, $2);
+            append_list($$, $1, decl);
             clear_variables();
         }
     | declaration   {
-            create_list($$, $1);
+            p_term *decl = add_debug(@1, $1);
+            create_list($$, decl);
             clear_variables();
         }
     ;
@@ -457,9 +482,13 @@ argument_and_term
     ;
 
 not_term
-    : K_NOT compare_term        { $$ = unary_term("\\+", $2); }
-    | '!' compare_term          { $$ = unary_term("\\+", $2); }
-    | compare_term              { $$ = $1; }
+    : K_NOT compare_term        {
+            $$ = add_debug(@1, unary_term("\\+", $2));
+        }
+    | '!' compare_term          {
+            $$ = add_debug(@1, unary_term("\\+", $2));
+        }
+    | compare_term              { $$ = add_debug(@1, $1); }
     ;
 
 compare_term
@@ -684,8 +713,14 @@ property
     ;
 
 statements
-    : statements statement  { append_r_list($$, $1, $2); }
-    | statement             { create_r_list($$, $1); }
+    : statements statement  {
+            p_term *stmt = add_debug(@2, $2);
+            append_r_list($$, $1, stmt);
+        }
+    | statement             {
+            p_term *stmt = add_debug(@1, $1);
+            create_r_list($$, stmt);
+        }
     ;
 
 statement
@@ -694,7 +729,7 @@ statement
     | compound_statement    { $$ = $1; }
     | loop_statement        { $$ = $1; }
     | ';'       {
-            $$ = p_term_create_atom(context, "true");
+            $$ = add_debug(@1, p_term_create_atom(context, "true"));
         }
     ;
 
@@ -826,6 +861,7 @@ class_member
             p_term_bind_functor_arg(clause, 1, self);
             p_term_bind_functor_arg(clause, 2, p_term_arg($1, 1));
             create_empty_list($$.vars);
+            clause = add_debug(@1, clause);
             create_list($$.clauses, clause);
             clear_variables();
         }
@@ -837,7 +873,7 @@ member_vars
     ;
 
 member_var
-    : atom                          { $$ = $1; }
+    : atom                          { $$ = add_debug(@1, $1); }
     ;
 
 object_declaration
