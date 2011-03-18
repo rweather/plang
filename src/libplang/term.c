@@ -95,14 +95,6 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  */
 
 /**
- * \var P_TERM_TYPED_VARIABLE
- * \ingroup term
- * The term is an unbound variable that has type restrictions on
- * what kind of terms may be bound to it.
- * \sa p_term_create_typed_variable()
- */
-
-/**
  * \var P_TERM_MEMBER_VARIABLE
  * \ingroup term
  * The term is a reference to a member variable within an object.
@@ -348,7 +340,7 @@ p_term *p_term_create_string(p_context *context, const char *str)
  * Returns the variable term.
  *
  * \ingroup term
- * \sa p_term_create_named_variable(), p_term_create_typed_variable()
+ * \sa p_term_create_named_variable()
  */
 p_term *p_term_create_variable(p_context *context)
 {
@@ -382,49 +374,6 @@ p_term *p_term_create_named_variable(p_context *context, const char *name)
     term->header.type = P_TERM_VARIABLE;
     term->header.size = (unsigned int)len;
     strcpy((char *)(term + 1), name);
-    return (p_term *)term;
-}
-
-/**
- * \brief Creates an unbound variable within \a context that has a
- * type constraint.
- *
- * Returns the variable term.  Values that are bound to the variable
- * must be of the specified \a type or unification fails.  If \a type
- * is P_TERM_FUNCTOR or P_TERM_OBJECT, then \a functor_name specifies
- * further information to restrict the type.
- *
- * If \a arg_count is non-zero, and \a type is P_TERM_FUNCTOR,
- * then the term the variable is bound to must be a functor with
- * the specified number of arguments.
- *
- * If \a variable_name is not null, then it is added to the term
- * as the variable's name.  This is intended for debugging purposes.
- *
- * The \a functor_name must be an atom or null.
- *
- * \ingroup term
- * \sa p_term_create_named_variable(), p_term_create_typed_variable()
- */
-p_term *p_term_create_typed_variable(p_context *context, int type, p_term *functor_name, int arg_count, const char *variable_name)
-{
-    size_t len = variable_name ? strlen(variable_name) : 0;
-    struct p_term_typed_var *term;
-    if (len) {
-        term = p_term_malloc(context, struct p_term_typed_var,
-                             sizeof(struct p_term_typed_var) + len + 1);
-    } else {
-        term = p_term_new(context, struct p_term_typed_var);
-    }
-    if (!term)
-        return 0;
-    term->header.type = P_TERM_TYPED_VARIABLE;
-    term->header.size = (unsigned int)len;
-    term->constraint.type = (unsigned int)type;
-    term->constraint.size = (unsigned int)arg_count;
-    term->functor_name = p_term_deref(functor_name);
-    if (len)
-        strcpy((char *)(term + 1), variable_name);
     return (p_term *)term;
 }
 
@@ -558,11 +507,11 @@ p_term *p_term_class_name_atom(p_context *context)
  * Returns the dereferenced version of \a term, or null if
  * \a term is null.  The result may be a variable if it is unbound.
  *
- * Dereferencing is needed when terms of type P_TERM_VARIABLE,
- * P_TERM_TYPED_VARIABLE, or P_TERM_MEMBER_VARIABLE are bound to
- * other terms during unification.  Normally dereferencing is
- * performed automatically by term query functions such as
- * p_term_type(), p_term_arg_count(), p_term_name(), etc.
+ * Dereferencing is needed when terms of type P_TERM_VARIABLE
+ * or P_TERM_MEMBER_VARIABLE are bound to other terms during
+ * unification.  Normally dereferencing is performed automatically
+ * by term query functions such as p_term_type(), p_term_arg_count(),
+ * p_term_name(), etc.
  *
  * \ingroup term
  * \sa p_term_type()
@@ -639,9 +588,6 @@ const char *p_term_name(const p_term *term)
         break;
     case P_TERM_MEMBER_VARIABLE:
         return p_term_name(term->member_var.name);
-    case P_TERM_TYPED_VARIABLE:
-        if (term->typed_var.header.size > 0)
-            return (const char *)(&(term->typed_var) + 1);
     default: break;
     }
     return 0;
@@ -1296,35 +1242,6 @@ static p_term *p_term_resolve_member(p_context *context, p_term *term, int flags
     return value;
 }
 
-/* Determine if an object is an instance of a specific class name */
-static int p_term_is_instance_of_name(p_context *context, p_term *term, p_term *name)
-{
-    p_term *cname = context->class_name_atom;
-    p_term *pname = context->prototype_atom;
-    if (term->object.properties[0].name == cname ||
-            term->object.properties[1].name == cname)
-        return 0;   /* Object is a class, not an instance */
-    if (term->object.properties[0].name != pname)
-        return 0;
-    term = term->object.properties[0].value;
-    while (term != 0) {
-        term = p_term_deref_non_null(term);
-        if (term->header.type != P_TERM_OBJECT)
-            break;
-        if (term->object.properties[0].name == cname) {
-            if (term->object.properties[0].value == name)
-                return 1;
-        } else if (term->object.properties[1].name == cname) {
-            if (term->object.properties[1].value == name)
-                return 1;
-        }
-        if (term->object.properties[0].name != pname)
-            break;
-        term = term->object.properties[0].value;
-    }
-    return 0;
-}
-
 /* Unify an unbound variable against a term */
 static int p_term_unify_variable(p_context *context, p_term *term1, p_term *term2, int flags)
 {
@@ -1341,109 +1258,6 @@ static int p_term_unify_variable(p_context *context, p_term *term1, p_term *term
     /* Bail out if unification is supposed to be non-destructive */
     if (flags & P_BIND_EQUALITY)
         return 0;
-
-    /* Handle typed variables */
-    if (term1->header.type == P_TERM_TYPED_VARIABLE) {
-        switch (term2->header.type) {
-        case P_TERM_FUNCTOR:
-            /* "X : functor" or "X : name/arity" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_FUNCTOR)
-                return 0;
-            if (term1->typed_var.constraint.size > 0) {
-                if (term2->header.size !=
-                        term1->typed_var.constraint.size)
-                    return 0;
-                if (term2->functor.functor_name !=
-                        term1->typed_var.functor_name)
-                    return 0;
-            }
-            break;
-        case P_TERM_LIST:
-            /* "X : list" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_LIST)
-                return 0;
-            break;
-        case P_TERM_ATOM:
-            /* "X : atom" or "X : list" constraint */
-            if (term1->typed_var.constraint.type == P_TERM_LIST) {
-                /* Can bind the nil atom to a list type constraint */
-                if (term2 == context->nil_atom)
-                    break;
-                return 0;
-            } else if (term1->typed_var.constraint.type != P_TERM_ATOM) {
-                /* Expecting something other than an atom */
-                return 0;
-            }
-            break;
-        case P_TERM_STRING:
-            /* "X : string" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_STRING)
-                return 0;
-            break;
-        case P_TERM_INTEGER:
-            /* "X : int" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_INTEGER)
-                return 0;
-            break;
-        case P_TERM_REAL:
-            /* "X : real" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_REAL)
-                return 0;
-            break;
-        case P_TERM_OBJECT:
-            /* "X : object" or "X : classname" constraint */
-            if (term1->typed_var.constraint.type != P_TERM_OBJECT)
-                return 0;
-            if (term1->typed_var.functor_name) {
-                /* Must be an instance of a specific class */
-                if (!p_term_is_instance_of_name
-                        (context, term2, term1->typed_var.functor_name))
-                    return 0;
-            }
-            break;
-        case P_TERM_VARIABLE:
-            /* Bind the free variable to the typed variable */
-            return p_term_bind_var(context, term2, term1, flags);
-        case P_TERM_TYPED_VARIABLE:
-            /* Bind the looser type contraint to the tighter */
-            if (term1->typed_var.constraint.type !=
-                    term2->typed_var.constraint.type)
-                return 0;
-            if (term1->typed_var.constraint.type == P_TERM_FUNCTOR) {
-                if (term1->typed_var.constraint.size > 0) {
-                    if (term2->typed_var.constraint.size > 0) {
-                        if (term1->typed_var.constraint.size !=
-                                term2->typed_var.constraint.size)
-                            return 0;
-                        if (term1->typed_var.functor_name !=
-                                term2->typed_var.functor_name)
-                            return 0;
-                    } else {
-                        return p_term_bind_var
-                            (context, term2, term1, flags);
-                    }
-                }
-            } else if (term1->typed_var.constraint.type == P_TERM_OBJECT) {
-                if (term1->typed_var.functor_name) {
-                    if (term2->typed_var.functor_name) {
-                        /* FIXME: because the class names are atoms,
-                         * not objects, it isn't possible to check
-                         * for inheritance relationships here.  Should
-                         * be able to fix this in the future once we
-                         * have a class database */
-                        if (term1->typed_var.functor_name !=
-                                term2->typed_var.functor_name)
-                            return 0;
-                    } else {
-                        return p_term_bind_var
-                            (context, term2, term1, flags);
-                    }
-                }
-            }
-            break;
-        default: return 0;
-        }
-    }
 
     /* Bind the variable and return */
     if (flags & P_BIND_RECORD_ONE_WAY)
@@ -1707,51 +1521,6 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
             (*print_func)(print_data, "_%lx", (long)term);
         }
         break;
-    case P_TERM_TYPED_VARIABLE:
-        if (term->var.value) {
-            p_term_print_inner(context, term->var.value, print_func,
-                               print_data, level - 1);
-            break;
-        }
-        if (term->header.size > 0)
-            (*print_func)(print_data, "%s", p_term_name(term));
-        else
-            (*print_func)(print_data, "_%lx", (long)term);
-        switch (term->typed_var.constraint.type) {
-        case P_TERM_FUNCTOR:
-            if (term->typed_var.constraint.size > 0) {
-                (*print_func)(print_data, " : %s/%u",
-                              p_term_name(term->typed_var.functor_name),
-                              term->typed_var.constraint.size);
-            } else {
-                (*print_func)(print_data, " : functor");
-            }
-            break;
-        case P_TERM_LIST:
-            (*print_func)(print_data, " : list");
-            break;
-        case P_TERM_ATOM:
-            (*print_func)(print_data, " : atom");
-            break;
-        case P_TERM_STRING:
-            (*print_func)(print_data, " : string");
-            break;
-        case P_TERM_INTEGER:
-            (*print_func)(print_data, " : int");
-            break;
-        case P_TERM_REAL:
-            (*print_func)(print_data, " : real");
-            break;
-        case P_TERM_OBJECT:
-            if (term->typed_var.constraint.size > 0) {
-                (*print_func)(print_data, " : %s",
-                              p_term_name(term->typed_var.functor_name));
-            } else {
-                (*print_func)(print_data, " : object");
-            }
-            break;
-        }
-        break;
     case P_TERM_MEMBER_VARIABLE:
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
@@ -1812,8 +1581,7 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
         7, /* 7: P_TERM_OBJECT */
         0, 0, 0, 0, 0, 0, 0, 0,
         1, /* 16: P_TERM_VARIABLE */
-        1, /* 17: P_TERM_TYPED_VARIABLE */
-        1  /* 18: P_TERM_MEMBER_VARIABLE */
+        1  /* 17: P_TERM_MEMBER_VARIABLE */
     };
 
     /* Dereference the terms */
@@ -1918,7 +1686,6 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
         break;
     case P_TERM_OBJECT:
     case P_TERM_VARIABLE:
-    case P_TERM_TYPED_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
         return (term1 < term2) ? -1 : 1;
     default: break;
@@ -1966,7 +1733,6 @@ int p_term_is_ground(const p_term *term)
     case P_TERM_OBJECT:
         return 1;
     case P_TERM_VARIABLE:
-    case P_TERM_TYPED_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
     case P_TERM_RENAME:
         return 0;
@@ -2044,24 +1810,6 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
             clone = p_term_create_named_variable(context, p_term_name(term));
         else
             clone = p_term_create_variable(context);
-        if (!clone)
-            return 0;
-        _p_context_record_in_trace(context, term);
-        rename = p_term_malloc
-            (context, p_term, sizeof(struct p_term_rename));
-        if (!rename)
-            return 0;
-        rename->header.type = P_TERM_RENAME;
-        rename->rename.var = clone;
-        term->var.value = rename;
-        return clone;
-    case P_TERM_TYPED_VARIABLE:
-        /* Clone a typed variable */
-        clone = p_term_create_typed_variable
-            (context, (int)(term->typed_var.constraint.type),
-             term->typed_var.functor_name,
-             (int)(term->typed_var.constraint.size),
-             p_term_name(term));
         if (!clone)
             return 0;
         _p_context_record_in_trace(context, term);

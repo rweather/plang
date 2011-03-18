@@ -64,13 +64,12 @@
  * <a href="http://pauillac.inria.fr/~deransar/prolog/docs.html">ISO
  * Standard Prolog</a> predicates.  Plang is not a strict subset or
  * superset of Standard Prolog and does not pretend to be.  It contains
- * additional term types for typed variables, member variables,
- * strings, and objects.  It also has a completely new clause syntax
- * based on C-style procedural programming languages.  However,
- * Plang does try to be compatible with the standard when there is
- * no good reason to diverge.  The documentation for the builtin
- * predicates indicate where they attempt compatibility with
- * Standard Prolog.
+ * additional term types for member variables, strings, and objects.
+ * It also has a completely new clause syntax based on C-style
+ * procedural programming languages.  However, Plang does try to
+ * be compatible with the standard when there is no good reason
+ * to diverge.  The documentation for the builtin predicates indicate
+ * where they attempt compatibility with Standard Prolog.
  */
 /*\@{*/
 

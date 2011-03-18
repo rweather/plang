@@ -230,12 +230,6 @@ static p_term *make_class_declaration
         p_term *r_hole;
     } r_list;
     struct {
-        p_term *name;
-        p_term *atom_name;
-        int arity;
-        int type;
-    } constraint;
-    struct {
         p_term *vars;
         p_term *clauses;
     } class_body;
@@ -320,22 +314,20 @@ static p_term *make_class_declaration
 %type <term>        opt_property_bindings member_var
 
 %type <term>        statement if_statement compound_statement
-%type <term>        loop_statement unbind_vars unbind_var
+%type <term>        loop_statement unbind_vars
 
 %type <list>        list_members properties declaration_list
 %type <list>        member_vars unbind_var_list
 
 %type <arg_list>    arguments
 %type <r_list>      statements and_term argument_and_term
-%type <constraint>  type_constraint
 %type <class_body>  class_body
 %type <member_list> class_members class_member
 %type <member_ref>  member_reference
 
 /* Shift/reduce: dangling "else" in if_statement */
 /* Shift/reduce: "!" used as cut vs "!" used as logical negation */
-/* Shift/reduce: dangling ":" in type_constraint */
-%expect 3
+%expect 2
 
 %start file
 %%
@@ -598,10 +590,6 @@ primary_term
     | K_REAL                    { $$ = $1; }
     | K_STRING                  { $$ = $1; }
     | K_VARIABLE                { $$ = $1; }
-    | K_VARIABLE ':' type_constraint    {
-            $$ = p_term_create_typed_variable
-                (context, $3.type, $3.name, $3.arity, p_term_name($1));
-        }
     | '!'    {
             $$ = p_term_create_atom(context, "!");
         }
@@ -668,39 +656,6 @@ member_reference
                 (context, $1.object, $1.name, $1.auto_create);
             $$.name = $3;
             $$.auto_create = 1;
-        }
-    ;
-
-type_constraint
-    : atom    {
-            const char *name = p_term_name($1);
-            $$.atom_name = $1;
-            $$.name = 0;
-            $$.arity = 0;
-            if (!strcmp(name, "int"))
-                $$.type = P_TERM_INTEGER;
-            else if (!strcmp(name, "real"))
-                $$.type = P_TERM_REAL;
-            else if (!strcmp(name, "string"))
-                $$.type = P_TERM_STRING;
-            else if (!strcmp(name, "atom"))
-                $$.type = P_TERM_ATOM;
-            else if (!strcmp(name, "list"))
-                $$.type = P_TERM_LIST;
-            else if (!strcmp(name, "functor"))
-                $$.type = P_TERM_FUNCTOR;
-            else if (!strcmp(name, "object"))
-                $$.type = P_TERM_OBJECT;
-            else {
-                $$.type = P_TERM_OBJECT;
-                $$.name = $1;
-            }
-        }
-    | atom '/' K_INTEGER  {
-            $$.atom_name = $1;
-            $$.name = $1;
-            $$.arity = p_term_integer_value($3);
-            $$.type = P_TERM_FUNCTOR;
         }
     ;
 
@@ -819,16 +774,8 @@ unbind_vars
     ;
 
 unbind_var_list
-    : unbind_var_list ',' unbind_var    { append_list($$, $1, $3); }
-    | unbind_var                        { create_list($$, $1); }
-    ;
-
-unbind_var
-    : K_VARIABLE                        { $$ = $1; }
-    | K_VARIABLE ':' type_constraint    {
-            $$ = p_term_create_typed_variable
-                (context, $3.type, $3.name, $3.arity, p_term_name($1));
-        }
+    : unbind_var_list ',' K_VARIABLE    { append_list($$, $1, $3); }
+    | K_VARIABLE                        { create_list($$, $1); }
     ;
 
 class_declaration
@@ -900,17 +847,6 @@ member_vars
 
 member_var
     : atom                          { $$ = $1; }
-    | atom ':' type_constraint      {
-            p_term *constraint = $3.atom_name;
-            if (!constraint)
-                constraint = p_term_create_atom(context, "object");
-            if ($3.arity) {
-                constraint = binary_term
-                    ("/", constraint,
-                     p_term_create_integer(context, $3.arity));
-            }
-            $$ = binary_term(":", $1, constraint);
-        }
     ;
 
 object_declaration

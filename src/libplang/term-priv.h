@@ -94,15 +94,6 @@ struct p_term_var {
     p_term *value;
 };
 
-/* Can only be unified with a p_term that matches the p_term type
-   information in "constraint" and "functor_name" */
-struct p_term_typed_var {
-    struct p_term_header header;
-    p_term *value;
-    struct p_term_header constraint;
-    p_term *functor_name;               /* Must be an atom or null */
-};
-
 struct p_term_member_var {
     struct p_term_header header;
     p_term *value;
@@ -147,7 +138,6 @@ union p_term {
     struct p_term_atom          atom;
     struct p_term_string        string;
     struct p_term_var           var;
-    struct p_term_typed_var     typed_var;
     struct p_term_member_var    member_var;
     struct p_term_integer       integer;
     struct p_term_real          real;

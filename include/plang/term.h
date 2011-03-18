@@ -38,7 +38,6 @@ enum {
     P_TERM_OBJECT,
 
     P_TERM_VARIABLE         = 16,   /* Used as a flag for all vars */
-    P_TERM_TYPED_VARIABLE,
     P_TERM_MEMBER_VARIABLE,
 };
 
@@ -60,7 +59,6 @@ p_term *p_term_create_atom(p_context *context, const char *name);
 p_term *p_term_create_string(p_context *context, const char *str);
 p_term *p_term_create_variable(p_context *context);
 p_term *p_term_create_named_variable(p_context *context, const char *name);
-p_term *p_term_create_typed_variable(p_context *context, int type, p_term *functor_name, int arg_count, const char *variable_name);
 p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term *name, int auto_create);
 p_term *p_term_create_integer(p_context *context, int value);
 p_term *p_term_create_real(p_context *context, double value);

@@ -577,35 +577,6 @@ static void test_variable()
     P_VERIFY(p_term_deref(0) == 0);
 }
 
-static void test_typed_variable()
-{
-    p_term *var1;
-    p_term *var2;
-    p_term *var3;
-    p_term *var4;
-    p_term *atom;
-
-    var1 = p_term_create_typed_variable(context, P_TERM_ATOM, 0, 0, 0);
-    P_VERIFY(p_term_name(var1) == 0);
-    P_COMPARE(p_term_type(var1), P_TERM_TYPED_VARIABLE);
-
-    var2 = p_term_create_typed_variable(context, P_TERM_ATOM, 0, 0, "");
-    P_VERIFY(p_term_name(var2) == 0);
-    P_COMPARE(p_term_type(var2), P_TERM_TYPED_VARIABLE);
-
-    atom = p_term_create_atom(context, "bar");
-    var3 = p_term_create_typed_variable
-        (context, P_TERM_FUNCTOR, atom, 2, "foo");
-    P_VERIFY(strcmp(p_term_name(var3), "foo") == 0);
-    P_COMPARE(p_term_type(var3), P_TERM_TYPED_VARIABLE);
-    P_VERIFY(p_term_deref(var3) == var3);
-
-    var4 = p_term_create_variable(context);
-    P_VERIFY(p_term_bind_variable(context, var4, var3, P_BIND_DEFAULT));
-
-    P_VERIFY(p_term_deref(var4) == var3);
-}
-
 static void test_member_variable()
 {
     p_term *object;
@@ -1046,7 +1017,6 @@ int main(int argc, char *argv[])
     P_TEST_RUN(real);
     P_TEST_RUN(list);
     P_TEST_RUN(variable);
-    P_TEST_RUN(typed_variable);
     P_TEST_RUN(member_variable);
     P_TEST_RUN(functor);
     P_TEST_RUN(object);
