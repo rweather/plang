@@ -51,7 +51,6 @@ struct p_context
 
     int goal_active;
     p_term *goal;
-    p_term *error;
     void *goal_marker;
 
     int allow_test_goals;
@@ -68,6 +67,8 @@ struct p_trace
 
 int _p_context_record_in_trace(p_context *context, p_term *var);
 int _p_context_record_contents_in_trace(p_context *context, void **location);
+
+p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error);
 
 /** @endcond */
 

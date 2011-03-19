@@ -31,7 +31,7 @@ static p_goal_result execute_goal(const char *source)
     if (p_context_consult_string(context, source) != 0)
         return P_RESULT_ERROR;
     goal = _p_context_test_goal(context);   /* Fetch test goal */
-    return p_context_execute_goal(context, goal);
+    return p_context_execute_goal(context, goal, 0);
 }
 
 #define run_goal(x) execute_goal("\?\?-- " x ".\n")
