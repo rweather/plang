@@ -271,6 +271,21 @@ static p_term *add_debug_line
         p_term *name;
         int auto_create;
     } member_ref;
+    struct {
+        p_term *l_head;
+        p_term *l_tail;
+        int is_default;
+    } case_labels;
+    struct {
+        p_term *l_head;
+        p_term *l_tail;
+        p_term *default_case;
+        int is_default;
+    } switch_case;
+    struct {
+        p_term *case_list;
+        p_term *default_case;
+    } switch_body;
 }
 
 /* Lexical tokens */
@@ -310,7 +325,10 @@ static p_term *add_debug_line
 %token K_EXP            "`**'"
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
+%token K_CASE           "`case'"
+%token K_CATCH          "`catch'"
 %token K_CLASS          "`class'"
+%token K_DEFAULT        "`default'"
 %token K_DO             "`do'"
 %token K_ELSE           "`else'"
 %token K_FOR            "`for'"
@@ -318,6 +336,8 @@ static p_term *add_debug_line
 %token K_IN             "`in'"
 %token K_IS             "`is'"
 %token K_NEW            "`new'"
+%token K_SWITCH         "`switch'"
+%token K_TRY            "`try'"
 %token K_WHILE          "`while'"
 %token K_VAR            "`var'"
 
@@ -334,10 +354,15 @@ static p_term *add_debug_line
 %type <term>        opt_property_bindings member_var
 
 %type <term>        statement if_statement compound_statement
-%type <term>        loop_statement unbind_vars
+%type <term>        loop_statement unbind_vars try_statement
+%type <term>        catch_clause switch_statement
+
+%type <case_labels> case_label case_labels
+%type <switch_case> switch_cases switch_case
+%type <switch_body> switch_body
 
 %type <list>        list_members properties declaration_list
-%type <list>        member_vars unbind_var_list
+%type <list>        member_vars unbind_var_list catch_clauses
 
 %type <arg_list>    arguments
 %type <r_list>      statements and_term argument_and_term
@@ -347,7 +372,8 @@ static p_term *add_debug_line
 
 /* Shift/reduce: dangling "else" in if_statement */
 /* Shift/reduce: "!" used as cut vs "!" used as logical negation */
-%expect 2
+/* Shift/reduce: "catch" clause in "try" statements */
+%expect 3
 
 %start file
 %%
@@ -396,9 +422,15 @@ goal
     : K_QUEST_DASH term K_DOT_TERMINATOR    {
             $$ = unary_term("?-", $2);
         }
-    | K_TEST_GOAL term K_DOT_TERMINATOR    {
+    | K_QUEST_DASH compound_statement       {
+            $$ = unary_term("?-", $2);
+        }
+    | K_TEST_GOAL term K_DOT_TERMINATOR     {
             /* Goal that is not executed during the consult but
              * which is saved for unit tests to execute separately */
+            $$ = unary_term("\?\?--", $2);
+        }
+    | K_TEST_GOAL compound_statement        {
             $$ = unary_term("\?\?--", $2);
         }
     ;
@@ -426,11 +458,11 @@ callable_term
         }
     ;
 
-/* "var" is a keyword in some limited circumstances, but most
- * of the time it is an atom */
+/* Atom or a keyword that is an atom in most circumstances */
 atom
     : K_ATOM        { $$ = $1; }
     | K_VAR         { $$ = p_term_create_atom(context, "var"); }
+    | K_CATCH       { $$ = p_term_create_atom(context, "catch"); }
     ;
 
 arguments
@@ -451,8 +483,7 @@ arguments
     ;
 
 term
-    : term K_OR if_term         { $$ = binary_term(";", $1, $3); }
-    | term ';' if_term          { $$ = binary_term(";", $1, $3); }
+    : term K_OR if_term         { $$ = binary_term("||", $1, $3); }
     | if_term                   { $$ = $1; }
     ;
 
@@ -471,7 +502,7 @@ and_term
 
 argument_term
     : argument_term K_OR argument_and_term {
-            $$ = binary_term(";", $1, finalize_r_list($3));
+            $$ = binary_term("||", $1, finalize_r_list($3));
         }
     | argument_and_term         { $$ = finalize_r_list($1); }
     ;
@@ -483,10 +514,10 @@ argument_and_term
 
 not_term
     : K_NOT compare_term        {
-            $$ = add_debug(@1, unary_term("\\+", $2));
+            $$ = add_debug(@1, unary_term("!", $2));
         }
     | '!' compare_term          {
-            $$ = add_debug(@1, unary_term("\\+", $2));
+            $$ = add_debug(@1, unary_term("!", $2));
         }
     | compare_term              { $$ = add_debug(@1, $1); }
     ;
@@ -728,6 +759,8 @@ statement
     | if_statement          { $$ = $1; }
     | compound_statement    { $$ = $1; }
     | loop_statement        { $$ = $1; }
+    | try_statement         { $$ = $1; }
+    | switch_statement      { $$ = $1; }
     | ';'       {
             $$ = add_debug(@1, p_term_create_atom(context, "true"));
         }
@@ -735,20 +768,25 @@ statement
 
 if_statement
     : K_IF condition statement     {
-            /* Convert the if statement into (A -> B) form */
-            $$ = p_term_create_functor
-                (context, p_term_create_atom(context, "->"), 2);
-            p_term_bind_functor_arg($$, 0, $2);
-            p_term_bind_functor_arg($$, 1, $3);
-        }
-    | K_IF condition statement K_ELSE statement {
-            /* Convert the if statement into (A -> B ; C) form */
+            /* Convert the if statement into (A -> B || true) form */
             p_term *if_stmt = p_term_create_functor
                 (context, p_term_create_atom(context, "->"), 2);
             p_term_bind_functor_arg(if_stmt, 0, $2);
             p_term_bind_functor_arg(if_stmt, 1, $3);
             $$ = p_term_create_functor
-                (context, p_term_create_atom(context, ";"), 2);
+                (context, p_term_create_atom(context, "||"), 2);
+            p_term_bind_functor_arg($$, 0, if_stmt);
+            p_term_bind_functor_arg
+                ($$, 1, p_term_create_atom(context, "true"));
+        }
+    | K_IF condition statement K_ELSE statement {
+            /* Convert the if statement into (A -> B || C) form */
+            p_term *if_stmt = p_term_create_functor
+                (context, p_term_create_atom(context, "->"), 2);
+            p_term_bind_functor_arg(if_stmt, 0, $2);
+            p_term_bind_functor_arg(if_stmt, 1, $3);
+            $$ = p_term_create_functor
+                (context, p_term_create_atom(context, "||"), 2);
             p_term_bind_functor_arg($$, 0, if_stmt);
             p_term_bind_functor_arg($$, 1, $5);
         }
@@ -769,7 +807,7 @@ loop_statement
     : K_WHILE unbind_vars condition statement   {
             $$ = ternary_term("$$while", $2, $3, $4);
         }
-    | K_DO unbind_vars compound_statement K_WHILE condition {
+    | K_DO unbind_vars compound_statement K_WHILE condition ';' {
             $$ = ternary_term("$$do", $2, $3, $5);
         }
     | K_FOR unbind_vars '(' K_VARIABLE  {
@@ -802,6 +840,124 @@ unbind_vars
 unbind_var_list
     : unbind_var_list ',' K_VARIABLE    { append_list($$, $1, $3); }
     | K_VARIABLE                        { create_list($$, $1); }
+    ;
+
+try_statement
+    : K_TRY compound_statement catch_clauses    {
+            $$ = binary_term("$$try", $2, finalize_list($3));
+        }
+    ;
+
+catch_clauses
+    : catch_clauses catch_clause        { append_list($$, $1, $2); }
+    | catch_clause                      { create_list($$, $1); }
+    ;
+
+catch_clause
+    : K_CATCH '(' argument_term ')' compound_statement  {
+            $$ = binary_term("$$catch", $3, $5);
+        }
+    ;
+
+switch_statement
+    : K_SWITCH '(' argument_term ')' '{' switch_body '}' {
+            $$ = ternary_term
+                ("$$switch", $3, $6.case_list, $6.default_case);
+        }
+    ;
+
+switch_body
+    : switch_cases      {
+            $$.case_list = finalize_list($1);
+            if ($1.default_case)
+                $$.default_case = $1.default_case;
+            else
+                $$.default_case = p_term_create_atom(context, "fail");
+        }
+    | /* empty */       {
+            $$.case_list = p_term_nil_atom(context);
+            $$.default_case = p_term_create_atom(context, "fail");
+        }
+    ;
+
+switch_cases
+    : switch_cases switch_case  {
+            append_lists($$, $1, $2);
+            if ($1.is_default) {
+                $$.default_case = $1.default_case;
+                if ($1.is_default == 2 || $2.is_default == 2) {
+                    /* Multiple default cases already reported */
+                    $$.is_default = 2;
+                } else if ($1.is_default && $2.is_default) {
+                    yyerror_printf
+                        (&(@2), context, yyscanner,
+                         "multiple `default' cases in `switch'");
+                    $$.is_default = 2;
+                } else {
+                    $$.is_default = $1.is_default;
+                }
+            } else if ($2.is_default) {
+                $$.default_case = $2.default_case;
+                $$.is_default = $2.is_default;
+            } else {
+                $$.default_case = 0;
+                $$.is_default = 0;
+            }
+        }
+    | switch_case               { $$ = $1; }
+    ;
+
+switch_case
+    : case_labels statement     {
+            p_term *case_list = finalize_list($1);
+            if (case_list != context->nil_atom) {
+                p_term *term = p_term_create_functor
+                    (context, p_term_create_atom(context, "$$case"), 2);
+                p_term_bind_functor_arg(term, 0, case_list);
+                p_term_bind_functor_arg(term, 1, $2);
+                create_list($$, term);
+            } else {
+                create_empty_list($$);
+            }
+            if ($1.is_default) {
+                $$.default_case = $2;
+                $$.is_default = $1.is_default;
+            } else {
+                $$.default_case = 0;
+                $$.is_default = 0;
+            }
+        }
+    ;
+
+case_labels
+    : case_labels case_label    {
+                if ($2.is_default) {
+                    append_lists($$, $1, $2);
+                    if ($1.is_default) {
+                        yyerror_printf
+                            (&(@2), context, yyscanner,
+                             "multiple `default' cases in `switch'");
+                        $$.is_default = 2;
+                    } else {
+                        $$.is_default = 1;
+                    }
+                } else {
+                    append_lists($$, $1, $2);
+                    $$.is_default = $1.is_default;
+                }
+            }
+    | case_label                { $$ = $1; }
+    ;
+
+case_label
+    : K_CASE argument_term ':'  {
+            create_list($$, $2);
+            $$.is_default = 0;
+        }
+    | K_DEFAULT ':'             {
+            create_empty_list($$);
+            $$.is_default = 1;
+        }
     ;
 
 class_declaration

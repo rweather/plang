@@ -24,42 +24,217 @@ P_TEST_DECLARE();
 
 p_term *_p_context_test_goal(p_context *context);
 
-static p_goal_result execute_goal(const char *source)
+static p_goal_result execute_goal(const char *source, const char *expected_error)
 {
     p_term *goal;
+    p_term *error;
+    p_goal_result result;
     _p_context_test_goal(context);          /* Allow goal saving */
     if (p_context_consult_string(context, source) != 0)
         return P_RESULT_ERROR;
     goal = _p_context_test_goal(context);   /* Fetch test goal */
-    return p_context_execute_goal(context, goal, 0);
+    error = 0;
+    result = p_context_execute_goal(context, goal, &error);
+    if (result == P_RESULT_ERROR && expected_error) {
+        p_term *expected;
+        p_context_consult_string(context, expected_error);
+        expected = _p_context_test_goal(context);
+        if (!p_term_unify(context, error, expected, P_BIND_EQUALITY))
+            P_FAIL("did not receive the expected error");
+    }
+    return result;
 }
 
-#define run_goal(x) execute_goal("\?\?-- " x ".\n")
+#define run_goal(x) execute_goal("\?\?-- " x ".\n", 0)
+#define run_goal_error(x,error)     \
+    execute_goal("\?\?-- " x ".\n", "\?\?-- " error ".\n")
+#define run_stmt(x) execute_goal("\?\?-- { " x " }\n", 0)
+#define run_stmt_error(x,error)     \
+    execute_goal("\?\?-- { " x " }\n", "\?\?-- " error ".\n")
 
-static void test_logic_and_control()
+static void test_logic_values()
 {
     P_COMPARE(run_goal("true"), P_RESULT_TRUE);
     P_COMPARE(run_goal("fail"), P_RESULT_FAIL);
     P_COMPARE(run_goal("false"), P_RESULT_FAIL);
 }
 
-static void test_term_comparison()
+static void test_logic_and()
+{
+    P_COMPARE(run_goal("atom(a), atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(X) && atom(a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(a) && atom(a)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(X) && atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(X) && atom(a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(a) && atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(a) && atom(b)"), P_RESULT_TRUE);
+}
+
+static void test_logic_or()
+{
+    P_COMPARE(run_goal("atom(a) || atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(X) || atom(a)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(X) || atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(X) || atom(a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(a) || atom(X)"), P_RESULT_TRUE);
+}
+
+static void test_logic_not()
+{
+    P_COMPARE(run_goal("!atom(a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("X = a, !(X = b), X == a"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("X = a, !(X = a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("X = a, \\+(X = a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("\\+ fail"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("! true"), P_RESULT_FAIL);
+    P_COMPARE(run_goal_error("!X", "instantiation_error"), P_RESULT_ERROR);
+}
+
+static void test_logic_call()
+{
+    P_COMPARE(run_goal("call(fail)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("X = atom(a), call(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("call(X)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("call(1.5)", "type_error(callable, 1.5)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("call((atom(a), 1.5))", "type_error(callable, 1.5)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal("call((!, atom(a)))"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("call((!, fail))"), P_RESULT_FAIL);
+}
+
+static void test_logic_catch()
+{
+    P_COMPARE(run_goal_error("throw(a)", "a"), P_RESULT_ERROR);
+    P_COMPARE(run_goal("catch(throw(a), X, Y = caught), Y == caught"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("catch(atom(a), X, Y = caught), Y !== caught"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("catch(throw(a), b, Y = caught)", "a"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("catch(call(1.5), b, Y = caught)", "type_error(callable, 1.5)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal("catch(throw(a), X, fail)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("catch(atom(a), X, fail)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("catch(throw(a), X, throw(b))", "b"), P_RESULT_ERROR);
+    P_COMPARE(run_goal("catch(catch(throw(a), X, throw(b)), Z, Y = caught), Y == caught"), P_RESULT_TRUE);
+
+    P_COMPARE(run_stmt("try { throw(a); } catch(X) { Y = caught; } Y == caught;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("try { atom(a); } catch(X) { Y = caught; } Y !== caught;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt_error("try { throw(a); } catch(b) { Y = caught; }", "a"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("try { call(1.5); } catch(b) { Y = caught; }", "type_error(callable, 1.5)"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("try { throw(a); } catch(X) { fail; }"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("try { atom(a); } catch(X) { fail; }"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt_error("try { throw(a); } catch(X) { throw(b); }", "b"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("try { throw(a); } catch(X) { throw(b); } catch(Z) { Y = caught; }", "b"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("try { throw(a); } catch(b) { throw(b); } catch(Z) { Y = caught; }; Y == caught;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("try { try { throw(a); } catch(X) { throw(b); } } catch(Z) { Y = caught; } Y == caught;"), P_RESULT_TRUE);
+}
+
+static void test_logic_do()
+{
+    P_COMPARE(run_stmt("do {} while (false);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("do { if (X == f(Y)) Y = a; else X = f(Y); } while (X !== f(a));"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("do { fail; } while (true);"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt_error("do { throw(a); } while (true);", "a"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("do {} while (throw(b));", "b"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("do { if (Y == c) X = b; else X = a; Y = c; } while (X !== b);"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("do [X] { if (Y == c) X = b; else X = a; Y = c; } while (X !== b);"), P_RESULT_TRUE);
+}
+
+static void test_logic_for()
+{
+    P_COMPARE(run_stmt("for (X in []) {}"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt_error("for (X in Y) {}", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("for (X in [a, b, c |Y]) {}", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("for (X in [a, b, c |f(d)]) {}", "type_error(list, f(d))"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("for (X in f(d)) {}", "type_error(list, f(d))"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("for (X in [a, b]) { atom(X); }"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("for (X in [a, b]) { X == a; }"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt_error("for (X in [a, b]) { throw(c); }", "c"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("for (X in [a, b]) { Y = X; }"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("for [Y] (X in [a, b]) { Y = X; }"), P_RESULT_TRUE);
+}
+
+static void test_logic_if_expr()
+{
+    P_COMPARE(run_goal("atom(a) -> atom(b) || atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(a) -> atom(X) || atom(c)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(X) -> atom(X) || atom(c)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("!, atom(X) -> atom(a) || atom(c)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(a) -> atom(a) || atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("call(X) || atom(X)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("call(X) -> atom(a) || atom(X)", "instantiation_error"), P_RESULT_ERROR);
+
+    P_COMPARE(run_goal("atom(a) -> atom(b)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(X) -> atom(b)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(X) -> atom(b)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("!, atom(a) -> atom(b)"), P_RESULT_TRUE);
+}
+
+static void test_logic_if_stmt()
+{
+    P_COMPARE(run_stmt("if (atom(a)) atom(b); else atom(X);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (atom(a)) atom(X); else atom(c);"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("if (atom(X)) atom(X); else atom(c);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (!, atom(X)) atom(a); else atom(c);"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("if (!, atom(a)) atom(a); else atom(X);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt_error("if (call(X)) atom(a); else atom(X);", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("if (X) atom(a); else atom(X);", "instantiation_error"), P_RESULT_ERROR);
+
+    P_COMPARE(run_stmt("if (atom(a)) atom(b);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (atom(X)) atom(Y);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (!, atom(X)) atom(b);"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("if (!, atom(a)) atom(b);"), P_RESULT_TRUE);
+}
+
+static void test_logic_switch()
+{
+    P_COMPARE(run_stmt("switch (a) {}"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("switch (a) { default: true; }"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("switch (a) { case X: Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("switch (f(a)) { case g(X): case f(X): Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("switch (f(a)) { case g(X): Y = c; case f(X): Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("switch (f(a)) { case g(X): Y = c; case h(X): Y = b; default: Y = d; } var(X); Y == d;"), P_RESULT_TRUE);
+}
+
+static void test_logic_while()
+{
+    P_COMPARE(run_stmt("while (false) {}"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("while (X !== f(a)) { if (X == f(Y)) Y = a; else X = f(Y); }"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("while (true) { fail; }"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt_error("while (true) { throw(a); }", "a"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt_error("while (throw(b)) {}", "b"), P_RESULT_ERROR);
+    P_COMPARE(run_stmt("while (X !== b) { if (Y == c) X = b; else X = a; Y = c; }"), P_RESULT_FAIL);
+    P_COMPARE(run_stmt("while [X] (Z !== d) { if (Y == c) { X = b; Z = d; } else { X = a; } Y = c; }"), P_RESULT_TRUE);
+}
+
+static void test_term_eq()
 {
     P_COMPARE(run_goal("X == X"), P_RESULT_TRUE);
     P_COMPARE(run_goal("X == Y"), P_RESULT_FAIL);
     P_COMPARE(run_goal("f(X,Y) == f(X,Y)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(Y,X) == f(X,Y)"), P_RESULT_FAIL);
+}
 
+static void test_term_ne()
+{
     P_COMPARE(run_goal("X !== X"), P_RESULT_FAIL);
     P_COMPARE(run_goal("X !== Y"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(X,Y) !== f(X,Y)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("f(Y,X) !== f(X,Y)"), P_RESULT_TRUE);
 
+    P_COMPARE(run_goal("X \\== X"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("X \\== Y"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("f(X,Y) \\== f(X,Y)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("f(Y,X) \\== f(X,Y)"), P_RESULT_TRUE);
+}
+
+static void test_term_lt()
+{
     P_COMPARE(run_goal("f(j) @< f(k)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(k) @< f(j)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("f(j) @< f(j)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("2.0 @< 1"), P_RESULT_TRUE);
+}
 
+static void test_term_le()
+{
     P_COMPARE(run_goal("f(j) @<= f(k)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(j) @<= f(j)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(k) @<= f(j)"), P_RESULT_FAIL);
@@ -69,12 +244,18 @@ static void test_term_comparison()
     P_COMPARE(run_goal("f(j) @=< f(j)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(k) @=< f(j)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("2.0 @=< 1"), P_RESULT_TRUE);
+}
 
+static void test_term_gt()
+{
     P_COMPARE(run_goal("f(j) @> f(k)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("f(k) @> f(j)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(j) @> f(j)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("2.0 @> 1"), P_RESULT_FAIL);
+}
 
+static void test_term_ge()
+{
     P_COMPARE(run_goal("f(j) @>= f(k)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("f(k) @>= f(j)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("f(j) @>= f(j)"), P_RESULT_TRUE);
@@ -109,7 +290,7 @@ static void test_term_unification()
     P_COMPARE(run_goal("unifiable(f(X,b), f(a,Y)), var(X), var(Y)"), P_RESULT_TRUE);
 }
 
-static void test_type_testing()
+static void test_type_atom()
 {
     P_COMPARE(run_goal("atom(a)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atom(X)"), P_RESULT_FAIL);
@@ -119,7 +300,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("atom(1)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("atom(1.5)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("atom(\"foo\")"), P_RESULT_FAIL);
+}
 
+static void test_type_atomic()
+{
     P_COMPARE(run_goal("atomic(a)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atomic(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("X = a, atomic(X)"), P_RESULT_TRUE);
@@ -128,7 +312,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("atomic(1)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atomic(1.5)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atomic(\"foo\")"), P_RESULT_TRUE);
+}
 
+static void test_type_compound()
+{
     P_COMPARE(run_goal("compound(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("compound([])"), P_RESULT_FAIL);
     P_COMPARE(run_goal("compound(X)"), P_RESULT_FAIL);
@@ -138,7 +325,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("compound(1)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("compound(1.5)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("compound(\"foo\")"), P_RESULT_FAIL);
+}
 
+static void test_type_float()
+{
     P_COMPARE(run_goal("float(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("float(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("float(f(X))"), P_RESULT_FAIL);
@@ -146,7 +336,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("X = 1.5, float(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("float(1)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("float(\"foo\")"), P_RESULT_FAIL);
+}
 
+static void test_type_integer()
+{
     P_COMPARE(run_goal("integer(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("integer(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("integer(f(X))"), P_RESULT_FAIL);
@@ -154,7 +347,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("X = 1, integer(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("integer(1.5)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("integer(\"foo\")"), P_RESULT_FAIL);
+}
 
+static void test_type_nonvar()
+{
     P_COMPARE(run_goal("nonvar(a)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("nonvar(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("nonvar(f(X))"), P_RESULT_TRUE);
@@ -162,7 +358,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("X = a, nonvar(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("nonvar(1.5)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("nonvar(\"foo\")"), P_RESULT_TRUE);
+}
 
+static void test_type_number()
+{
     P_COMPARE(run_goal("number(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("number(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("number(f(X))"), P_RESULT_FAIL);
@@ -170,7 +369,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("X = 1, number(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("number(1.5)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("number(\"foo\")"), P_RESULT_FAIL);
+}
 
+static void test_type_string()
+{
     P_COMPARE(run_goal("string(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("string(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("string(f(X))"), P_RESULT_FAIL);
@@ -178,7 +380,10 @@ static void test_type_testing()
     P_COMPARE(run_goal("string(1.5)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("string(\"foo\")"), P_RESULT_TRUE);
     P_COMPARE(run_goal("X = \"foo\", string(X)"), P_RESULT_TRUE);
+}
 
+static void test_type_var()
+{
     P_COMPARE(run_goal("var(a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("var(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("var(f(X))"), P_RESULT_FAIL);
@@ -194,10 +399,34 @@ int main(int argc, char *argv[])
     P_TEST_INIT("test-builtins");
     P_TEST_CREATE_CONTEXT();
 
-    P_TEST_RUN(logic_and_control);
-    P_TEST_RUN(term_comparison);
+    P_TEST_RUN(logic_values);
+    P_TEST_RUN(logic_and);
+    P_TEST_RUN(logic_or);
+    P_TEST_RUN(logic_not);
+    P_TEST_RUN(logic_call);
+    P_TEST_RUN(logic_catch);
+    P_TEST_RUN(logic_do);
+    P_TEST_RUN(logic_for);
+    P_TEST_RUN(logic_if_expr);
+    P_TEST_RUN(logic_if_stmt);
+    P_TEST_RUN(logic_switch);
+    P_TEST_RUN(logic_while);
+    P_TEST_RUN(term_eq);
+    P_TEST_RUN(term_ne);
+    P_TEST_RUN(term_lt);
+    P_TEST_RUN(term_le);
+    P_TEST_RUN(term_gt);
+    P_TEST_RUN(term_ge);
     P_TEST_RUN(term_unification);
-    P_TEST_RUN(type_testing);
+    P_TEST_RUN(type_atom);
+    P_TEST_RUN(type_atomic);
+    P_TEST_RUN(type_compound);
+    P_TEST_RUN(type_float);
+    P_TEST_RUN(type_integer);
+    P_TEST_RUN(type_nonvar);
+    P_TEST_RUN(type_number);
+    P_TEST_RUN(type_string);
+    P_TEST_RUN(type_var);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

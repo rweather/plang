@@ -48,6 +48,7 @@ p_context *p_context_create(void)
     context->clause_atom = p_term_create_atom(context, ":-");
     context->comma_atom = p_term_create_atom(context, ",");
     context->line_atom = p_term_create_atom(context, "$$line");
+    context->if_atom = p_term_create_atom(context, "->");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -121,7 +122,7 @@ P_INLINE void **p_context_pop_trace(p_context *context, void *marker)
 void *p_context_mark_trace(p_context *context)
 {
     if (context->trace)
-        return (void *)&(context->trace[context->trace_top]);
+        return (void *)&(context->trace->bindings[context->trace_top]);
     else
         return 0;
 }
@@ -317,6 +318,20 @@ int p_context_consult_string(p_context *context, const char *str)
  */
 
 /**
+ * \var P_RESULT_CUT_FAIL
+ * \ingroup context
+ * The goal failed but it contained a \ref cut_0 "!/0" declaration
+ * to reduce further back-tracking at the caller's level.
+ */
+
+/**
+ * \var P_RESULT_CUT_TRUE
+ * \ingroup context
+ * The goal succeeded but it contained a \ref cut_0 "!/0" declaration
+ * to reduce further back-tracking at the caller's level.
+ */
+
+/**
  * \var P_RESULT_ERROR
  * \ingroup context
  * The goal resulted in a thrown error that has not been caught.
@@ -324,7 +339,7 @@ int p_context_consult_string(p_context *context, const char *str)
  */
 
 /* Deterministic execution of goals - FIXME: non-determinism */
-p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
+static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term **error)
 {
     p_goal_result result;
     p_term *pred;
@@ -347,9 +362,14 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
         /* Handle comma terms, assumed to be right-recursive */
         if (goal->header.size == 2 &&
                 goal->functor.functor_name == context->comma_atom) {
+            int have_cut = 0;
             do {
                 result = p_goal_call(context, goal->functor.arg[0], error);
-                if (result != P_RESULT_TRUE)
+                if (result == P_RESULT_CUT_TRUE)
+                    have_cut = 1;
+                else if (result == P_RESULT_FAIL && have_cut)
+                    return P_RESULT_CUT_FAIL;
+                else if (result != P_RESULT_TRUE)
                     return result;
                 goal = p_term_deref(goal->functor.arg[1]);
                 if (!goal || goal->header.type != P_TERM_FUNCTOR)
@@ -357,7 +377,14 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
                 if (goal->header.size != 2)
                     break;
             } while (goal->functor.functor_name == context->comma_atom);
-            return p_goal_call(context, goal, error);
+            result = p_goal_call(context, goal, error);
+            if (have_cut) {
+                if (result == P_RESULT_TRUE)
+                    result = P_RESULT_CUT_TRUE;
+                else if (result == P_RESULT_FAIL)
+                    result = P_RESULT_CUT_FAIL;
+            }
+            return result;
         }
         name = goal->functor.functor_name;
         arity = (int)(goal->header.size);
@@ -367,7 +394,7 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
             (context, p_term_create_atom(context, "type_error"), 2);
         p_term_bind_functor_arg
             (*error, 0, p_term_create_atom(context, "callable"));
-        p_term_bind_functor_arg(*error, 1, goal);
+        p_term_bind_functor_arg(*error, 1, p_term_clone(context, goal));
         return P_RESULT_ERROR;
     }
 
@@ -398,6 +425,14 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
     p_term_bind_functor_arg(*error, 1, pred);
     return P_RESULT_ERROR;
 }
+p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
+{
+    void *marker = p_context_mark_trace(context);
+    p_goal_result result = p_goal_call_inner(context, goal, error);
+    if (result != P_RESULT_TRUE && result != P_RESULT_CUT_TRUE)
+        p_context_backtrack_trace(context, marker);
+    return result;
+}
 
 /**
  * \brief Executes \a goal against the current database state
@@ -425,6 +460,10 @@ p_goal_result p_context_execute_goal
     result = p_goal_call(context, goal, &error_term);
     if (error)
         *error = error_term;
+    if (result == P_RESULT_CUT_TRUE)
+        result = P_RESULT_TRUE;
+    else if (result == P_RESULT_CUT_FAIL)
+        result = P_RESULT_FAIL;
     return result;
 }
 

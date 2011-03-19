@@ -41,6 +41,7 @@ struct p_context
     p_term *clause_atom;
     p_term *comma_atom;
     p_term *line_atom;
+    p_term *if_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trace *trace;

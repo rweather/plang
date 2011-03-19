@@ -146,7 +146,7 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "->"            { RETURNTOK(K_ARROW); }
 "."/{AFTERDOT}  { RETURNTOK(K_DOT_TERMINATOR); }
 "||"            { RETURNTOK(K_OR); }
-"&&"            { RETURNTOK(K_OR); }
+"&&"            { RETURNTOK(K_AND); }
 "\\+"           { RETURNTOK(K_NOT); }
 "\\="           { RETURNTOK(K_NE); }
 "!="            { RETURNTOK(K_NE); }
@@ -176,7 +176,10 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "**"            { RETURNTOK(K_EXP); }
 ".."            { RETURNTOK(K_DOT_DOT); }
 ":="            { RETURNTOK(K_GETS); }
+"case"          { RETURNTOK(K_CASE); }
+"catch"         { RETURNTOK(K_CATCH); }
 "class"         { RETURNTOK(K_CLASS); }
+"default"       { RETURNTOK(K_DEFAULT); }
 "do"            { RETURNTOK(K_DO); }
 "else"          { RETURNTOK(K_ELSE); }
 "for"           { RETURNTOK(K_FOR); }
@@ -184,6 +187,8 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "in"            { RETURNTOK(K_IN); }
 "is"            { RETURNTOK(K_IS); }
 "new"           { RETURNTOK(K_NEW); }
+"switch"        { RETURNTOK(K_SWITCH); }
+"try"           { RETURNTOK(K_TRY); }
 "while"         { RETURNTOK(K_WHILE); }
 "var"           { RETURNTOK(K_VAR); }
 

@@ -20,14 +20,33 @@
 #include <plang/database.h>
 #include "term-priv.h"
 #include "database-priv.h"
+#include "context-priv.h"
 
 /**
  * \defgroup predicates Builtin predicates - Overview
  *
  * \par Logic and control
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_or_2 "(||)/2",
+ * \ref call_1 "call/1",
+ * \ref catch_3 "catch/3",
+ * \ref logical_and_2 "(,)/2",
+ * \ref cut_0 "(!)/0",
+ * \ref do_stmt "do",
+ * \ref not_provable_1 "(!)/1",
+ * \ref not_provable_1 "(\\+)/1",
  * \ref fail_0 "fail/0",
  * \ref false_0 "false/0",
- * \ref true_0 "true/0"
+ * \ref for_stmt "for",
+ * \ref if_stmt "(->)/2",
+ * \ref if_stmt "if",
+ * \ref once_1 "once/1",
+ * \ref repeat_0 "repeat/0",
+ * \ref switch_stmt "switch",
+ * \ref throw_1 "throw/1",
+ * \ref true_0 "true/0",
+ * \ref catch_3 "try",
+ * \ref while_stmt "while"
  *
  * \par Term comparison
  * \ref term_eq_2 "(==)/2",
@@ -75,17 +94,422 @@
 
 /*\@}*/
 
+/* Create a "type_error" term */
+static p_term *p_builtin_type_error
+    (p_context *context, const char *name, p_term *term)
+{
+    p_term *error = p_term_create_functor
+        (context, p_term_create_atom(context, "type_error"), 2);
+    p_term_bind_functor_arg
+        (error, 0, p_term_create_atom(context, name));
+    p_term_bind_functor_arg(error, 1, p_term_clone(context, term));
+    return error;
+}
+
+/* Destructively sets a variable to a value */
+P_INLINE void p_builtin_set_variable(p_term *var, p_term *value)
+{
+    if (!var || (var->header.type & P_TERM_VARIABLE) == 0)
+        return;
+    var->var.value = value;
+}
+
+/* Unbinds a list of local loop variables */
+static void p_builtin_unbind_variables(p_term *list)
+{
+    list = p_term_deref(list);
+    while (list && list->header.type == P_TERM_LIST) {
+        p_builtin_set_variable(list->list.head, 0);
+        list = p_term_deref(list->list.tail);
+    }
+}
+
 /**
  * \defgroup logic_and_control Builtin predicates - Logic and control
  *
  * Predicates in this group are used to structure the flow of
  * execution through a Plang program.
  *
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_or_2 "(||)/2",
+ * \ref call_1 "call/1",
+ * \ref catch_3 "catch/3",
+ * \ref logical_and_2 "(,)/2",
+ * \ref cut_0 "(!)/0",
+ * \ref do_stmt "do",
+ * \ref not_provable_1 "(!)/1",
+ * \ref not_provable_1 "(\\+)/1",
  * \ref fail_0 "fail/0",
  * \ref false_0 "false/0",
- * \ref true_0 "true/0"
+ * \ref for_stmt "for",
+ * \ref if_stmt "(->)/2",
+ * \ref if_stmt "if",
+ * \ref once_1 "once/1",
+ * \ref repeat_0 "repeat/0",
+ * \ref switch_stmt "switch",
+ * \ref throw_1 "throw/1",
+ * \ref true_0 "true/0",
+ * \ref catch_3 "try",
+ * \ref while_stmt "while"
  */
 /*\@{*/
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor logical_and_2
+ * <b>(&amp;&amp;)/2</b>, <b>(,)/2</b> - sequential execution of two goals.
+ *
+ * \par Usage
+ * \em Goal1 <b>&amp;&amp;</b> \em Goal2
+ * \par
+ * \em (Goal1, \em Goal2)
+ *
+ * \par Description
+ * Executes \em Goal1 and then executes \em Goal2 if \em Goal1
+ * was successful.
+ * \par
+ * The <b>(&amp;&amp;)/2</b> form is recommended for use within
+ * boolean conditions for <b>if</b>, <b>while</b>, and similar
+ * statements.  The <b>(,)/2</b> form usually occurs as a result
+ * of parsing the statement sequence { \em Goal1 ; \em Goal2 }.
+ *
+ * \par Examples
+ * \code
+ * nonvar(X); integer(X)
+ * (nonvar(X), integer(X))
+ * if (nonvar(X) && integer(X)) { ... }
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>(,)/2</b> predicate is compatible with
+ * \ref standard "Standard Prolog".  The <b>(&amp;&amp;)/2</b>
+ * predicate is an alias for <b>(,)/2</b>.
+ *
+ * \par See Also
+ * \ref logical_or_2 "(||)/2",
+ * \ref not_provable_1 "(!)/1"
+ */
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor logical_or_2
+ * <b>(||)/2</b> - alternative execution of two goals.
+ *
+ * \par Usage
+ * \em Goal1 <b>||</b> \em Goal2
+ *
+ * \par Description
+ * Executes \em Goal1 and succeeds if \em Goal1 succeeds.
+ * Otherwise executes \em Goal2.
+ *
+ * \par Examples
+ * \code
+ * nonvar(X) || integer(X)
+ * if (atom(X) || integer(X)) { ... }
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog" has a <b>(;)/2</b> predicate
+ * that is used for disjunction.  That predicate has been omitted
+ * from Plang because it conflicts with ";" used as a conjunction
+ * operator in statement lists.
+ *
+ * \par See Also
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref not_provable_1 "(!)/1",
+ * \ref if_stmt "if"
+ */
+static p_goal_result p_builtin_logical_or
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *term = p_term_deref(args[0]);
+    p_goal_result result;
+    if (term->header.type == P_TERM_FUNCTOR &&
+            term->header.size == 2 &&
+            term->functor.functor_name == context->if_atom) {
+        /* The term has the form (A -> B || C) */
+        result = p_goal_call(context, p_term_arg(term, 0), error);
+        if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
+            return p_goal_call(context, p_term_arg(term, 1), error);
+        else if (result == P_RESULT_FAIL)
+            return p_goal_call(context, args[1], error);
+        else if (result == P_RESULT_CUT_FAIL)
+            result = P_RESULT_FAIL;
+        return result;
+    } else {
+        /* Regular disjunction */
+        result = p_goal_call(context, term, error);
+        if (result == P_RESULT_FAIL)
+            result = p_goal_call(context, args[1], error);
+        else if (result == P_RESULT_CUT_FAIL)
+            result = P_RESULT_FAIL;
+        else if (result == P_RESULT_CUT_TRUE)
+            result = P_RESULT_TRUE;
+        return result;
+    }
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor call_1
+ * <b>call/1</b> - meta-execution of a goal.
+ *
+ * \par Usage
+ * \b call(\em Goal)
+ *
+ * \par Description
+ * If \em Goal is a callable term, then execute it as though it
+ * had been compiled normally.  If \em Goal is not a callable term,
+ * then throw an error as described below.
+ *
+ * \par
+ * The effect of a \ref cut_0 "(!)/0" inside \em Goal is limited
+ * to the goal itself and does not affect control flow outside
+ * the <b>call/1</b> term.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - if \em Goal is a variable.
+ * \li <tt>type_error(callable, </tt>\em Goal<tt>)</tt> - if \em Goal
+ *     is not a variable and not callable.
+ *
+ * \par Examples
+ * \code
+ * call(fail)           fails
+ * X = atom(a); call(X) calls atom(a) and then succeeds
+ * call(X)              instantiation_error
+ * call(1.5)            type_error(callable, 1.5)
+ * call((atom(a), 1.5)) atom(a) succeeds and then type_error(callable, 1.5)
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>call/1</b> predicate is mostly compatible with
+ * \ref standard "Standard Prolog".  The main departure is that
+ * Standard Prolog will scan the entire structure of \em Goal
+ * and throw a <tt>type_error</tt> if some part of it is not callable.
+ * The last example above would throw
+ * <tt>type_error(callable, (atom(a), 1.5))</tt> and not execute
+ * <tt>atom(a)</tt> in Standard Prolog.  Plang implements lazy
+ * evaluation of <b>call/1</b> subgoals, so only the outermost
+ * layer of \em Goal is checked before execution begins.
+ *
+ * \par See Also
+ * \ref cut_0 "(!)/0",
+ * \ref once_1 "once/1"
+ */
+static p_goal_result p_builtin_call
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result = p_goal_call(context, args[0], error);
+    if (result == P_RESULT_CUT_FAIL)
+        result = P_RESULT_FAIL;
+    else if (result == P_RESULT_CUT_TRUE)
+        result = P_RESULT_TRUE;
+    return result;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor catch_3
+ * <b>catch/3</b>, <b>try</b> - catches an error that was thrown during
+ * execution of a goal.
+ *
+ * \par Usage
+ * \b catch(\em Goal, \em Pattern, \em Recovery)
+ * \par
+ * \b try { \em Goal } \b catch (\em Pattern1) { \em Recovery1 } \b catch (\em Pattern2) { \em Recovery2 } ...
+ *
+ * \par Description
+ * Executes <b>call</b>(\em Goal) and succeeds or fails accordingly.
+ * If \em Goal throws an error with \ref throw_1 "throw/1", and the
+ * error can be unified with \em Pattern, then <b>call</b>(\em Recovery)
+ * will be executed.  If the error does not unify with \em Pattern,
+ * then the error will continue to be thrown further up the call chain.
+ * \par
+ * In the case of the <b>try</b> statement, each \em PatternN is
+ * tried in turn until a match is found.  The \em RecoveryN goal
+ * for that pattern is then executed.  Note that this is not the
+ * same as \b catch(catch(\em Goal, \em Pattern1, \em Recovery1),
+ * \em Pattern2, \em Recovery2).  The <b>catch/3</b> form may
+ * execute \em Recovery2 if an error is thrown during \em Recovery1.
+ * The <b>try</b> statement form will not.
+ *
+ * \par Compatibility
+ * The <b>catch/3</b> predicate is compatible with
+ * \ref standard "Standard Prolog".  The <b>try ... catch ...</b>
+ * statement is the recommended equivalent in Plang because of its
+ * better support for multiple catch blocks.
+ *
+ * \par See Also
+ * \ref throw_1 "throw/1",
+ * \ref call_1 "call/1"
+ */
+static p_goal_result p_builtin_catch
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result = p_goal_call(context, args[0], error);
+    if (result != P_RESULT_ERROR)
+        return result;
+    if (!p_term_unify(context, args[1], *error, P_BIND_DEFAULT))
+        return result;
+    *error = 0;
+    return p_goal_call(context, args[2], error);
+}
+static p_goal_result p_builtin_try
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *list, *head, *catch;
+    p_goal_result result = p_goal_call(context, args[0], error);
+    if (result != P_RESULT_ERROR)
+        return result;
+    catch = p_term_create_atom(context, "$$catch");
+    list = p_term_deref(args[1]);
+    while (list && list->header.type == P_TERM_LIST) {
+        head = p_term_deref(p_term_head(list));
+        if (head->header.type == P_TERM_FUNCTOR &&
+                head->header.size == 2 &&
+                head->functor.functor_name == catch) {
+            if (p_term_unify(context, p_term_arg(head, 0), *error,
+                             P_BIND_DEFAULT)) {
+                *error = 0;
+                return p_goal_call(context, p_term_arg(head, 1), error);
+            }
+        }
+        list = p_term_deref(p_term_tail(list));
+    }
+    return result;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor cut_0
+ * <b>(!)/0</b> - prunes alternative solutions by cutting unexplored
+ * branches in the solution search tree.
+ *
+ * \par Usage
+ * \b !
+ *
+ * \par Description
+ * The \b ! predicate always succeeds but also prunes alternative
+ * solutions at the next higher goal level.
+ *
+ * \par Examples
+ * \code
+ * !                succeeds
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref call_1 "call/1"
+ */
+static p_goal_result p_builtin_cut
+    (p_context *context, p_term **args, p_term **error)
+{
+    return P_RESULT_CUT_TRUE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor do_stmt
+ * <b>do</b> - repeatedly execute a statement until a
+ * condition is false.
+ *
+ * \par Usage
+ * \b do { \em Statements } (\em Condition);
+ * \par
+ * \b do [\em UnbindVars] { \em Statements } (\em Condition);
+ *
+ * \par Description
+ * The \b do loop evaluates \em Statements, and then evaluates
+ * \em Condition.  If \em Condition is true, then the loop repeats.
+ * If \em Statements fails, then the loop will fail.
+ * \par
+ * If \em UnbindVars is specified, then it contains a list of
+ * local variables that will be unbound at the beginning of
+ * each loop iteration before \em Statements is evaluated.
+ *
+ * \par Examples
+ * \code
+ * X = 1; do { stdout::writeln(X); X ::= X + 1; } while (X <= 10);
+ * X = 1; do [Y] { Y is X * 2; stdout::writeln(Y); X ::= X + 1; } while (X <= 10);
+ * \endcode
+ *
+ * \par See Also
+ * \ref for_stmt "for",
+ * \ref while_stmt "while"
+ */
+static p_goal_result p_builtin_do
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result;
+    for (;;) {
+        if (args[0] != context->nil_atom)
+            p_builtin_unbind_variables(args[0]);
+        result = p_goal_call(context, args[1], error);
+        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+            return P_RESULT_FAIL;
+        else if (result == P_RESULT_ERROR)
+            return P_RESULT_ERROR;
+        result = p_goal_call(context, args[2], error);
+        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+            break;
+        else if (result == P_RESULT_ERROR)
+            return P_RESULT_ERROR;
+    }
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor not_provable_1
+ * <b>(!)/1</b>, <b>(\\+)/1</b> - negation by failure.
+ *
+ * \par Usage
+ * \b ! \em Term
+ * \par
+ * <b>\\+</b> \em Term
+ *
+ * \par Description
+ * If \b call(\em Term) succeeds, then fail; otherwise succeed.
+ *
+ * \par Examples
+ * \code
+ * X = a; !(X = b)      succeeds with X = a
+ * X = a; !(X = a)      fails
+ * \+ fail              succeeds
+ * ! true               fails
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>(\\+)/1</b> predicate is compatible with
+ * \ref standard "Standard Prolog".  The new name <b>(!)/1</b>
+ * is the recommended spelling.
+ *
+ * \par See Also
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_or_2 "(||)/2"
+ */
+static p_goal_result p_builtin_not_provable
+    (p_context *context, p_term **args, p_term **error)
+{
+    void *marker = p_context_mark_trace(context);
+    p_goal_result result = p_goal_call(context, args[0], error);
+    p_context_backtrack_trace(context, marker);
+    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
+        return P_RESULT_FAIL;
+    else if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+        return P_RESULT_TRUE;
+    return result;
+}
 
 /**
  * \addtogroup logic_and_control
@@ -127,6 +551,329 @@ static p_goal_result p_builtin_fail
 /**
  * \addtogroup logic_and_control
  * <hr>
+ * \anchor for_stmt
+ * <b>for</b> - loop over the members of a list.
+ *
+ * \par Usage
+ * \b for (\em Variable \b in \em List) \em Statement
+ * \par
+ * \b for [\em UnbindVars] (\em Variable \b in \em List) \em Statement
+ *
+ * \par Description
+ * The \b for loop iterates over the members of \em List, binding
+ * \em Variable to each member in turn and performing \em Statement.
+ * The \em Variable must have a new name that does not occur
+ * previously in the clause.
+ * \par
+ * If \em Statement fails for a member of \em List, then the loop
+ * will fail.  If \em Statement succeeds for all members of
+ * \em List, then the loop will succeed.
+ * \par
+ * If \em UnbindVars is specified, then it contains a list of
+ * local variables that will be unbound at the beginning of
+ * each loop iteration.  The \em Variable must not appear in
+ * \em UnbindVars.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - if \em List is a variable,
+ *     or the tail of \em List is a variable.
+ * \li <tt>type_error(list, </tt>\em List<tt>)</tt> - if \em List
+ *     is not a variable or a list, or the tail of \em List
+ *     is not a variable or <b>[]</b>.
+ *
+ * \par Examples
+ * \code
+ * for (X in List) { stdout::writeln(X); }
+ * for [Y] (X in List) { Y is X * 2; stdout::writeln(Y); }
+ * \endcode
+ *
+ * \par See Also
+ * \ref do_stmt "do",
+ * \ref while_stmt "while"
+ */
+static p_goal_result p_builtin_for
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *list = p_term_deref(args[2]);
+    p_goal_result result;
+    for (;;) {
+        if (!list || (list->header.type & P_TERM_VARIABLE) != 0) {
+            *error = p_term_create_atom(context, "instantiation_error");
+            return P_RESULT_ERROR;
+        } else if (list == context->nil_atom) {
+            break;
+        } else if (list->header.type != P_TERM_LIST) {
+            *error = p_builtin_type_error(context, "list", list);
+            return P_RESULT_ERROR;
+        }
+        if (args[0] != context->nil_atom)
+            p_builtin_unbind_variables(args[0]);
+        p_builtin_set_variable(args[1], list->list.head);
+        result = p_goal_call(context, args[3], error);
+        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+            return P_RESULT_FAIL;
+        else if (result == P_RESULT_ERROR)
+            return P_RESULT_ERROR;
+        list = p_term_deref(list->list.tail);
+    }
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor if_stmt
+ * <b>(->)/2</b>, <b>if</b> - if-then statement.
+ *
+ * \par Usage
+ * \b if (\em Goal1) \em Goal2
+ * \par
+ * \b if (\em Goal1) \em Goal2 \b else \em Goal3
+ * \par
+ * (\em Goal1 -> \em Goal2 || \b true)
+ * \par
+ * (\em Goal1 -> \em Goal2 || \em Goal3)
+ *
+ * \par Description
+ * The \em Goal1 is executed, and if it succeeds then \em Goal2 is
+ * executed.  If \em Goal1 fails, then \em Goal3 is executed.
+ * If \em Goal3 is omitted, then the statement succeeds if
+ * \em Goal1 fails.
+ * \par
+ * If the goal has the form (\em Goal1 -> \em Goal2) without a
+ * \em Goal3 else goal, then the goal will fail if \em Goal1 fails.
+ * By contrast, \b if (\em Goal1) \em Goal2 will succeed if
+ * \em Goal1 fails.
+ *
+ * \par Examples
+ * \code
+ * if (A) B; else C;
+ * (A -> B || C)
+ * if (A) B;
+ * (A -> B || true)         succeeds if A fails
+ * (A -> B)                 fails if A fails
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>(->)/2</b> predicate is compatible with
+ * \ref standard "Standard Prolog".  Standard prolog expresses
+ * if-then-else as <tt>(A -> B ; C)</tt> which is not supported
+ * in Plang.  The <b>if</b> statement form is the recommended
+ * method to express conditionals in Plang.
+ *
+ * \par See Also
+ * \ref logical_or_2 "(||)/2",
+ * \ref switch_stmt "switch"
+ */
+static p_goal_result p_builtin_if
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result = p_goal_call(context, args[0], error);
+    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
+        return p_goal_call(context, args[1], error);
+    else if (result == P_RESULT_CUT_FAIL)
+        return P_RESULT_FAIL;
+    else
+        return result;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor once_1
+ * <b>once/1</b> - executes a goal only once, ignoring subsequent
+ * solutions.
+ *
+ * \par Usage
+ * \b once(\em Goal)
+ *
+ * \par Description
+ * Executes \b call(\em Goal) and then executes a cut,
+ * \ref cut_0 "(!)/0", to prune searches for further solutions.
+ * In essence, \b once(\em Goal) behaves like \b call(\em Goal, !).
+ *
+ * \par Examples
+ * \code
+ * once((X = a || Y = b))   succeeds with X = a, never performs Y = b
+ * once(fail)               fails
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref call_1 "call/1"
+ */
+static char const p_builtin_once[] =
+    "once(Goal) { call((Goal, !)); }";
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor repeat_0
+ * <b>repeat/0</b> - succeeds repeatedly and indefinitely.
+ *
+ * \par Usage
+ * \b repeat; ...; \b fail
+ *
+ * \par Description
+ * Repeats the sequence of statements between \b repeat and
+ * \b fail indefinitely until a cut, \ref cut_0 "(!)/0",
+ * is encountered.
+ *
+ * \par Examples
+ * \code
+ * repeat; stdout::writeln("hello"); fail
+ *                      outputs "hello" indefinitely
+ * repeat; !            succeeds
+ * repeat; !; fail      fails
+ * repeat; fail         loops indefinitely
+ * repeat; a = b        loops indefinitely due to unification failure
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref fail_0 "fail/0"
+ */
+static char const p_builtin_repeat[] =
+    "repeat() {}"
+    "repeat() { repeat(); }";
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor switch_stmt
+ * <b>switch</b> - switch on a term and choose a matching statement
+ * to handle the term.
+ *
+ * \par Usage
+ * \b switch (\em Term) { \b case \em Label1: \em Statement1; ...; \b case \em LabelN: \em StatementN; \b default: \em DefaultStatement; }
+ *
+ * \par Description
+ * Finds the first \em LabelM term in the \b case list that unifies
+ * with \em Term, and executes the associated \em StatementM.
+ * If none of the \b case labels match, then executes the
+ * \em DefaultStatement associated with the \b default label.
+ * If there is no \b default label, then the \b switch statement fails.
+ * \par
+ * Multiple case labels can be specified for the same statement with
+ * \b case \em Label1: \b case \em Label2: ... \b case \em LabelN: \em Statement.
+ * The \b default label can be mixed with regular \b case labels.
+ * \par
+ * Unlike C/C++, execution does not fall through from
+ * \em StatementM to the following \em StatementM+1.
+ * \par
+ * Once a \em LabelM is found that unifies with \em Term, the \b switch
+ * statement does an implicit cut, \ref cut_0 "(!)/0", to commit the
+ * clause to that choice.  Backtracking does not select later
+ * \b case labels even if they may have otherwise unified
+ * with \em Term.
+ *
+ * \par Examples
+ * \code
+ * eval(Term, Answer) {
+ *     switch (Term) {
+ *         case X + Y: {
+ *             eval(X, XAnswer);
+ *             eval(Y, YAnswer);
+ *             Answer is XAnswer + YAnswer;
+ *         }
+ *         case X - Y: {
+ *             eval(X, XAnswer);
+ *             eval(Y, YAnswer);
+ *             Answer is XAnswer - YAnswer;
+ *         }
+ *         case X * Y: {
+ *             eval(X, XAnswer);
+ *             eval(Y, YAnswer);
+ *             Answer is XAnswer * YAnswer;
+ *         }
+ *         case X / Y: {
+ *             eval(X, XAnswer);
+ *             eval(Y, YAnswer);
+ *             Answer is XAnswer / YAnswer;
+ *         }
+ *         case -X: {
+ *             eval(X, XAnswer);
+ *             Answer is -XAnswer;
+ *         }
+ *         default: {
+ *             if (number(Term))
+ *                 Answer = Term;
+ *             else
+ *                 lookup_variable(Term, Answer);
+ *         }
+ *     }
+ * }
+ *
+ * eval(2 * x + y, Answer)
+ * \endcode
+ *
+ * \par See Also
+ * \ref if_stmt "if"
+ */
+static p_goal_result p_builtin_switch
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *list = p_term_deref(args[1]);
+    p_term *case_atom = p_term_create_atom(context, "$$case");
+    p_term *case_term;
+    p_term *label_list;
+    while (list && list->header.type == P_TERM_LIST) {
+        case_term = p_term_deref(list->list.head);
+        if (case_term && case_term->header.type == P_TERM_FUNCTOR &&
+                case_term->header.size == 2 &&
+                case_term->functor.functor_name == case_atom) {
+            label_list = p_term_deref(p_term_arg(case_term, 0));
+            while (label_list && label_list->header.type == P_TERM_LIST) {
+                if (p_term_unify(context, args[0],
+                                 label_list->list.head,
+                                 P_BIND_DEFAULT)) {
+                    return p_goal_call
+                        (context, p_term_arg(case_term, 1), error);
+                }
+                label_list = p_term_deref(label_list->list.tail);
+            }
+        }
+        list = p_term_deref(list->list.tail);
+    }
+    return p_goal_call(context, args[2], error);
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor throw_1
+ * <b>throw/1</b> - throws an error to an enclosing catch goal.
+ *
+ * \par Usage
+ * \b throw(\em Term)
+ *
+ * \par Description
+ * Throws a freshly renamed version of \em Term as an error to
+ * an enclosing \ref catch_3 "catch/3" goal that matches \em Term.
+ * Plang will backtrack to the matching \ref catch_3 "catch/3"
+ * goal and then execute the associated recovery goal.
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref catch_3 "catch/3"
+ */
+static p_goal_result p_builtin_throw
+    (p_context *context, p_term **args, p_term **error)
+{
+    *error = p_term_clone(context, args[0]);
+    return P_RESULT_ERROR;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
  * \anchor true_0
  * <b>true/0</b> - always succeed.
  *
@@ -150,6 +897,59 @@ static p_goal_result p_builtin_fail
 static p_goal_result p_builtin_true
     (p_context *context, p_term **args, p_term **error)
 {
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor while_stmt
+ * <b>while</b> - repeatedly execute a statement while a
+ * condition is true.
+ *
+ * \par Usage
+ * \b while (\em Condition) \em Statement
+ * \par
+ * \b while [\em UnbindVars] (\em Condition) \em Statement
+ *
+ * \par Description
+ * The \b while loop evaluates \em Condition at the beginning
+ * of each iteration.  If \em Condition is true then \em Statement
+ * will be executed.  Otherwise, the loop terminates.
+ * If \em Statement fails, then the loop will fail.
+ * \par
+ * If \em UnbindVars is specified, then it contains a list of
+ * local variables that will be unbound at the beginning of
+ * each loop iteration before \em Condition is evaluated.
+ *
+ * \par Examples
+ * \code
+ * X = 1; while (X <= 10) { stdout::writeln(X); X ::= X + 1; }
+ * X = 1; while [Y] (X <= 10) { Y is X * 2; stdout::writeln(Y); X ::= X + 1; }
+ * \endcode
+ *
+ * \par See Also
+ * \ref do_stmt "do",
+ * \ref for_stmt "for"
+ */
+static p_goal_result p_builtin_while
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result;
+    for (;;) {
+        if (args[0] != context->nil_atom)
+            p_builtin_unbind_variables(args[0]);
+        result = p_goal_call(context, args[1], error);
+        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+            break;
+        else if (result == P_RESULT_ERROR)
+            return result;
+        result = p_goal_call(context, args[2], error);
+        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
+            return P_RESULT_FAIL;
+        else if (result == P_RESULT_ERROR)
+            return P_RESULT_ERROR;
+    }
     return P_RESULT_TRUE;
 }
 
@@ -1193,30 +1993,54 @@ void _p_db_init_builtins(p_context *context)
         {"@=<", 2, p_builtin_term_le},
         {"@>", 2, p_builtin_term_gt},
         {"@>=", 2, p_builtin_term_ge},
+        {"!", 0, p_builtin_cut},
+        {"!", 1, p_builtin_not_provable},
+        {"\\+", 1, p_builtin_not_provable},
+        {"||", 2, p_builtin_logical_or},
+        {"->", 2, p_builtin_if},
         {"atom", 1, p_builtin_atom},
         {"atomic", 1, p_builtin_atomic},
+        {"call", 1, p_builtin_call},
+        {"catch", 3, p_builtin_catch},
         {"class_object", 1, p_builtin_class_object_1},
         {"class_object", 2, p_builtin_class_object_2},
         {"compound", 1, p_builtin_compound},
+        {"$$do", 3, p_builtin_do},
         {"fail", 0, p_builtin_fail},
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
+        {"$$for", 4, p_builtin_for},
         {"integer", 1, p_builtin_integer},
         {"nonvar", 1, p_builtin_nonvar},
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
         {"string", 1, p_builtin_string},
+        {"$$switch", 3, p_builtin_switch},
+        {"throw", 1, p_builtin_throw},
         {"true", 0, p_builtin_true},
+        {"$$try", 2, p_builtin_try},
         {"unifiable", 2, p_builtin_unifiable},
         {"unify_with_occurs_check", 2, p_builtin_unify},
         {"var", 1, p_builtin_var},
+        {"$$while", 3, p_builtin_while},
         {0, 0, 0}
     };
+    static const char * const builtin_sources[] = {
+        p_builtin_once,
+        p_builtin_repeat,
+        0
+    };
     int index;
+
+    /* Register predicates that are implemented in C */
     for (index = 0; builtins[index].name != 0; ++index) {
         p_db_set_builtin_predicate
             (p_term_create_atom(context, builtins[index].name),
              builtins[index].arity, builtins[index].func);
     }
+
+    /* Register predicates that are implemented in Plang */
+    for (index = 0; builtin_sources[index] != 0; ++index)
+        p_context_consult_string(context, builtin_sources[index]);
 }

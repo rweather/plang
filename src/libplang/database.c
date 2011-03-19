@@ -133,11 +133,8 @@ void _p_db_init(p_context *context)
         {"-",       P_OP_FY,   200},
         {"\\",      P_OP_FY,   200},
 
-#if 0
         /* Operators specific to this implementation that give
-         * better C-style names to some of the above.  These are
-         * implemented as aliases in the parser which are converted
-         * into the traditional operators during parsing */
+         * better C-style names to some of the above */
         {"||",      P_OP_XFY, 1100},    /* ; */
         {"&&",      P_OP_XFY, 1000},    /* , */
         {"!",       P_OP_FY,   900},    /* \+ */
@@ -147,7 +144,6 @@ void _p_db_init(p_context *context)
         {"@<=",     P_OP_XFX,  700},    /* @=< */
         {"<=",      P_OP_XFX,  700},    /* =< */
         {"~",       P_OP_FY,   200},    /* \ */
-#endif
 
         /* New operators specific to this implementation */
         {":=",      P_OP_XFX,  700},    /* Variable assignment */ 
