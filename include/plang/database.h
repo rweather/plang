@@ -44,6 +44,11 @@ typedef p_goal_result (*p_db_builtin)(p_context *context, p_term **args, p_term 
 p_db_builtin p_db_builtin_predicate(const p_term *name, int arity);
 void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin);
 
+int p_db_clause_assert_first(p_context *context, p_term *clause);
+int p_db_clause_assert_last(p_context *context, p_term *clause);
+int p_db_clause_retract(p_context *context, p_term *clause);
+int p_db_clause_abolish(p_context *context, const p_term *name, int arity);
+
 #ifdef __cplusplus
 };
 #endif

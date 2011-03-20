@@ -19,6 +19,7 @@
 
 #include <plang/database.h>
 #include "database-priv.h"
+#include "context-priv.h"
 
 /**
  * \defgroup database Database
@@ -330,6 +331,212 @@ void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
 
     /* Set the builtin */
     info->builtin_func = builtin;
+}
+
+/* Extract the predicate name and arity from a clause */
+static p_term *p_db_predicate_name
+    (p_context *context, p_term *clause, int *arity)
+{
+    p_term *head;
+    clause = p_term_deref(clause);
+    if (!clause || clause->header.type != P_TERM_FUNCTOR ||
+            clause->header.size != 2 ||
+            clause->functor.functor_name != context->clause_atom)
+        return 0;
+    head = p_term_deref(clause->functor.arg[0]);
+    if (!head)
+        return 0;
+    if (head->header.type == P_TERM_ATOM) {
+        *arity = 0;
+        return head;
+    } else if (head->header.type == P_TERM_FUNCTOR) {
+        *arity = (int)(head->header.size);
+        return head->functor.functor_name;
+    }
+    return 0;
+}
+
+/**
+ * \brief Asserts \a clause as the first clause in a database
+ * predicate on \a context.
+ *
+ * Returns non-zero if the clause was added, or zero if the
+ * predicate is read-only.  It is assumed that \a clause is a
+ * freshly renamed term, is well-formed, and the top-level
+ * functor is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_clause_assert_last(), p_db_clause_retract()
+ * \sa p_db_clause_abolish()
+ */
+int p_db_clause_assert_first(p_context *context, p_term *clause)
+{
+    p_database_info *info;
+    p_term *name;
+    int arity;
+    p_term *list;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find or create the information block for the arity */
+    info = p_db_create_arity(name, (unsigned int)arity);
+    if (!info)
+        return 0;
+
+    /* Bail out if the predicate is builtin or read-only */
+    if (info->builtin_func || info->read_only)
+        return 0;
+
+    /* Add the clause to the head of the list */
+    if (info->clauses_head) {
+        list = p_term_create_list(context, clause, info->clauses_head);
+        info->clauses_head = list;
+    } else {
+        list = p_term_create_list(context, clause, 0);
+        info->clauses_head = list;
+        info->clauses_tail = list;
+    }
+    return 1;
+}
+
+/**
+ * \brief Asserts \a clause as the last clause in a database
+ * predicate on \a context.
+ *
+ * Returns non-zero if the clause was added, or zero if the
+ * predicate is read-only.  It is assumed that \a clause is a
+ * freshly renamed term, is well-formed, and the top-level
+ * functor is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_clause_assert_first(), p_db_clause_retract()
+ * \sa p_db_clause_abolish()
+ */
+int p_db_clause_assert_last(p_context *context, p_term *clause)
+{
+    p_database_info *info;
+    p_term *name;
+    int arity;
+    p_term *list;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find or create the information block for the arity */
+    info = p_db_create_arity(name, (unsigned int)arity);
+    if (!info)
+        return 0;
+
+    /* Bail out if the predicate is builtin or read-only */
+    if (info->builtin_func || info->read_only)
+        return 0;
+
+    /* Add the clause to the tail of the list */
+    if (info->clauses_head) {
+        list = p_term_create_list(context, clause, 0);
+        p_term_set_tail(info->clauses_tail, list);
+        info->clauses_tail = list;
+    } else {
+        list = p_term_create_list(context, clause, 0);
+        info->clauses_head = list;
+        info->clauses_tail = list;
+    }
+    return 1;
+}
+
+/**
+ * \brief Retracts \a clause from the predicate database
+ * on \a context.
+ *
+ * Returns a positive value if the clause was retracted, zero if the
+ * predicate is read-only, or a negative value if there are no
+ * more matching clauses.  It is assumed that the top-level
+ * functor of \a clause is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_clause_assert_first(), p_db_clause_assert_last()
+ * \sa p_db_clause_abolish()
+ */
+int p_db_clause_retract(p_context *context, p_term *clause)
+{
+    p_database_info *info;
+    p_term *name;
+    int arity;
+    p_term *list;
+    p_term *prev;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find the information block for the arity */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (!info)
+        return -1;
+
+    /* Bail out if the predicate is builtin or read-only */
+    if (info->builtin_func || info->read_only)
+        return 0;
+
+    /* Retract the first clause that unifies */
+    list = info->clauses_head;
+    prev = 0;
+    while (list) {
+        if (p_term_unify(context, clause, list->list.head,
+                         P_BIND_DEFAULT)) {
+            if (prev)
+                p_term_set_tail(prev, list->list.tail);
+            else
+                info->clauses_head = list->list.tail;
+            if (!list->list.tail)
+                info->clauses_tail = prev;
+            return 1;
+        }
+        prev = list;
+        list = list->list.tail;
+    }
+    return -1;
+}
+
+/**
+ * \brief Abolishes all clauses from the predicate database
+ * on \a context that match \a name and \a arity.
+ *
+ * Returns non-zero if the clauses were abolished, or zero if the
+ * predicate is read-only.
+ *
+ * \ingroup database
+ * \sa p_db_clause_assert_first(), p_db_clause_assert_last()
+ * \sa p_db_clause_retract()
+ */
+int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 1;   /* Absolishing a non-existent clause succeeds */
+
+    /* Find the information block for the arity */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (!info)
+        return 1;   /* Absolishing a non-existent clause succeeds */
+
+    /* Bail out if the predicate is builtin or read-only */
+    if (info->builtin_func || info->read_only)
+        return 0;
+
+    /* Retract all of the clauses */
+    info->clauses_head = 0;
+    info->clauses_tail = 0;
+    return 1;
 }
 
 /*\@}*/

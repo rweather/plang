@@ -45,10 +45,13 @@ struct p_database_info
 {
     p_database_info *next;
     unsigned int arity;
-    unsigned int op_specifier : 16;
+    unsigned int read_only : 1;
+    unsigned int op_specifier : 15;
     unsigned int op_priority : 16;
     p_db_builtin builtin_func;
     p_class_info *class_info;
+    p_term *clauses_head;
+    p_term *clauses_tail;
 };
 
 void _p_db_init(p_context *context);

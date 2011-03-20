@@ -49,6 +49,7 @@ p_context *p_context_create(void)
     context->comma_atom = p_term_create_atom(context, ",");
     context->line_atom = p_term_create_atom(context, "$$line");
     context->if_atom = p_term_create_atom(context, "->");
+    context->slash_atom = p_term_create_atom(context, "/");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -344,8 +345,10 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
     p_goal_result result;
     p_term *pred;
     p_term *name;
-    int arity;
+    unsigned int arity;
     p_db_builtin builtin;
+    p_database_info *info;
+    void *marker;
 
     /* Bail out if the goal is a variable */
     goal = p_term_deref_line(context, goal);
@@ -387,7 +390,7 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
             return result;
         }
         name = goal->functor.functor_name;
-        arity = (int)(goal->header.size);
+        arity = goal->header.size;
     } else {
         /* Not an atom or functor, so not a callable term */
         *error = p_term_create_functor
@@ -399,16 +402,43 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
     }
 
     /* Find a builtin to handle the functor */
-    builtin = p_db_builtin_predicate(name, arity);
-    if (builtin) {
-        if (arity != 0) {
+    info = name->atom.db_info;
+    while (info && info->arity != arity)
+        info = info->next;
+    if (info && (builtin = info->builtin_func) != 0) {
+        if (arity != 0)
             return (*builtin)(context, goal->functor.arg, error);
-        } else {
+        else
             return (*builtin)(context, 0, error);
-        }
     }
 
-    /* TODO: look for a user-defined predicate to handle the functor */
+    /* Look for a user-defined predicate to handle the functor */
+    if (info && info->clauses_head) {
+        p_term *clause_list = info->clauses_head;
+        p_term *body;
+        while (clause_list != 0) {
+            /* Try each clause in turn and commit to the one that
+             * succeeds, throws an error, or fails with cut.
+             * TODO: non-determinism and backtracking */
+            marker = p_context_mark_trace(context);
+            body = p_term_unify_clause
+                (context, goal, clause_list->list.head);
+            if (body) {
+                if (body == P_TERM_TRUE_BODY)
+                    return P_RESULT_TRUE;
+                result = p_goal_call(context, body, error);
+                if (result == P_RESULT_TRUE ||
+                        result == P_RESULT_CUT_TRUE)
+                    return P_RESULT_TRUE;
+                else if (result == P_RESULT_CUT_FAIL)
+                    return P_RESULT_FAIL;
+                else if (result == P_RESULT_ERROR)
+                    return P_RESULT_ERROR;
+                p_context_backtrack_trace(context, marker);
+            }
+            clause_list = clause_list->list.tail;
+        }
+    }
 
     /* The predicate does not exist - throw an error or fail */
     if (context->fail_on_unknown)
@@ -421,7 +451,7 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
         (context, p_term_create_atom(context, "/"), 2);
     p_term_bind_functor_arg(pred, 0, name);
     p_term_bind_functor_arg
-        (pred, 1, p_term_create_integer(context, arity));
+        (pred, 1, p_term_create_integer(context, (int)arity));
     p_term_bind_functor_arg(*error, 1, pred);
     return P_RESULT_ERROR;
 }

@@ -137,6 +137,7 @@ IDENTCHAR       ([a-zA-Z_0-9]|"::")
 EXPONENT        [Ee][+-]?{DIGIT}+
 WHITE           [ \t\r\f\v\032]
 AFTERDOT        ({WHITE}|[\n%]|"/*")
+NEG             (-?)
 
 %%
 
@@ -144,6 +145,7 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
 "?-"            { RETURNTOK(K_QUEST_DASH); }
 "??--"          { RETURNTOK(K_TEST_GOAL); }
 "->"            { RETURNTOK(K_ARROW); }
+"-->"           { RETURNTOK(K_DARROW); }
 "."/{AFTERDOT}  { RETURNTOK(K_DOT_TERMINATOR); }
 "||"            { RETURNTOK(K_OR); }
 "&&"            { RETURNTOK(K_AND); }
@@ -208,7 +210,7 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
         RETURNTOK(K_VARIABLE);
     }
 
-{DIGIT}+"."{DIGIT}+({EXPONENT}?) {
+{NEG}{DIGIT}+"."{DIGIT}+({EXPONENT}?) {
         lval->term = p_term_create_real(context, atof(yytext));
         RETURNTOK(K_REAL);
     }
@@ -219,17 +221,17 @@ AFTERDOT        ({WHITE}|[\n%]|"/*")
         RETURNTOK(K_INTEGER);
     }
 
-"0"[xX]{HEX}+      {
+{NEG}"0"[xX]{HEX}+      {
         lval->term = p_term_create_integer
             (context, strtol(yytext + 2, (char **)0, 16));
         RETURNTOK(K_INTEGER);
     }
-"0"{OCT}+      {
+{NEG}"0"{OCT}+      {
         lval->term = p_term_create_integer
             (context, strtol(yytext + 1, (char **)0, 8));
         RETURNTOK(K_INTEGER);
     }
-{DIGIT}+        {
+{NEG}{DIGIT}+        {
         lval->term = p_term_create_integer
             (context, strtol(yytext, (char **)0, 10));
         RETURNTOK(K_INTEGER);

@@ -298,6 +298,7 @@ static p_term *add_debug_line
 %token K_QUEST_DASH     "`?-'"
 %token K_TEST_GOAL      "`??--'"
 %token K_ARROW          "`->'"
+%token K_DARROW         "`-->'"
 %token K_DOT_TERMINATOR "`.'"
 %token K_OR             "`||'"
 %token K_AND            "`&&'"
@@ -351,7 +352,7 @@ static p_term *add_debug_line
 %type <term>        multiplicative_term power_term unary_term
 %type <term>        primary_term condition if_term argument_term
 %type <term>        new_term property property_bindings
-%type <term>        opt_property_bindings member_var
+%type <term>        opt_property_bindings member_var bracketed_term
 
 %type <term>        statement if_statement compound_statement
 %type <term>        loop_statement unbind_vars try_statement
@@ -480,6 +481,14 @@ arguments
             $$.num_args = 1;
             $$.max_args = 4;
         }
+    ;
+
+bracketed_term
+    : term                      { $$ = $1; }
+    | term K_COLON_DASH term    { $$ = binary_term(":-", $1, $3); }
+    | term K_DARROW term        { $$ = binary_term("-->", $1, $3); }
+    | K_COLON_DASH term         { $$ = unary_term(":-", $2); }
+    | K_QUEST_DASH term         { $$ = unary_term("?-", $2); }
     ;
 
 term
@@ -653,7 +662,7 @@ primary_term
     | '[' ']'                   { $$ = p_term_nil_atom(context); }
     | '[' list_members ']'      { $$ = finalize_list($2); }
     | '[' list_members '|' term ']' { $$ = finalize_list_tail($2, $4); }
-    | '(' term ')'              { $$ = $2; }
+    | '(' bracketed_term ')'    { $$ = $2; }
     | member_reference          {
             $$ = p_term_create_member_variable
                 (context, $1.object, $1.name, $1.auto_create);

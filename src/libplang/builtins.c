@@ -25,6 +25,12 @@
 /**
  * \defgroup predicates Builtin predicates - Overview
  *
+ * \par Clause handling
+ * \ref abolish_1 "abolish/1",
+ * \ref asserta_1 "asserta/1",
+ * \ref assertz_1 "assertz/1",
+ * \ref retract_1 "retract/1"
+ *
  * \par Logic and control
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2",
@@ -106,6 +112,32 @@ static p_term *p_builtin_type_error
     return error;
 }
 
+/* Create a "domain_error" term */
+static p_term *p_builtin_domain_error
+    (p_context *context, const char *name, p_term *term)
+{
+    p_term *error = p_term_create_functor
+        (context, p_term_create_atom(context, "domain_error"), 2);
+    p_term_bind_functor_arg
+        (error, 0, p_term_create_atom(context, name));
+    p_term_bind_functor_arg(error, 1, p_term_clone(context, term));
+    return error;
+}
+
+/* Create a "permission_error" term */
+static p_term *p_builtin_permission_error
+    (p_context *context, const char *name1, const char *name2, p_term *term)
+{
+    p_term *error = p_term_create_functor
+        (context, p_term_create_atom(context, "permission_error"), 3);
+    p_term_bind_functor_arg
+        (error, 0, p_term_create_atom(context, name1));
+    p_term_bind_functor_arg
+        (error, 1, p_term_create_atom(context, name2));
+    p_term_bind_functor_arg(error, 2, p_term_clone(context, term));
+    return error;
+}
+
 /* Destructively sets a variable to a value */
 P_INLINE void p_builtin_set_variable(p_term *var, p_term *value)
 {
@@ -123,6 +155,371 @@ static void p_builtin_unbind_variables(p_term *list)
         list = p_term_deref(list->list.tail);
     }
 }
+
+/**
+ * \defgroup clause_handling Builtin predicates - Clause handling
+ *
+ * Predicates in this group are used to add and remove clauses
+ * from the predicate database.
+ *
+ * \ref abolish_1 "abolish/1",
+ * \ref asserta_1 "asserta/1",
+ * \ref assertz_1 "assertz/1",
+ * \ref retract_1 "retract/1"
+ */
+/*\@{*/
+
+static p_term *p_builtin_parse_indicator
+    (p_context *context, p_term *pred, int *arity, p_term **error)
+{
+    p_term *name_term;
+    p_term *arity_term;
+    pred = p_term_deref(pred);
+    if (!pred || (pred->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return 0;
+    } else if (pred->header.type != P_TERM_FUNCTOR ||
+               pred->header.size != 2 ||
+               pred->functor.functor_name != context->slash_atom) {
+        *error = p_builtin_type_error
+            (context, "predicate_indicator", pred);
+        return 0;
+    }
+    name_term = p_term_deref(pred->functor.arg[0]);
+    arity_term = p_term_deref(pred->functor.arg[1]);
+    if (!name_term || (name_term->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return 0;
+    }
+    if (!arity_term || (arity_term->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return 0;
+    }
+    if (arity_term->header.type != P_TERM_INTEGER) {
+        *error = p_builtin_type_error(context, "integer", arity_term);
+        return 0;
+    }
+    if (name_term->header.type != P_TERM_ATOM) {
+        *error = p_builtin_type_error(context, "atom", name_term);
+        return 0;
+    }
+    *arity = p_term_integer_value(arity_term);
+    if (*arity < 0) {
+        *error = p_builtin_domain_error
+            (context, "not_less_than_zero", arity_term);
+        return 0;
+    }
+    return name_term;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor abolish_1
+ * <b>abolish/1</b> - removes a user-defined predicate from
+ * the predicate database.
+ *
+ * \par Usage
+ * \b abolish(\em Pred)
+ *
+ * \par Description
+ * Removes all clauses from the predicate database that are
+ * associated with the predicate indicator \em Pred and succeeds.
+ * The indicator should have the form \em Name / \em Arity.
+ * If the predicate does not exist, then succeeds.
+ * \par
+ * Removing a predicate that is in the process of being executed
+ * leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - one of \em Pred, \em Name,
+ *     or \em Arity, is a variable.
+ * \li <tt>type_error(predicate_indicator, \em Pred)</tt> - \em Pred
+ *     does not have the form \em Name / \em Arity.
+ * \li <tt>type_error(integer, \em Arity)</tt> - \em Arity is not
+ *     an integer.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not an atom.
+ * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Arity
+ *     is less than zero.
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     \em Pred is a builtin or read-only predicate.
+ *
+ * \par Examples
+ * \code
+ * abolish(userdef/3)       succeeds
+ * abolish(Pred)            instantiation_error
+ * abolish(Name/3)          instantiation_error
+ * abolish(userdef/Arity)   instantiation_error
+ * abolish(1.5)             type_error(predicate_indicator, 1.5)
+ * abolish(userdef/a)       type_error(integer, a)
+ * abolish(1/a)             type_error(integer, a)
+ * abolish(1/3)             type_error(atom, 1)
+ * abolish(userdef/-3)      domain_error(not_less_than_zero, -3)
+ * abolish(abolish/1)       permission_error(modify, static_procedure, abolish/1)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref asserta_1 "asserta/1",
+ * \ref retract_1 "retract/1"
+ */
+static p_goal_result p_builtin_abolish
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *name;
+    int arity;
+    name = p_builtin_parse_indicator(context, args[0], &arity, error);
+    if (!name)
+        return P_RESULT_ERROR;
+    if (!p_db_clause_abolish(context, name, arity)) {
+        *error = p_builtin_permission_error
+            (context, "modify", "static_procedure", args[0]);
+        return P_RESULT_ERROR;
+    }
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor asserta_1
+ * \anchor assertz_1
+ * <b>asserta/1</b>, <b>assertz/1</b> - adds a clause to the
+ * start/end of a user-defined predicate in the predicate database.
+ *
+ * \par Usage
+ * \b asserta(\em Clause)
+ * \par
+ * \b assertz(\em Clause)
+ *
+ * \par Description
+ * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
+ * then break it down into \em Head :- \em Body.  Otherwise, let
+ * \em Head be \em Clause and \em Body be \b true.
+ * \par
+ * A freshly renamed version of the clause \em Head :- \em Body is
+ * added to the predicate database at the start (<b>asserta/1</b>)
+ * or end (<b>assertz/1</b>) of the predicate defined by \em Head.
+ * \par
+ * Adding a clause to a predicate that is in the process of being
+ * executed leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Clause or \em Head
+ *     is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ * \li <tt>type_error(callable, \em Body)</tt> - \em Body is not a
+ *     callable term.  In a departure from \ref standard "Standard Prolog",
+ *     this error is thrown when the \em Body is executed, not when
+ *     the \em Clause is asserted into the database.
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     the predicate indicator \em Pred of \em Head refers to a
+ *     builtin or read-only predicate.
+ *
+ * \par Examples
+ * \code
+ * asserta(Clause)              instantiation_error
+ * assertz((Head :- true))      instantiation_error
+ * asserta((1.5 :- true))       type_error(callable, 1.5)
+ * assertz((a :- true))         succeeds
+ * asserta((a(X) :- b(X,Y)))    succeeds
+ * assertz(a(X))                succeeds
+ * asserta((a :- X))            type_error(callable, X) when executed
+ * assertz(asserta(X))          permission_error(modify, static_procedure, asserta/1)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref abolish_1 "abolish/1",
+ * \ref retract_1 "retract/1"
+ */
+static p_goal_result p_builtin_assert
+    (p_context *context, p_term **args, p_term **error, int at_start)
+{
+    p_term *clause = p_term_deref(args[0]);
+    p_term *head;
+    p_term *pred;
+    if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (clause->header.type == P_TERM_FUNCTOR &&
+            clause->header.size == 2 &&
+            clause->functor.functor_name == context->clause_atom) {
+        head = p_term_deref(clause->functor.arg[0]);
+    } else {
+        head = clause;
+        clause = p_term_create_functor
+            (context, context->clause_atom, 2);
+        p_term_bind_functor_arg(clause, 0, head);
+        p_term_bind_functor_arg
+            (clause, 1, p_term_create_atom(context, "true"));
+    }
+    if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (head->header.type != P_TERM_ATOM &&
+            head->header.type != P_TERM_FUNCTOR) {
+        *error = p_builtin_type_error(context, "callable", head);
+        return P_RESULT_ERROR;
+    }
+    clause = p_term_clone(context, clause);
+    if (at_start) {
+        if (p_db_clause_assert_first(context, clause))
+            return P_RESULT_TRUE;
+    } else {
+        if (p_db_clause_assert_last(context, clause))
+            return P_RESULT_TRUE;
+    }
+    pred = p_term_create_functor(context, context->slash_atom, 2);
+    if (head->header.type == P_TERM_ATOM) {
+        p_term_bind_functor_arg(pred, 0, head);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer(context, 0));
+    } else {
+        p_term_bind_functor_arg(pred, 0, head->functor.functor_name);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer
+                            (context, (int)(head->header.size)));
+    }
+    *error = p_builtin_permission_error
+        (context, "modify", "static_procedure", pred);
+    return P_RESULT_ERROR;
+}
+static p_goal_result p_builtin_asserta
+    (p_context *context, p_term **args, p_term **error)
+{
+    return p_builtin_assert(context, args, error, 1);
+}
+static p_goal_result p_builtin_assertz
+    (p_context *context, p_term **args, p_term **error)
+{
+    return p_builtin_assert(context, args, error, 0);
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor retract_1
+ * <b>retract/1</b> - removes a clause from a user-defined
+ * predicate in the predicate database.
+ *
+ * \par Usage
+ * \b retract(\em Clause)
+ *
+ * \par Description
+ * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
+ * then break it down into \em Head :- \em Body.  Otherwise, let
+ * \em Head be \em Clause and \em Body be \b true.
+ * \par
+ * The <b>retract/1</b> predicate finds the first clause in
+ * the predicate database that unifies with \em Head :- \em Body,
+ * removes it, and then succeeds.  If \em Head :- \em Body does
+ * not unify with any clause in the database, then
+ * <b>retract/1</b> fails.
+ * \par
+ * Upon success, \em Clause is unified with the clause that was
+ * removed.
+ * \par
+ * Removing a clause from a predicate that is in the process of
+ * being executed leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Clause or \em Head
+ *     is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     the predicate indicator \em Pred of \em Head refers to a
+ *     builtin or read-only predicate.
+ *
+ * \par Examples
+ * \code
+ * retract(Clause)              instantiation_error
+ * retract((Head :- true))      instantiation_error
+ * retract((1.5 :- true))       type_error(callable, 1.5)
+ * retract((a(X) :- b(X, Y))    fails
+ * assertz((a(X) :- b(X, Y))); retract((a(X) :- b(X, Y)))   succeeds
+ * retract(retract(X))          permission_error(modify, static_procedure, retract/1)
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>retract/1</b> predicate in \ref standard "Standard Prolog"
+ * removes multiple clauses that match \em Head :- \em Body upon
+ * back-tracking.  In Plang, only the first clause is removed and
+ * back-tracking will cause a failure.  It is possible to remove
+ * all clauses that match a specific \em Head :- \em Body as follows:
+ * \code
+ * while [X, Y] (retract((a(X) :- b(X, Y)))) {}
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_1 "abolish/1",
+ * \ref asserta_1 "asserta/1"
+ */
+static p_goal_result p_builtin_retract
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *clause = p_term_deref(args[0]);
+    p_term *head;
+    p_term *pred;
+    int result;
+    if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (clause->header.type == P_TERM_FUNCTOR &&
+            clause->header.size == 2 &&
+            clause->functor.functor_name == context->clause_atom) {
+        head = p_term_deref(clause->functor.arg[0]);
+    } else {
+        head = clause;
+        clause = p_term_create_functor
+            (context, context->clause_atom, 2);
+        p_term_bind_functor_arg(clause, 0, head);
+        p_term_bind_functor_arg
+            (clause, 1, p_term_create_atom(context, "true"));
+    }
+    if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (head->header.type != P_TERM_ATOM &&
+            head->header.type != P_TERM_FUNCTOR) {
+        *error = p_builtin_type_error(context, "callable", head);
+        return P_RESULT_ERROR;
+    }
+    result = p_db_clause_retract(context, clause);
+    if (result > 0)
+        return P_RESULT_TRUE;
+    else if (result < 0)
+        return P_RESULT_FAIL;
+    pred = p_term_create_functor(context, context->slash_atom, 2);
+    if (head->header.type == P_TERM_ATOM) {
+        p_term_bind_functor_arg(pred, 0, head);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer(context, 0));
+    } else {
+        p_term_bind_functor_arg(pred, 0, head->functor.functor_name);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer
+                            (context, (int)(head->header.size)));
+    }
+    *error = p_builtin_permission_error
+        (context, "modify", "static_procedure", pred);
+    return P_RESULT_ERROR;
+}
+
+/*\@}*/
 
 /**
  * \defgroup logic_and_control Builtin predicates - Logic and control
@@ -1998,6 +2395,9 @@ void _p_db_init_builtins(p_context *context)
         {"\\+", 1, p_builtin_not_provable},
         {"||", 2, p_builtin_logical_or},
         {"->", 2, p_builtin_if},
+        {"abolish", 1, p_builtin_abolish},
+        {"asserta", 1, p_builtin_asserta},
+        {"assertz", 1, p_builtin_assertz},
         {"atom", 1, p_builtin_atom},
         {"atomic", 1, p_builtin_atomic},
         {"call", 1, p_builtin_call},
@@ -2015,6 +2415,7 @@ void _p_db_init_builtins(p_context *context)
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
+        {"retract", 1, p_builtin_retract},
         {"string", 1, p_builtin_string},
         {"$$switch", 3, p_builtin_switch},
         {"throw", 1, p_builtin_throw},
