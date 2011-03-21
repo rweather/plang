@@ -1422,7 +1422,13 @@ static const p_term *p_term_deref_limited(const p_term *term)
     return term;
 }
 
-static void p_term_print_inner(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data, int level)
+/* Print an atom name */
+static void p_term_print_atom(const p_term *atom, p_term_print_func print_func, void *print_data)
+{
+    (*print_func)(print_data, "%s", p_term_name(atom));
+}
+
+static void p_term_print_inner(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data, int level, int prec)
 {
     /* Bail out if we have exceeded the maximum recursion depth */
     if (level <= 0) {
@@ -1439,28 +1445,104 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
     /* Determine how to print this type of term */
     switch (term->header.type) {
     case P_TERM_FUNCTOR: {
-        /* TODO: operators with precedence and associativity */
         unsigned int index;
-        (*print_func)(print_data, "%s(",
-                      p_term_name(term->functor.functor_name));
-        for (index = 0; index < term->header.size; ++index) {
-            if (index)
-                (*print_func)(print_data, ", ");
-            p_term_print_inner
-                (context, term->functor.arg[index],
-                 print_func, print_data, level - 1);
+        p_op_specifier spec;
+        int priority;
+        spec = p_db_operator_info
+            (term->functor.functor_name,
+             (int)(term->header.size), &priority);
+        if (spec == P_OP_NONE) {
+            p_term_print_atom(term->functor.functor_name,
+                              print_func, print_data);
+            (*print_func)(print_data, "(");
+            for (index = 0; index < term->header.size; ++index) {
+                if (index)
+                    (*print_func)(print_data, ", ");
+                p_term_print_inner
+                    (context, term->functor.arg[index],
+                     print_func, print_data, level - 1, 950);
+            }
+            (*print_func)(print_data, ")");
+        } else {
+            int bracketed = (priority > prec);
+            if (bracketed) {
+                (*print_func)(print_data, "(");
+                priority = 1300;
+            }
+            switch (spec) {
+            case P_OP_NONE: break;
+            case P_OP_XF:
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority - 1);
+                (*print_func)(print_data, " %s",
+                              p_term_name(term->functor.functor_name));
+                break;
+            case P_OP_YF:
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority);
+                (*print_func)(print_data, " %s",
+                              p_term_name(term->functor.functor_name));
+                break;
+            case P_OP_XFX:
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority - 1);
+                (*print_func)(print_data, " %s ",
+                              p_term_name(term->functor.functor_name));
+                p_term_print_inner
+                    (context, term->functor.arg[1],
+                     print_func, print_data, level - 1, priority - 1);
+                break;
+            case P_OP_XFY:
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority - 1);
+                (*print_func)(print_data, " %s ",
+                              p_term_name(term->functor.functor_name));
+                p_term_print_inner
+                    (context, term->functor.arg[1],
+                     print_func, print_data, level - 1, priority);
+                break;
+            case P_OP_YFX:
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority);
+                (*print_func)(print_data, " %s ",
+                              p_term_name(term->functor.functor_name));
+                p_term_print_inner
+                    (context, term->functor.arg[1],
+                     print_func, print_data, level - 1, priority - 1);
+                break;
+            case P_OP_FX:
+                (*print_func)(print_data, "%s ",
+                              p_term_name(term->functor.functor_name));
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority - 1);
+                break;
+            case P_OP_FY:
+                (*print_func)(print_data, "%s ",
+                              p_term_name(term->functor.functor_name));
+                p_term_print_inner
+                    (context, term->functor.arg[0],
+                     print_func, print_data, level - 1, priority);
+                break;
+            }
+            if (bracketed)
+                (*print_func)(print_data, ")");
         }
-        (*print_func)(print_data, ")");
         break; }
     case P_TERM_LIST:
         (*print_func)(print_data, "[");
         p_term_print_inner(context, term->list.head,
-                           print_func, print_data, level - 1);
+                           print_func, print_data, level - 1, 950);
         term = p_term_deref_limited(term->list.tail);
         while (term && term->header.type == P_TERM_LIST && level > 0) {
             (*print_func)(print_data, ", ");
             p_term_print_inner(context, term->list.head,
-                               print_func, print_data, level - 1);
+                               print_func, print_data, level - 1, 950);
             term = p_term_deref_limited(term->list.tail);
             --level;
         }
@@ -1471,15 +1553,14 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
         if (term != context->nil_atom) {
             (*print_func)(print_data, "|");
             p_term_print_inner(context, term, print_func,
-                               print_data, level - 1);
+                               print_data, level - 1, 950);
         }
         (*print_func)(print_data, "]");
         break;
     case P_TERM_ATOM:
-        (*print_func)(print_data, "%s", p_term_name(term));
+        p_term_print_atom(term, print_func, print_data);
         break;
     case P_TERM_STRING:
-        /* TODO: escape special characters */
         (*print_func)(print_data, "\"%s\"", p_term_name(term));
         break;
     case P_TERM_INTEGER:
@@ -1508,10 +1589,11 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
                     continue;
                 if (!first)
                     (*print_func)(print_data, ", ");
-                (*print_func)(print_data, "%s: ", p_term_name(name));
+                p_term_print_atom(name, print_func, print_data);
+                (*print_func)(print_data, ": ");
                 p_term_print_inner
                     (context, term->object.properties[index].value,
-                     print_func, print_data, level - 1);
+                     print_func, print_data, level - 1, 950);
                 first = 0;
             }
             term = term->object.next;
@@ -1521,7 +1603,7 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
     case P_TERM_VARIABLE:
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
-                               print_data, level - 1);
+                               print_data, level - 1, prec);
         } else if (term->header.size > 0) {
             (*print_func)(print_data, "%s", p_term_name(term));
         } else {
@@ -1531,12 +1613,13 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
     case P_TERM_MEMBER_VARIABLE:
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
-                               print_data, level - 1);
+                               print_data, level - 1, prec);
             break;
         }
         p_term_print_inner(context, term->member_var.object, print_func,
-                           print_data, level - 1);
-        (*print_func)(print_data, ".%s", p_term_name(term->member_var.name));
+                           print_data, level - 1, 0);
+        (*print_func)(print_data, ".");
+        p_term_print_atom(term->member_var.name, print_func, print_data);
         break;
     default: break;
     }
@@ -1551,10 +1634,38 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
  *
  * \ingroup term
  * \sa p_term_stdio_print_func(), p_term_print_func
+ * \sa p_term_print_unquoted()
  */
 void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data)
 {
-    p_term_print_inner(context, term, print_func, print_data, 1000);
+    p_term_print_inner(context, term, print_func, print_data, 1000, 1300);
+}
+
+/**
+ * \brief Prints \a term within \a context to the output stream
+ * defined by \a print_func and \a print_data.
+ *
+ * If \a term is an atom or string, then it will be printed
+ * without quoting.  Otherwise, the behavior is the same as
+ * p_term_print().
+ *
+ * This function is intended for debugging purposes.  It may refuse
+ * to print some parts of \a term if the recursion depth is too high.
+ *
+ * \ingroup term
+ * \sa p_term_print()
+ */
+void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data)
+{
+    term = p_term_deref(term);
+    if (term) {
+        if (term->header.type == P_TERM_ATOM ||
+                term->header.type == P_TERM_STRING) {
+            (*print_func)(print_data, "%s", p_term_name(term));
+            return;
+        }
+    }
+    p_term_print_inner(context, term, print_func, print_data, 1000, 1300);
 }
 
 /**
