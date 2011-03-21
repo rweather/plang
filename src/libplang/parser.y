@@ -705,6 +705,16 @@ member_reference
             $$.name = $3;
             $$.auto_create = 1;
         }
+    | atom '.' atom     {
+            $$.object = $1;
+            $$.name = $3;
+            $$.auto_create = 0;
+        }
+    | atom K_DOT_DOT atom     {
+            $$.object = $1;
+            $$.name = $3;
+            $$.auto_create = 1;
+        }
     | member_reference '.' atom   {
             $$.object = p_term_create_member_variable
                 (context, $1.object, $1.name, $1.auto_create);

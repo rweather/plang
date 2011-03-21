@@ -49,6 +49,9 @@ int p_db_clause_assert_last(p_context *context, p_term *clause);
 int p_db_clause_retract(p_context *context, p_term *clause);
 int p_db_clause_abolish(p_context *context, const p_term *name, int arity);
 
+p_term *p_db_global_object(p_context *context, p_term *name);
+void p_db_set_global_object(p_context *context, p_term *name, p_term *value);
+
 #ifdef __cplusplus
 };
 #endif

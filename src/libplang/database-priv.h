@@ -52,6 +52,7 @@ struct p_database_info
     p_class_info *class_info;
     p_term *clauses_head;
     p_term *clauses_tail;
+    p_term *global_object;
 };
 
 void _p_db_init(p_context *context);

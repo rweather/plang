@@ -18,6 +18,7 @@
  */
 
 #include <plang/term.h>
+#include <plang/database.h>
 #include "term-priv.h"
 #include "context-priv.h"
 #include <string.h>
@@ -1225,6 +1226,12 @@ static p_term *p_term_resolve_member(p_context *context, p_term *term, int flags
     if (object->header.type == P_TERM_MEMBER_VARIABLE) {
         /* Resolve a nested member reference */
         object = p_term_resolve_member(context, object, flags);
+        if (!object)
+            return 0;
+        object = p_term_deref_non_null(object);
+    } else if (object->header.type == P_TERM_ATOM) {
+        /* Look up a global object reference */
+        object = p_db_global_object(context, object);
         if (!object)
             return 0;
         object = p_term_deref_non_null(object);
