@@ -99,12 +99,62 @@ static void test_operators()
     }
 }
 
+p_term *_p_context_test_goal(p_context *context);
+
+static p_goal_result execute_goal(const char *source, const char *expected_error)
+{
+    p_term *goal;
+    p_term *error;
+    p_goal_result result;
+    _p_context_test_goal(context);          /* Allow goal saving */
+    if (p_context_consult_string(context, source) != 0)
+        return (p_goal_result)(P_RESULT_ERROR + 1);
+    goal = _p_context_test_goal(context);   /* Fetch test goal */
+    error = 0;
+    result = p_context_execute_goal(context, goal, &error);
+    if (result == P_RESULT_ERROR && expected_error) {
+        p_term *expected;
+        p_context_consult_string(context, expected_error);
+        expected = _p_context_test_goal(context);
+        if (!p_term_unify(context, error, expected, P_BIND_EQUALITY))
+            P_FAIL("did not receive the expected error");
+    }
+    return result;
+}
+
+#define run_goal(x) execute_goal("\?\?-- " x ".\n", 0)
+#define run_goal_error(x,error)     \
+    execute_goal("\?\?-- " x ".\n", "\?\?-- " error ".\n")
+#define run_stmt(x) execute_goal("\?\?-- { " x " }\n", 0)
+#define run_stmt_error(x,error)     \
+    execute_goal("\?\?-- { " x " }\n", "\?\?-- " error ".\n")
+
+static void test_user_predicate()
+{
+    static char const user_source[] =
+        "a(b).\n"
+        "a(c) :- true.\n"
+        "a(X) :- b(X).\n"
+        "b(e).\n"
+        "b(f) :- c(f).\n"
+        "b(g) { throw(foo); }\n"
+        ;
+    P_VERIFY(p_context_consult_string(context, user_source) == 0);
+    P_COMPARE(run_goal("a(b)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("a(c)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("a(d)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("a(e)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("a(f)", "existence_error(procedure, c/1)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("a(g)", "foo"), P_RESULT_ERROR);
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-database");
     P_TEST_CREATE_CONTEXT();
 
     P_TEST_RUN(operators);
+    P_TEST_RUN(user_predicate);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

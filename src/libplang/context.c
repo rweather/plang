@@ -224,7 +224,8 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
             decl = p_term_deref_line(context, list->list.head);
             if (decl && decl->header.type == P_TERM_FUNCTOR) {
                 if (decl->functor.functor_name == clause_atom) {
-                    /* TODO */
+                    /* TODO: error reporting */
+                    p_db_clause_assert_last(context, decl);
                 } else if (decl->functor.functor_name == goal_atom) {
                     /* TODO */
                 } else if (decl->functor.functor_name == test_goal_atom) {
@@ -438,6 +439,7 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
             }
             clause_list = clause_list->list.tail;
         }
+        return P_RESULT_FAIL;
     }
 
     /* The predicate does not exist - throw an error or fail */
