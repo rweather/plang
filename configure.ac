@@ -71,6 +71,7 @@ AC_CONFIG_FILES([
   include/plang/Makefile
   src/Makefile
   src/libplang/Makefile
+  src/frontend/Makefile
   tests/Makefile
   tests/libplang/Makefile])
 AC_OUTPUT
