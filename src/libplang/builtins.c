@@ -51,6 +51,8 @@
  * \ref fail_0 "fail/0",
  * \ref false_0 "false/0",
  * \ref for_stmt "for",
+ * \ref halt_0 "halt/0",
+ * \ref halt_1 "halt/1",
  * \ref if_stmt "(->)/2",
  * \ref if_stmt "if",
  * \ref once_1 "once/1",
@@ -743,6 +745,8 @@ static p_goal_result p_builtin_import
  * \ref fail_0 "fail/0",
  * \ref false_0 "false/0",
  * \ref for_stmt "for",
+ * \ref halt_0 "halt/0",
+ * \ref halt_1 "halt/1",
  * \ref if_stmt "(->)/2",
  * \ref if_stmt "if",
  * \ref once_1 "once/1",
@@ -1057,13 +1061,13 @@ static p_goal_result p_builtin_do
         result = p_goal_call(context, args[1], error);
         if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
             return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR)
-            return P_RESULT_ERROR;
+        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            return result;
         result = p_goal_call(context, args[2], error);
         if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
             break;
-        else if (result == P_RESULT_ERROR)
-            return P_RESULT_ERROR;
+        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            return result;
     }
     return P_RESULT_TRUE;
 }
@@ -1214,11 +1218,101 @@ static p_goal_result p_builtin_for
         result = p_goal_call(context, args[3], error);
         if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
             return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR)
-            return P_RESULT_ERROR;
+        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            return result;
         list = p_term_deref(list->list.tail);
     }
     return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor halt_0
+ * <b>halt/0</b> - stops execution of the top-level goal.
+ *
+ * \par Usage
+ * \b halt
+ *
+ * \par Description
+ * Exits from execution of the top-level goal, returning control
+ * back to the system with an exit value of 0.
+ * \par
+ * It is not possible to trap the halt state with
+ * \ref catch_3 "catch/3".
+ *
+ * \par Examples
+ * \code
+ * halt
+ * catch(halt, X, stdout::writeln('not reached'))
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref halt_1 "halt/1"
+ */
+static p_goal_result p_builtin_halt_0
+    (p_context *context, p_term **args, p_term **error)
+{
+    *error = p_term_create_integer(context, 0);
+    return P_RESULT_HALT;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor halt_1
+ * <b>halt/1</b> - stops execution of the top-level goal with a
+ * specific exit value.
+ *
+ * \par Usage
+ * \b halt(\em ExitValue)
+ *
+ * \par Description
+ * Exits from execution of the top-level goal, returning control
+ * back to the system with the specified integer \em ExitValue.
+ * The \em ExitValue may be clamped to a system-specific range
+ * to make it suitable for passing back to the host operating system.
+ * \par
+ * It is not possible to trap the halt state with
+ * \ref catch_3 "catch/3" if \em ExitValue is a valid integer.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em ExitValue is a variable.
+ * \li <tt>type_error(integer, \em ExitValue)</tt> - \em ExitValue
+ *     is not an integer.
+ *
+ * \par Examples
+ * \code
+ * halt(3)
+ * catch(halt(3), X, stdout::writeln('not reached'))
+ * halt(X)              instantiation_error
+ * halt(1.0)            type_error(integer, 1.0)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref halt_0 "halt/0"
+ */
+static p_goal_result p_builtin_halt_1
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *exitval = p_term_deref(args[0]);
+    if (!exitval || (exitval->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (exitval->header.type != P_TERM_INTEGER) {
+        *error = p_builtin_type_error(context, "integer", exitval);
+        return P_RESULT_ERROR;
+    }
+    *error = exitval;
+    return P_RESULT_HALT;
 }
 
 /**
@@ -1543,13 +1637,13 @@ static p_goal_result p_builtin_while
         result = p_goal_call(context, args[1], error);
         if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
             break;
-        else if (result == P_RESULT_ERROR)
+        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
             return result;
         result = p_goal_call(context, args[2], error);
         if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
             return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR)
-            return P_RESULT_ERROR;
+        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            return result;
     }
     return P_RESULT_TRUE;
 }
@@ -2657,6 +2751,8 @@ void _p_db_init_builtins(p_context *context)
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
         {"$$for", 4, p_builtin_for},
+        {"halt", 0, p_builtin_halt_0},
+        {"halt", 1, p_builtin_halt_1},
         {"import", 1, p_builtin_import},
         {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},

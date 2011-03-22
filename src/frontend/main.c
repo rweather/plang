@@ -102,6 +102,10 @@ int main(int argc, char *argv[])
         exitval = 0;
     } else if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL) {
         exitval = 1;
+    } else if (result == P_RESULT_HALT) {
+        exitval = p_term_integer_value(error_term);
+        if (exitval < 0 || exitval > 127)
+            exitval = 127;
     } else {
         fprintf(stderr, "%s: main/1 threw uncaught error: ", argv[1]);
         p_term_print(context, error_term, p_term_stdio_print_func, stderr);

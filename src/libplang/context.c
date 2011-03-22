@@ -351,6 +351,15 @@ int p_context_consult_string(p_context *context, const char *str)
  * Further back-tracking may be possible.
  */
 
+/**
+ * \var P_RESULT_HALT
+ * \ingroup context
+ * The goal resulted in execution of a \ref halt_0 "halt/0" or
+ * \ref halt_1 "halt/1" subgoal.  Execution should wind back
+ * to the top-level goal and return control to the caller of
+ * p_context_execute_goal().
+ */
+
 /* Deterministic execution of goals - FIXME: non-determinism */
 static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term **error)
 {
@@ -444,8 +453,9 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
                     return P_RESULT_TRUE;
                 else if (result == P_RESULT_CUT_FAIL)
                     return P_RESULT_FAIL;
-                else if (result == P_RESULT_ERROR)
-                    return P_RESULT_ERROR;
+                else if (result == P_RESULT_ERROR ||
+                         result == P_RESULT_HALT)
+                    return result;
                 p_context_backtrack_trace(context, marker);
             }
             clause_list = clause_list->list.tail;
@@ -481,12 +491,15 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
  * \brief Executes \a goal against the current database state
  * of \a context.
  *
- * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE, or
- * P_RESULT_ERROR.  The previous goal, if any, will be abandoned
- * before execution of \a goal starts.
+ * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE,
+ * P_RESULT_ERROR, or P_RESULT_HALT.  The previous goal, if any,
+ * will be abandoned before execution of \a goal starts.
  *
  * If \a error is not null, then it will be set to the error
  * term for P_RESULT_ERROR.
+ *
+ * If the return value is P_RESULT_HALT, then \a error will be
+ * set to an integer term corresponding to the requested exit value.
  *
  * \ingroup context
  * \sa p_context_reexecute_goal(), p_context_abandon_goal()
@@ -514,12 +527,16 @@ p_goal_result p_context_execute_goal
  * \brief Re-executes the current goal on \a context by forcing a
  * back-track to find a new solution.
  *
- * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE, or
- * P_RESULT_ERROR reporting the status of the new solution found.
- * Once P_RESULT_FAIL is reported, no further solutions are possible.
+ * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE,
+ * P_RESULT_ERROR, or P_RESULT_HALT reporting the status of the
+ * new solution found.  Once P_RESULT_FAIL is reported,
+ * no further solutions are possible.
  *
  * If \a error is not null, then it will be set to the error
  * term for P_RESULT_ERROR.
+ *
+ * If the return value is P_RESULT_HALT, then \a error will be
+ * set to an integer term corresponding to the requested exit value.
  *
  * \ingroup context
  * \sa p_context_execute_goal(), p_context_abandon_goal()
@@ -586,6 +603,8 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
         fputs(": uncaught error: ", stderr);
         p_term_print(context, error, p_term_stdio_print_func, stderr);
         putc('\n', stderr);
+    } else if (result == P_RESULT_HALT) {
+        fputs(": ignoring halt during directive\n", stderr);
     } else {
         fputs(": fail\n", stderr);
     }

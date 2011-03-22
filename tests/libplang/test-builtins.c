@@ -31,11 +31,12 @@ static p_goal_result execute_goal(const char *source, const char *expected_error
     p_goal_result result;
     _p_context_test_goal(context);          /* Allow goal saving */
     if (p_context_consult_string(context, source) != 0)
-        return (p_goal_result)(P_RESULT_ERROR + 1);
+        return (p_goal_result)(P_RESULT_HALT + 1);
     goal = _p_context_test_goal(context);   /* Fetch test goal */
     error = 0;
     result = p_context_execute_goal(context, goal, &error);
-    if (result == P_RESULT_ERROR && expected_error) {
+    if ((result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            && expected_error) {
         p_term *expected;
         p_context_consult_string(context, expected_error);
         expected = _p_context_test_goal(context);
@@ -189,6 +190,18 @@ static void test_logic_for()
     P_COMPARE(run_stmt_error("for (X in [a, b]) { throw(c); }", "c"), P_RESULT_ERROR);
     P_COMPARE(run_stmt("for (X in [a, b]) { Y = X; }"), P_RESULT_FAIL);
     P_COMPARE(run_stmt("for [Y] (X in [a, b]) { Y = X; }"), P_RESULT_TRUE);
+}
+
+static void test_logic_halt()
+{
+    P_COMPARE(run_goal_error("halt", "0"), P_RESULT_HALT);
+    P_COMPARE(run_goal_error("halt(3)", "3"), P_RESULT_HALT);
+    P_COMPARE(run_goal_error("halt(-321)", "-321"), P_RESULT_HALT);
+    P_COMPARE(run_goal_error("halt(X)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("halt(1.0)", "type_error(integer, 1.0)"), P_RESULT_ERROR);
+
+    P_COMPARE(run_goal_error("catch(halt, X, Y)", "0"), P_RESULT_HALT);
+    P_COMPARE(run_stmt_error("try { halt(3); } catch(X) {}", "3"), P_RESULT_HALT);
 }
 
 static void test_logic_if_expr()
@@ -450,6 +463,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(logic_catch);
     P_TEST_RUN(logic_do);
     P_TEST_RUN(logic_for);
+    P_TEST_RUN(logic_halt);
     P_TEST_RUN(logic_if_expr);
     P_TEST_RUN(logic_if_stmt);
     P_TEST_RUN(logic_switch);

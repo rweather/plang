@@ -41,7 +41,8 @@ typedef enum {
     P_RESULT_TRUE       = 1,
     P_RESULT_CUT_FAIL   = 2,
     P_RESULT_CUT_TRUE   = 3,
-    P_RESULT_ERROR      = 4
+    P_RESULT_ERROR      = 4,
+    P_RESULT_HALT       = 5
 } p_goal_result;
 
 p_goal_result p_context_execute_goal
