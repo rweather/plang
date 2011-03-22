@@ -21,9 +21,11 @@
 #include <plang/term.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 
 int main(int argc, char *argv[])
 {
+    const char *progname = argv[0];
     p_context *context;
     p_term *args;
     p_term *goal;
@@ -32,16 +34,52 @@ int main(int argc, char *argv[])
     p_goal_result result;
     int exitval;
 
+    /* Process leading options for the plang engine itself */
+    context = p_context_create();
+    while (argc > 1 && argv[1][0] == '-') {
+        if (!strcmp(argv[1], "-I") || !strcmp(argv[1], "--import")) {
+            ++argv;
+            --argc;
+            if (argc <= 1) {
+                fprintf(stderr, "%s: missing import pathname\n",
+                        progname);
+                p_context_free(context);
+                return 1;
+            }
+            p_context_add_import_path(context, argv[1]);
+        } else if (!strncmp(argv[1], "-I", 2)) {
+            p_context_add_import_path(context, argv[1] + 2);
+        } else if (!strncmp(argv[1], "--import=", 9)) {
+            p_context_add_import_path(context, argv[1] + 9);
+        } else if (!strcmp(argv[1], "--")) {
+            ++argv;
+            --argc;
+            break;
+        } else {
+            fprintf(stderr, "%s: unknown option `%s'\n",
+                    progname, argv[1]);
+            p_context_free(context);
+            return 1;
+        }
+        ++argv;
+        --argc;
+    }
+
     /* Bail out if no input file provided */
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s program [args ...]\n", argv[0]);
+        fprintf(stderr, "Usage: %s program [args ...]\n", progname);
+        p_context_free(context);
         return 1;
     }
 
     /* Load the contents of the input file */
-    context = p_context_create();
     error = p_context_consult_file(context, argv[1]);
-    if (error != 0) {
+    if (error == EINVAL) {
+        /* Syntax error that should have already been reported */
+        p_context_free(context);
+        return 1;
+    } else if (error != 0) {
+        /* Filesystem error */
         fprintf(stderr, "%s: %s\n", argv[1], strerror(error));
         p_context_free(context);
         return 1;

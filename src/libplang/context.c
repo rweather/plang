@@ -255,8 +255,11 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
  * The special \a filename \c - can be used to read from
  * standard input.
  *
+ * If \a filename has already been loaded into \a context
+ * previously, then this function does nothing and returns zero.
+ *
  * \ingroup context
- * \sa p_context_consult_string()
+ * \sa p_context_consult_string(), p_context_add_import_path()
  */
 int p_context_consult_file(p_context *context, const char *filename)
 {
@@ -267,11 +270,17 @@ int p_context_consult_file(p_context *context, const char *filename)
         stream.filename = "(standard-input)";
         stream.close_stream = 0;
     } else {
+        size_t index;
+        for (index = 0; index < context->loaded_files.num_paths; ++index) {
+            if (!strcmp(filename, context->loaded_files.paths[index]))
+                return 0;
+        }
         stream.stream = fopen(filename, "r");
         if (!stream.stream)
             return errno;
         stream.filename = filename;
         stream.close_stream = 1;
+        p_context_add_path(context->loaded_files, filename);
     }
     return p_context_consult(context, &stream);
 }
@@ -611,6 +620,18 @@ int p_context_is_debug(p_context *context)
 void p_context_set_debug(p_context *context, int debug)
 {
     context->debug = debug;
+}
+
+/**
+ * \brief Adds \a path to \a context as a directory to search for
+ * source files imported by \ref import_1 "import/1".
+ *
+ * \ingroup context
+ * \sa p_context_consult_file()
+ */
+void p_context_add_import_path(p_context *context, const char *path)
+{
+    p_context_add_path(context->user_imports, path);
 }
 
 /*\@}*/

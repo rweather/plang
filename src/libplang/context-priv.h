@@ -22,6 +22,7 @@
 
 #include <plang/context.h>
 #include <plang/term.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,6 +33,13 @@ extern "C" {
 #define P_CONTEXT_HASH_SIZE     511
 
 typedef struct p_trace p_trace;
+
+struct p_path_list
+{
+    char **paths;
+    size_t num_paths;
+    size_t max_paths;
+};
 
 struct p_context
 {
@@ -57,6 +65,10 @@ struct p_context
 
     int allow_test_goals;
     p_term *test_goal;
+
+    struct p_path_list user_imports;
+    struct p_path_list system_imports;
+    struct p_path_list loaded_files;
 };
 
 #define P_TRACE_SIZE 1020
@@ -72,6 +84,27 @@ int _p_context_record_contents_in_trace(p_context *context, void **location);
 
 p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error);
 void p_goal_call_from_parser(p_context *context, p_term *goal);
+
+#define p_context_add_path(list,name)   \
+    do { \
+        if ((list).num_paths >= (list).max_paths) { \
+            size_t new_max = (list).max_paths * 2; \
+            if (new_max < 8) \
+                new_max = 8; \
+            (list).paths = (char **)GC_REALLOC((list).paths, new_max * sizeof(char *)); \
+            (list).max_paths = new_max; \
+        } \
+        (list).paths[((list).num_paths)++] = GC_STRDUP(name); \
+    } while (0)
+
+/* Determine what kind of Win32 system we are running on */
+#if defined(__CYGWIN__) || defined(__CYGWIN32__)
+#define	P_WIN32         1
+#define	P_WIN32_CYGWIN  1
+#elif defined(_WIN32) || defined(WIN32)
+#define	P_WIN32         1
+#define	P_WIN32_NATIVE  1
+#endif
 
 /** @endcond */
 

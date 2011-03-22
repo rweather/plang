@@ -23,6 +23,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
+#include <errno.h>
 #include "parser.h"
 #include "term-priv.h"
 #include "parser-priv.h"
@@ -222,6 +224,167 @@ static p_term *add_debug_line
 }
 #define add_debug(loc, term) \
     (add_debug_line(context, p_term_get_extra(yyscanner), &(loc), term))
+
+static char *p_concat_strings
+    (const char *str1, size_t len1, const char *str2, size_t len2,
+     const char *str3, size_t len3)
+{
+    char *str = (char *)malloc(len1 + len2 + len3 + 1);
+    if (len1 > 0)
+        memcpy(str, str1, len1);
+    if (len2 > 0)
+        memcpy(str + len1, str2, len2);
+    if (len3 > 0)
+        memcpy(str + len1 + len2, str3, len3);
+    str[len1 + len2 + len3] = '\0';
+    return str;
+}
+
+static int p_context_consult_file_in_path
+    (p_context *context, const char *pathname, const char *name,
+     int has_extn, yyscan_t yyscanner)
+{
+    int error;
+    char *path;
+    if (has_extn) {
+        path = p_concat_strings
+            (pathname, strlen(pathname), name, strlen(name), 0, 0);
+    } else {
+        path = p_concat_strings
+            (pathname, strlen(pathname), name, strlen(name), ".lp", 3);
+    }
+    error = p_context_consult_file(context, path);
+    if (error == 0) {
+        /* File has been loaded successfully */
+        free(path);
+        return 1;
+    } else if (error == EINVAL) {
+        /* File exists but contained an error during loading */
+        ++(p_term_get_extra(yyscanner)->error_count);
+        free(path);
+        return 1;
+    }
+    free(path);
+    return 0;
+}
+
+static void p_context_import
+    (YYLTYPE *loc, p_context *context, yyscan_t yyscanner,
+     const char *name)
+{
+    const char *parent_filename;
+    size_t len, len2;
+    int has_extn, has_dir, is_root, error;
+    char *path;
+
+    /* Find the directory that contains the parent source file */
+    parent_filename = p_term_get_extra(yyscanner)->filename;
+    len = parent_filename ? strlen(parent_filename) : 0;
+    while (len > 0) {
+#if defined(P_WIN32)
+        if (parent_filename[len - 1] == '/' ||
+                parent_filename[len - 1] == '\\')
+            break;
+#else
+        if (parent_filename[len - 1] == '/')
+            break;
+#endif
+        --len;
+    }
+    if (!len) {
+#if defined(P_WIN32)
+        parent_filename = ".\\";
+#else
+        parent_filename = "./";
+#endif
+        len = 2;
+    }
+
+    /* Does the name need to have ".lp" appended to it?
+     * Also determine if this is a real filename or abbreviated */
+    len2 = strlen(name);
+    if (!len2) {
+        yyerror_printf(loc, context, yyscanner, "empty import name");
+        return;
+    }
+    has_extn = 0;
+    while (len2 > 0) {
+#if defined(P_WIN32)
+        if (name[len2 - 1] == '/' || name[len2 - 1] == '\\')
+            break;
+#else
+        if (name[len2 - 1] == '/')
+            break;
+#endif
+        if (name[len2 - 1] == '.')
+            has_extn = 1;
+        --len2;
+    }
+    has_dir = (len2 > 0);
+
+    /* Does the name start at the root directory, or is it relative? */
+    is_root = 0;
+    if (name[0] == '/') {
+        is_root = 1;
+#if defined(P_WIN32)
+    } else if (name[0] == '\\') {
+        is_root = 1;
+    } else if (((name[0] >= 'a' && name[0] <= 'z') ||
+                (name[0] >= 'A' && name[0] <= 'Z'))) {
+        if (name[1] == '/' || name[1] == '\\')
+            is_root = 1;
+#endif
+    }
+
+    /* Try the parent-relative filename first */
+    if (is_root) {
+        if (has_extn)
+            path = p_concat_strings(name, strlen(name), 0, 0, 0, 0);
+        else
+            path = p_concat_strings(name, strlen(name), ".lp", 3, 0, 0);
+    } else {
+        if (has_extn) {
+            path = p_concat_strings
+                (parent_filename, len, name, strlen(name), 0, 0);
+        } else {
+            path = p_concat_strings
+                (parent_filename, len, name, strlen(name), ".lp", 3);
+        }
+    }
+    error = p_context_consult_file(context, path);
+    if (error == 0) {
+        /* File has been loaded successfully */
+        free(path);
+        return;
+    } else if (error == EINVAL) {
+        /* File exists but contained an error during loading */
+        ++(p_term_get_extra(yyscanner)->error_count);
+        free(path);
+        return;
+    }
+    free(path);
+
+    /* Search the user and system import paths */
+    if (!has_dir) {
+        size_t index;
+        for (index = 0; index < context->user_imports.num_paths; ++index) {
+            if (p_context_consult_file_in_path
+                    (context, context->user_imports.paths[index],
+                     name, has_extn, yyscanner))
+                return;
+        }
+        for (index = 0; index < context->system_imports.num_paths; ++index) {
+            if (p_context_consult_file_in_path
+                    (context, context->system_imports.paths[index],
+                     name, has_extn, yyscanner))
+                return;
+        }
+    }
+
+    /* Cannot find the file to be imported */
+    yyerror_printf(loc, context, yyscanner,
+                   "cannot locate import `%s'", name);
+}
 
 %}
 
@@ -425,7 +588,16 @@ directive
                        p_term_functor($2) ==
                        p_term_create_atom(context, "import")) {
                 /* Import another source file at this location */
-                /* TODO */
+                p_term *name = p_term_deref(p_term_arg($2, 0));
+                if (!name || (name->header.type != P_TERM_ATOM &&
+                              name->header.type != P_TERM_STRING)) {
+                    yyerror_printf
+                        (&(@2), context, yyscanner,
+                         "import name is not an atom or string");
+                } else {
+                    p_context_import
+                        (&(@2), context, yyscanner, p_term_name(name));
+                }
                 $$ = unary_term(":-", $2);
             } else {
                 /* Execute the directive immediately */
