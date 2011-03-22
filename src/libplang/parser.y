@@ -227,16 +227,18 @@ static p_term *add_debug_line
 
 static char *p_concat_strings
     (const char *str1, size_t len1, const char *str2, size_t len2,
-     const char *str3, size_t len3)
+     const char *str3, size_t len3, const char *str4, size_t len4)
 {
-    char *str = (char *)malloc(len1 + len2 + len3 + 1);
+    char *str = (char *)malloc(len1 + len2 + len3 + len4 + 1);
     if (len1 > 0)
         memcpy(str, str1, len1);
     if (len2 > 0)
         memcpy(str + len1, str2, len2);
     if (len3 > 0)
         memcpy(str + len1 + len2, str3, len3);
-    str[len1 + len2 + len3] = '\0';
+    if (len4 > 0)
+        memcpy(str + len1 + len2 + len3, str4, len4);
+    str[len1 + len2 + len3 + len4] = '\0';
     return str;
 }
 
@@ -246,12 +248,28 @@ static int p_context_consult_file_in_path
 {
     int error;
     char *path;
+    size_t len = strlen(pathname);
+    const char *sep = 0;
+    size_t sep_len = 0;
+#if defined(P_WIN32)
+    if (len > 0 && pathname[len - 1] != '/' && pathname[len - 1] != '\\') {
+        sep = "\\";
+        sep_len = 1;
+    }
+#else
+    if (len > 0 && pathname[len - 1] != '/') {
+        sep = "/";
+        sep_len = 1;
+    }
+#endif
     if (has_extn) {
         path = p_concat_strings
-            (pathname, strlen(pathname), name, strlen(name), 0, 0);
+            (pathname, strlen(pathname), sep, sep_len,
+             name, strlen(name), 0, 0);
     } else {
         path = p_concat_strings
-            (pathname, strlen(pathname), name, strlen(name), ".lp", 3);
+            (pathname, strlen(pathname), sep, sep_len,
+             name, strlen(name), ".lp", 3);
     }
     error = p_context_consult_file(context, path);
     if (error == 0) {
@@ -339,16 +357,16 @@ static void p_context_import
     /* Try the parent-relative filename first */
     if (is_root) {
         if (has_extn)
-            path = p_concat_strings(name, strlen(name), 0, 0, 0, 0);
+            path = p_concat_strings(name, strlen(name), 0, 0, 0, 0, 0, 0);
         else
-            path = p_concat_strings(name, strlen(name), ".lp", 3, 0, 0);
+            path = p_concat_strings(name, strlen(name), ".lp", 3, 0, 0, 0, 0);
     } else {
         if (has_extn) {
             path = p_concat_strings
-                (parent_filename, len, name, strlen(name), 0, 0);
+                (parent_filename, len, name, strlen(name), 0, 0, 0, 0);
         } else {
             path = p_concat_strings
-                (parent_filename, len, name, strlen(name), ".lp", 3);
+                (parent_filename, len, name, strlen(name), ".lp", 3, 0, 0);
         }
     }
     error = p_context_consult_file(context, path);
