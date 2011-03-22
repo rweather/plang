@@ -407,24 +407,33 @@ declaration
     | class_declaration         { $$ = $1; }
     | object_declaration        { $$ = $1; }
     | error K_DOT_TERMINATOR    {
-            /* Replace the error term with "?- fail." */
-            $$ = unary_term("?-", p_term_create_atom(context, "fail"));
+            /* Replace the error term with "?- true." */
+            $$ = unary_term("?-", p_term_create_atom(context, "true"));
         }
     ;
 
 directive
     : K_COLON_DASH callable_term K_DOT_TERMINATOR   {
-            /* TODO: execute the directive */
-            $$ = unary_term(":-", $2);
+            if (p_term_type($2) == P_TERM_FUNCTOR &&
+                    p_term_arg_count($2) == 1 &&
+                    p_term_functor($2) ==
+                        p_term_create_atom(context, "initialization")) {
+                /* Turn "initialization(G)" directives into "?- G" */
+                $$ = unary_term("?-", add_debug(@2, p_term_arg($2, 0)));
+            } else {
+                /* Execute the directive immediately */
+                p_goal_call_from_parser(context, add_debug(@2, $2));
+                $$ = unary_term(":-", $2);
+            }
         }
     ;
 
 goal
     : K_QUEST_DASH term K_DOT_TERMINATOR    {
-            $$ = unary_term("?-", $2);
+            $$ = unary_term("?-", add_debug(@2, $2));
         }
     | K_QUEST_DASH compound_statement       {
-            $$ = unary_term("?-", $2);
+            $$ = unary_term("?-", add_debug(@2, $2));
         }
     | K_TEST_GOAL term K_DOT_TERMINATOR     {
             /* Goal that is not executed during the consult but

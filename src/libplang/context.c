@@ -227,7 +227,9 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
                     /* TODO: error reporting */
                     p_db_clause_assert_last(context, decl);
                 } else if (decl->functor.functor_name == goal_atom) {
-                    /* TODO */
+                    /* Execute the initialization goal */
+                    p_goal_call_from_parser
+                        (context, p_term_arg(decl, 0));
                 } else if (decl->functor.functor_name == test_goal_atom) {
                     /* Special goal that is used by unit tests.
                      * Ignored if unit testing is not active */
@@ -539,6 +541,44 @@ void p_context_abandon_goal(p_context *context)
         context->goal_active = 0;
         context->goal = 0;
         context->goal_marker = 0;
+    }
+}
+
+/* Calls a goal from the parser for immediate execution.
+ * After execution, backtracks to the initial state */
+void p_goal_call_from_parser(p_context *context, p_term *goal)
+{
+    p_term *error = 0;
+    void *marker = p_context_mark_trace(context);
+    p_goal_result result = p_goal_call(context, goal, &error);
+    p_context_backtrack_trace(context, marker);
+    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
+        return;
+    goal = p_term_deref(goal);
+    if (goal && goal->header.type == P_TERM_FUNCTOR &&
+            goal->header.size == 3 &&
+            goal->functor.functor_name == context->line_atom) {
+        p_term_print_unquoted
+            (context, p_term_arg(goal, 0),
+             p_term_stdio_print_func, stderr);
+        putc(':', stderr);
+        p_term_print_unquoted
+            (context, p_term_arg(goal, 1),
+             p_term_stdio_print_func, stderr);
+        putc(':', stderr);
+        putc(' ', stderr);
+        p_term_print
+            (context, p_term_arg(goal, 2),
+             p_term_stdio_print_func, stderr);
+    } else {
+        p_term_print(context, goal, p_term_stdio_print_func, stderr);
+    }
+    if (result == P_RESULT_ERROR) {
+        fputs(": uncaught error: ", stderr);
+        p_term_print(context, error, p_term_stdio_print_func, stderr);
+        putc('\n', stderr);
+    } else {
+        fputs(": fail\n", stderr);
     }
 }
 
