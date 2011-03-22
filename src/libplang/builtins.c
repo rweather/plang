@@ -18,6 +18,7 @@
  */
 
 #include <plang/database.h>
+#include <stdio.h>
 #include "term-priv.h"
 #include "database-priv.h"
 #include "context-priv.h"
@@ -2573,6 +2574,47 @@ static p_goal_result p_builtin_var
 
 /*\@}*/
 
+/* Dummy implementations for stdout/stderr printing until
+ * we get a better I/O system up and running */
+static p_goal_result p_builtin_print
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term_print_unquoted
+        (context, args[0], p_term_stdio_print_func, stdout);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_println
+    (p_context *context, p_term **args, p_term **error)
+{
+    putc('\n', stdout);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_printq
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term_print(context, args[0], p_term_stdio_print_func, stdout);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_print_error
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term_print_unquoted
+        (context, args[0], p_term_stdio_print_func, stderr);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_println_error
+    (p_context *context, p_term **args, p_term **error)
+{
+    putc('\n', stderr);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_printq_error
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term_print(context, args[0], p_term_stdio_print_func, stderr);
+    return P_RESULT_TRUE;
+}
+
 void _p_db_init_builtins(p_context *context)
 {
     struct p_builtin
@@ -2622,6 +2664,12 @@ void _p_db_init_builtins(p_context *context)
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
+        {"$$print", 1, p_builtin_print},
+        {"$$println", 0, p_builtin_println},
+        {"$$printq", 1, p_builtin_printq},
+        {"$$print_error", 1, p_builtin_print_error},
+        {"$$println_error", 0, p_builtin_println_error},
+        {"$$printq_error", 1, p_builtin_printq_error},
         {"retract", 1, p_builtin_retract},
         {"string", 1, p_builtin_string},
         {"$$switch", 3, p_builtin_switch},
