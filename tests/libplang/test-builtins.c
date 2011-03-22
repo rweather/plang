@@ -93,6 +93,21 @@ static void test_clause_retract()
     P_COMPARE(run_goal("assertz((b(a) :- c(a, d))), retract((b(Z) :- c(Z, W))), Z == a, W == d"), P_RESULT_TRUE);
 }
 
+static void test_directive_dynamic()
+{
+    P_COMPARE(run_goal("dynamic(userdef/3)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("dynamic(userdef/3)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal_error("dynamic(Pred)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(Name/3)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(userdef/Arity)", "instantiation_error"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(1.5)", "type_error(predicate_indicator, 1.5)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(userdef/a)", "type_error(integer, a)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(1/a)", "type_error(integer, a)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(1/3)", "type_error(atom, 1)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(userdef/-3)", "domain_error(not_less_than_zero, -3)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal_error("dynamic(dynamic/1)", "permission_error(modify, static_procedure, dynamic/1)"), P_RESULT_ERROR);
+}
+
 static void test_logic_values()
 {
     P_COMPARE(run_goal("true"), P_RESULT_TRUE);
@@ -455,6 +470,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(clause_abolish);
     P_TEST_RUN(clause_assert);
     P_TEST_RUN(clause_retract);
+    P_TEST_RUN(directive_dynamic);
     P_TEST_RUN(logic_values);
     P_TEST_RUN(logic_and);
     P_TEST_RUN(logic_or);

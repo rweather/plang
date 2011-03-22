@@ -84,6 +84,43 @@
  * Right-associative prefix operator.
  */
 
+/**
+ * \enum p_predicate_flags
+ * \ingroup database
+ * This enum defines flags that are associated with predicates
+ * in the database.
+ * \sa p_db_predicate_flags()
+ */
+
+/**
+ * \var P_PREDICATE_NONE
+ * \ingroup database
+ * No flags are specified for the predicate.
+ */
+
+/**
+ * \var P_PREDICATE_COMPILED
+ * \ingroup database
+ * The predicate has been compiled into a read-only form that
+ * cannot be modified by \ref asserta_1 "asserta/1" and friends.
+ */
+
+/**
+ * \var P_PREDICATE_DYNAMIC
+ * \ingroup database
+ * The predicate is marked as dynamic.  Its clauses will not
+ * be compiled.  This is intended for predicates that are
+ * created dynamically in the database at runtime.
+ */
+
+/**
+ * \var P_PREDICATE_BUILTIN
+ * \ingroup database
+ * The predicate was set by p_db_set_builtin_predicate(),
+ * is read-only, and cannot be modified by
+ * \ref asserta_1 "asserta/1" and friends.
+ */
+
 void _p_db_init(p_context *context)
 {
     struct p_db_op_info
@@ -331,6 +368,10 @@ void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
 
     /* Set the builtin */
     info->builtin_func = builtin;
+    if (builtin)
+        info->flags |= P_PREDICATE_BUILTIN;
+    else
+        info->flags &= ~P_PREDICATE_BUILTIN;
 }
 
 /* Extract the predicate name and arity from a clause */
@@ -361,8 +402,8 @@ static p_term *p_db_predicate_name
  * predicate on \a context.
  *
  * Returns non-zero if the clause was added, or zero if the
- * predicate is read-only.  It is assumed that \a clause is a
- * freshly renamed term, is well-formed, and the top-level
+ * predicate is builtin or compiled.  It is assumed that \a clause
+ * is a freshly renamed term, is well-formed, and the top-level
  * functor is "(:-)/2".
  *
  * \ingroup database
@@ -386,8 +427,8 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
     if (!info)
         return 0;
 
-    /* Bail out if the predicate is builtin or read-only */
-    if (info->builtin_func || info->read_only)
+    /* Bail out if the predicate is builtin or compiled */
+    if (info->flags & (P_PREDICATE_BUILTIN | P_PREDICATE_COMPILED))
         return 0;
 
     /* Add the clause to the head of the list */
@@ -407,8 +448,8 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
  * predicate on \a context.
  *
  * Returns non-zero if the clause was added, or zero if the
- * predicate is read-only.  It is assumed that \a clause is a
- * freshly renamed term, is well-formed, and the top-level
+ * predicate is compiled or builtin.  It is assumed that \a clause
+ * is a freshly renamed term, is well-formed, and the top-level
  * functor is "(:-)/2".
  *
  * \ingroup database
@@ -432,8 +473,8 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
     if (!info)
         return 0;
 
-    /* Bail out if the predicate is builtin or read-only */
-    if (info->builtin_func || info->read_only)
+    /* Bail out if the predicate is builtin or compiled */
+    if (info->flags & (P_PREDICATE_BUILTIN | P_PREDICATE_COMPILED))
         return 0;
 
     /* Add the clause to the tail of the list */
@@ -454,8 +495,8 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
  * on \a context.
  *
  * Returns a positive value if the clause was retracted, zero if the
- * predicate is read-only, or a negative value if there are no
- * more matching clauses.  It is assumed that the top-level
+ * predicate is compiled or builtin, or a negative value if there
+ * are no more matching clauses.  It is assumed that the top-level
  * functor of \a clause is "(:-)/2".
  *
  * \ingroup database
@@ -480,8 +521,8 @@ int p_db_clause_retract(p_context *context, p_term *clause)
     if (!info)
         return -1;
 
-    /* Bail out if the predicate is builtin or read-only */
-    if (info->builtin_func || info->read_only)
+    /* Bail out if the predicate is builtin or compiled */
+    if (info->flags & (P_PREDICATE_BUILTIN | P_PREDICATE_COMPILED))
         return 0;
 
     /* Retract the first clause that unifies */
@@ -509,7 +550,7 @@ int p_db_clause_retract(p_context *context, p_term *clause)
  * on \a context that match \a name and \a arity.
  *
  * Returns non-zero if the clauses were abolished, or zero if the
- * predicate is read-only.
+ * predicate is compiled or builtin.
  *
  * \ingroup database
  * \sa p_db_clause_assert_first(), p_db_clause_assert_last()
@@ -529,8 +570,8 @@ int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
     if (!info)
         return 1;   /* Absolishing a non-existent clause succeeds */
 
-    /* Bail out if the predicate is builtin or read-only */
-    if (info->builtin_func || info->read_only)
+    /* Bail out if the predicate is builtin or compiled */
+    if (info->flags & (P_PREDICATE_BUILTIN | P_PREDICATE_COMPILED))
         return 0;
 
     /* Retract all of the clauses */
@@ -584,6 +625,59 @@ void p_db_set_global_object(p_context *context, p_term *name, p_term *value)
     info = p_db_create_arity(name, 0);
     if (info)
         info->global_object = value;
+}
+
+/**
+ * \brief Returns the flags associated with the predicate
+ * \a name / \a arity in \a context.
+ *
+ * \ingroup database
+ * \sa p_db_set_predicate_flag()
+ */
+p_predicate_flags p_db_predicate_flags(p_context *context, const p_term *name, int arity)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return P_PREDICATE_NONE;
+
+    /* Search for the arity's information block */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (!info)
+        return P_PREDICATE_NONE;
+
+    /* Return the predicate flag details */
+    return (p_predicate_flags)(info->flags);
+}
+
+/**
+ * \brief Sets the \a flag associated with the predicate
+ * \a name / \a arity in \a context to \a value (0 or 1).
+ *
+ * \ingroup database
+ * \sa p_db_predicate_flags()
+ */
+void p_db_set_predicate_flag(p_context *context, p_term *name, int arity, p_predicate_flags flag, int value)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return;
+
+    /* Find or create an information block for the arity */
+    info = p_db_create_arity(name, arity);
+    if (!info)
+        return;
+
+    /* Alter the specified flag */
+    if (value)
+        info->flags |= flag;
+    else
+        info->flags &= ~flag;
 }
 
 /*\@}*/

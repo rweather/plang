@@ -45,8 +45,8 @@ struct p_database_info
 {
     p_database_info *next;
     unsigned int arity;
-    unsigned int read_only : 1;
-    unsigned int op_specifier : 15;
+    unsigned int flags : 8;
+    unsigned int op_specifier : 8;
     unsigned int op_priority : 16;
     p_db_builtin builtin_func;
     p_class_info *class_info;

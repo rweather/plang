@@ -37,6 +37,13 @@ typedef enum {
     P_OP_FY
 } p_op_specifier;
 
+typedef enum {
+    P_PREDICATE_NONE            = 0x00,
+    P_PREDICATE_COMPILED        = 0x01,
+    P_PREDICATE_DYNAMIC         = 0x02,
+    P_PREDICATE_BUILTIN         = 0x04
+} p_predicate_flags;
+
 p_op_specifier p_db_operator_info(const p_term *name, int arity, int *priority);
 void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority);
 
@@ -51,6 +58,9 @@ int p_db_clause_abolish(p_context *context, const p_term *name, int arity);
 
 p_term *p_db_global_object(p_context *context, p_term *name);
 void p_db_set_global_object(p_context *context, p_term *name, p_term *value);
+
+p_predicate_flags p_db_predicate_flags(p_context *context, const p_term *name, int arity);
+void p_db_set_predicate_flag(p_context *context, p_term *name, int arity, p_predicate_flags flag, int value);
 
 #ifdef __cplusplus
 };

@@ -34,6 +34,7 @@
  *
  * \par Directives
  * \ref directive_1 "(:-)/1",
+ * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
  * \ref initialization_1 "(?-)/1",
  * \ref initialization_1 "initialization/1"
@@ -252,7 +253,7 @@ static p_term *p_builtin_parse_indicator
  * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Arity
  *     is less than zero.
  * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
- *     \em Pred is a builtin or read-only predicate.
+ *     \em Pred is a builtin or compiled predicate.
  *
  * \par Examples
  * \code
@@ -328,7 +329,7 @@ static p_goal_result p_builtin_abolish
  *     the \em Clause is asserted into the database.
  * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
  *     the predicate indicator \em Pred of \em Head refers to a
- *     builtin or read-only predicate.
+ *     builtin or compiled predicate.
  *
  * \par Examples
  * \code
@@ -347,7 +348,8 @@ static p_goal_result p_builtin_abolish
  *
  * \par See Also
  * \ref abolish_1 "abolish/1",
- * \ref retract_1 "retract/1"
+ * \ref retract_1 "retract/1",
+ * \ref dynamic_1 "dynamic/1"
  */
 static p_goal_result p_builtin_assert
     (p_context *context, p_term **args, p_term **error, int at_start)
@@ -449,7 +451,7 @@ static p_goal_result p_builtin_assertz
  *     callable term (atom or functor).
  * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
  *     the predicate indicator \em Pred of \em Head refers to a
- *     builtin or read-only predicate.
+ *     builtin or compiled predicate.
  *
  * \par Examples
  * \code
@@ -577,6 +579,7 @@ static p_goal_result p_builtin_retract
  * immediate directive.
  *
  * \ref directive_1 "(:-)/1",
+ * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
  * \ref initialization_1 "(?-)/1",
  * \ref initialization_1 "initialization/1"
@@ -623,6 +626,79 @@ static p_goal_result p_builtin_retract
  * \ref call_1 "call/1",
  * \ref import_1 "import/1"
  */
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor dynamic_1
+ * <b>dynamic/1</b> - marks a user-defined predicate as dynamic.
+ *
+ * \par Usage
+ * <b>:-</b> \b dynamic(\em Pred).
+ *
+ * \par Description
+ * Marks the predicate associated with the predicate indicator
+ * \em Pred as dynamic.  The indicator should have the form
+ * \em Name / \em Arity.
+ * \par
+ * Clauses of a dynamic predicate will not be compiled.
+ * This is intended for predicates that are created dynamically
+ * in the database at runtime with \ref asserta_1 "asserta/1"
+ * and friends.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - one of \em Pred, \em Name,
+ *     or \em Arity, is a variable.
+ * \li <tt>type_error(predicate_indicator, \em Pred)</tt> - \em Pred
+ *     does not have the form \em Name / \em Arity.
+ * \li <tt>type_error(integer, \em Arity)</tt> - \em Arity is not
+ *     an integer.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not an atom.
+ * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Arity
+ *     is less than zero.
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     \em Pred is a builtin or compiled predicate.
+ *
+ * \par Examples
+ * \code
+ * dynamic(userdef/3)       succeeds
+ * dynamic(Pred)            instantiation_error
+ * dynamic(Name/3)          instantiation_error
+ * dynamic(userdef/Arity)   instantiation_error
+ * dynamic(1.5)             type_error(predicate_indicator, 1.5)
+ * dynamic(userdef/a)       type_error(integer, a)
+ * dynamic(1/a)             type_error(integer, a)
+ * dynamic(1/3)             type_error(atom, 1)
+ * dynamic(userdef/-3)      domain_error(not_less_than_zero, -3)
+ * dynamic(dynamic/1)       permission_error(modify, static_procedure, dynamic/1)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref asserta_1 "asserta/1"
+ */
+static p_goal_result p_builtin_dynamic
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *name;
+    int arity;
+    p_predicate_flags flags;
+    name = p_builtin_parse_indicator(context, args[0], &arity, error);
+    if (!name)
+        return P_RESULT_ERROR;
+    flags = p_db_predicate_flags(context, name, arity);
+    if (flags & (P_PREDICATE_COMPILED | P_PREDICATE_BUILTIN)) {
+        *error = p_builtin_permission_error
+            (context, "modify", "static_procedure", args[0]);
+        return P_RESULT_ERROR;
+    }
+    p_db_set_predicate_flag
+        (context, name, arity, P_PREDICATE_DYNAMIC, 1);
+    return P_RESULT_TRUE;
+}
 
 /**
  * \addtogroup directives
@@ -2747,6 +2823,7 @@ void _p_db_init_builtins(p_context *context)
         {"class_object", 2, p_builtin_class_object_2},
         {"compound", 1, p_builtin_compound},
         {"$$do", 3, p_builtin_do},
+        {"dynamic", 1, p_builtin_dynamic},
         {"fail", 0, p_builtin_fail},
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
