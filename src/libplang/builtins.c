@@ -31,6 +31,12 @@
  * \ref assertz_1 "assertz/1",
  * \ref retract_1 "retract/1"
  *
+ * \par Directives
+ * \ref directive_1 "(:-)/1",
+ * \ref import_1 "import/1",
+ * \ref initialization_1 "(?-)/1",
+ * \ref initialization_1 "initialization/1"
+ *
  * \par Logic and control
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2",
@@ -518,6 +524,203 @@ static p_goal_result p_builtin_retract
         (context, "modify", "static_procedure", pred);
     return P_RESULT_ERROR;
 }
+
+/*\@}*/
+
+/**
+ * \defgroup directives Builtin predicates - Directives
+ *
+ * Directives are executed while a source file is being loaded to
+ * modify environmental parameters, adjust language flags, etc.
+ * Two kinds of directives are provided: immediate and deferred.
+ * Immediate directives are immediately executed when the source
+ * file is parsed, but before predicates in the source file are
+ * defined into the database.  The following are examples:
+ *
+ * \code
+ * :- import(stdout).
+ * :- dynamic(person/1).
+ * \endcode
+ *
+ * Deferred directives are executed after the source file has
+ * been parsed and the predicates have been defined into the
+ * database.  The following is an example:
+ *
+ * \code
+ * class fridge {
+ *     ...
+ *     open()
+ *     {
+ *         ...
+ *     }
+ * }
+ *
+ * ?- {
+ *     new fridge(F);
+ *     set_global_object(my_fridge, F);
+ *     my_fridge.open();
+ * }
+ * \endcode
+ *
+ * After the directive is executed, the Plang engine will execute a
+ * cut, \ref cut_0 "(!)/0", and \ref fail_0 "fail/0" to backtrack
+ * to the original system state.  The only permanent modifications
+ * to the system state will be in the form of side-effects
+ * (e.g. the call to <b>set_global_object/2</b> above).
+ *
+ * Directives may also be called as regular builtin predicates
+ * during normal program execution.  The exception is
+ * \ref import_1 "import/1", which must be used within an
+ * immediate directive.
+ *
+ * \ref directive_1 "(:-)/1",
+ * \ref import_1 "import/1",
+ * \ref initialization_1 "(?-)/1",
+ * \ref initialization_1 "initialization/1"
+ */
+/*\@{*/
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor directive_1
+ * <b>(:-)/1</b> - execute a directive immediately while a
+ * source file is being loaded.
+ *
+ * \par Usage
+ * <b>:-</b> \em Directive.
+ *
+ * \par Description
+ * Executes \em Directive immediately when it is encountered
+ * in the source file during loading.  After execution of the
+ * \em Directive, an implicit cut, \ref cut_0 "(!)/0", and
+ * \ref fail_0 "fail/0" are performed to return the system
+ * to its original state before the call.  The only permanent
+ * modifications to the system state will be in the form
+ * of side-effects in \em Directive.
+ * \par
+ * The \em Directive is limited to an atom or a functor call
+ * by the Plang parser.  More complex terms are not permitted.
+ * \par
+ * If <b>(:-)/1</b> is called during normal program execution
+ * instead of within a directive, it will have the same
+ * effect as \ref call_1 "call/1".
+ *
+ * \par Examples
+ * \code
+ * :- import(stdout).
+ * :- dynamic(person/1).
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref initialization_1 "(?-)/1",
+ * \ref call_1 "call/1",
+ * \ref import_1 "import/1"
+ */
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor import_1
+ * <b>import/1</b> - imports another source file's definitions.
+ *
+ * \par Usage
+ * <b>:-</b> \b import(\em Name).
+ *
+ * \par Description
+ * The \em Name must be an atom or string, whose name refers to a
+ * Plang source file along the import search path.  If the referred
+ * to source file has not been loaded yet, it will be parsed and
+ * loaded into the current execution context.  If the referred
+ * to source file has already been loaded, then <b>import/1</b>
+ * does nothing and succeeds.
+ * \par
+ * If \em Name does not have a file extension, then <tt>.lp</tt>
+ * is added to \em Name.  Plang then searches in the same directory
+ * as the including source file for \em Name.  If not found,
+ * Plang will search the system-specific import search path
+ * looking for \em Name.
+ * \par
+ * If \em Name includes system-specific directory separator
+ * characters (e.g. /), then the specified file will be loaded
+ * directly without searching the import search path.
+ *
+ * \par Errors
+ *
+ * \li <tt>system_error</tt> - <b>import/1</b> was not used
+ *     within a \ref directive_1 "(:-)/1" directive.
+ *
+ * \par Examples
+ * \code
+ * :- import(stdout).
+ * :- import("stdout.lp").
+ * :- import(1.5).              error message: not an atom or string
+ * :- import("not_found.lp").   error message: non-existent file
+ * :- import("../dir/file.lp").
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog" has directives called
+ * <b>ensure_loaded/1</b> and <b>include/1</b> that perform a
+ * similar function to <b>import/1</b>.  Those Standard Prolog
+ * directives are not supported by Plang.
+ *
+ * \par See Also
+ * \ref directive_1 "(:-)/1"
+ */
+static p_goal_result p_builtin_import
+    (p_context *context, p_term **args, p_term **error)
+{
+    /* Importing is only allowed when parsing a source file
+     * because it isn't possible to know the filename of the
+     * parent when executed from within a normal predicate */
+    *error = p_term_create_atom(context, "system_error");
+    return P_RESULT_ERROR;
+}
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor initialization_1
+ * <b>(?-)/1</b>, <b>initialization/1</b> - execute a goal after a
+ * source file has been loaded.
+ *
+ * \par Usage
+ * <b>?-</b> \em Goal.
+ * \par
+ * <b>?-</b> { \em Goal }
+ * \par
+ * <b>:-</b> \b initialization(\em Goal).
+ *
+ * \par Description
+ * Executes \em Goal after the current source file has been
+ * completely loaded.  After execution of the \em Goal, an implicit
+ * cut, \ref cut_0 "(!)/0", and \ref fail_0 "fail/0" are performed
+ * to return the system to its original state before the call.
+ * The only permanent modifications to the system state will be
+ * in the form of side-effects in \em Goal.
+ * \par
+ * If <b>(?-)/1</b> or <b>initialization/1</b> is called during
+ * normal program execution instead of within a directive,
+ * it will have the same effect as \ref call_1 "call/1".
+ *
+ * \par Examples
+ * \code
+ * ?- stdout::writeln("Hello World!").
+ * \endcode
+ *
+ * \par Compatibility
+ * The <b>initialization/1</b> directive is compatible with
+ * \ref standard "Standard Prolog".  The <b>(?-)/1</b> form
+ * is the recommended syntax.
+ *
+ * \par See Also
+ * \ref directive_1 "(:-)/1",
+ * \ref call_1 "call/1"
+ */
 
 /*\@}*/
 
@@ -2395,6 +2598,8 @@ void _p_db_init_builtins(p_context *context)
         {"\\+", 1, p_builtin_not_provable},
         {"||", 2, p_builtin_logical_or},
         {"->", 2, p_builtin_if},
+        {"?-", 1, p_builtin_call},
+        {":-", 1, p_builtin_call},
         {"abolish", 1, p_builtin_abolish},
         {"asserta", 1, p_builtin_asserta},
         {"assertz", 1, p_builtin_assertz},
@@ -2410,6 +2615,8 @@ void _p_db_init_builtins(p_context *context)
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
         {"$$for", 4, p_builtin_for},
+        {"import", 1, p_builtin_import},
+        {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},
         {"nonvar", 1, p_builtin_nonvar},
         {"number", 1, p_builtin_number},

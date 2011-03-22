@@ -420,6 +420,13 @@ directive
                         p_term_create_atom(context, "initialization")) {
                 /* Turn "initialization(G)" directives into "?- G" */
                 $$ = unary_term("?-", add_debug(@2, p_term_arg($2, 0)));
+            } else if (p_term_type($2) == P_TERM_FUNCTOR &&
+                       p_term_arg_count($2) == 1 &&
+                       p_term_functor($2) ==
+                       p_term_create_atom(context, "import")) {
+                /* Import another source file at this location */
+                /* TODO */
+                $$ = unary_term(":-", $2);
             } else {
                 /* Execute the directive immediately */
                 p_goal_call_from_parser(context, add_debug(@2, $2));
