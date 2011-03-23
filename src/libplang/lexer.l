@@ -175,6 +175,7 @@ NEG             (-?)
 "\\"            { RETURNTOK(K_BITWISE_NOT); }
 "<<"            { RETURNTOK(K_SHIFT_LEFT); }
 ">>"            { RETURNTOK(K_SHIFT_RIGHT); }
+">>>"           { RETURNTOK(K_USHIFT_RIGHT); }
 "**"            { RETURNTOK(K_EXP); }
 ".."            { RETURNTOK(K_DOT_DOT); }
 ":="            { RETURNTOK(K_GETS); }

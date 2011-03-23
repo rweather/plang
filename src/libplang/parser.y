@@ -504,6 +504,7 @@ static void p_context_import
 %token K_BITWISE_NOT    "`\\'"
 %token K_SHIFT_LEFT     "`<<'"
 %token K_SHIFT_RIGHT    "`>>'"
+%token K_USHIFT_RIGHT    "`>>>'"
 %token K_EXP            "`**'"
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
@@ -829,6 +830,9 @@ multiplicative_term
         }
     | multiplicative_term K_SHIFT_RIGHT power_term {
             $$ = binary_term(">>", $1, $3);
+        }
+    | multiplicative_term K_USHIFT_RIGHT power_term {
+            $$ = binary_term(">>>", $1, $3);
         }
     | power_term    { $$ = $1; }
     ;

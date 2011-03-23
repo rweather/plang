@@ -78,6 +78,7 @@ static void test_operators()
         { 400, P_OP_YFX, 2, "mod"},
         { 400, P_OP_YFX, 2, "<<"},
         { 400, P_OP_YFX, 2, ">>"},
+        { 400, P_OP_YFX, 2, ">>>"},
         { 200, P_OP_XFX, 2, "**"},
         { 200, P_OP_XFY, 2, "^"},
         { 200, P_OP_FY,  1, "-"},
