@@ -49,6 +49,7 @@ struct p_database_info
     unsigned int op_specifier : 8;
     unsigned int op_priority : 16;
     p_db_builtin builtin_func;
+    p_db_arith arith_func;
     p_class_info *class_info;
     p_term *clauses_head;
     p_term *clauses_tail;
@@ -57,6 +58,7 @@ struct p_database_info
 
 void _p_db_init(p_context *context);
 void _p_db_init_builtins(p_context *context);
+void _p_db_init_arith(p_context *context);
 
 /** @endcond */
 

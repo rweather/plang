@@ -51,6 +51,21 @@ typedef p_goal_result (*p_db_builtin)(p_context *context, p_term **args, p_term 
 p_db_builtin p_db_builtin_predicate(const p_term *name, int arity);
 void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin);
 
+/** @cond */
+typedef struct {
+    int type;
+    union {
+        int integer_value;
+        double real_value;
+        p_term *string_value;
+    };
+} p_arith_value;
+/** @endcond */
+
+typedef p_goal_result (*p_db_arith)(p_context *context, p_arith_value *result, const p_arith_value *values, p_term **args, p_term **error);
+p_db_arith p_db_builtin_arith(const p_term *name, int arity);
+void p_db_set_builtin_arith(p_term *name, int arity, p_db_arith builtin);
+
 int p_db_clause_assert_first(p_context *context, p_term *clause);
 int p_db_clause_assert_last(p_context *context, p_term *clause);
 int p_db_clause_retract(p_context *context, p_term *clause);

@@ -1,1 +1,1 @@
-SUBDIRS = libplang
+SUBDIRS = libplang plang

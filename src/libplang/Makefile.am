@@ -1,6 +1,7 @@
 lib_LTLIBRARIES = libplang.la
 
 libplang_la_SOURCES = \
+	arith.c \
 	builtins.c \
 	context.c \
 	context-priv.h \

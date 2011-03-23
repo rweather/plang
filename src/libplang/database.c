@@ -325,6 +325,7 @@ void p_db_set_operator_info(p_term *name, p_op_specifier specifier, int priority
  *
  * \ingroup database
  * \sa p_db_builtin, p_db_set_builtin_predicate()
+ * \sa p_db_builtin_arith()
  */
 p_db_builtin p_db_builtin_predicate(const p_term *name, int arity)
 {
@@ -352,6 +353,7 @@ p_db_builtin p_db_builtin_predicate(const p_term *name, int arity)
  *
  * \ingroup database
  * \sa p_db_builtin, p_db_builtin_predicate()
+ * \sa p_db_set_builtin_arith()
  */
 void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
 {
@@ -373,6 +375,78 @@ void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
         info->flags |= P_PREDICATE_BUILTIN;
     else
         info->flags &= ~P_PREDICATE_BUILTIN;
+}
+
+/**
+ * \typedef p_db_arith
+ * \ingroup database
+ * This type defines the function prototype of a builtin
+ * arithmetic function.
+ *
+ * The arguments are the execution context, a pointer to the
+ * result value, a pointer to an array of argument values,
+ * a pointer to the raw terms that resulted in the argument
+ * values, and a return pointer for error terms.
+ *
+ * The return value should be one of P_RESULT_TRUE or P_RESULT_ERROR.
+ *
+ * Builtin arithmetic functions must be deterministic;
+ * they cannot backtrack.
+ *
+ * \sa p_db_set_builtin_arith()
+ */
+
+/**
+ * \brief Returns the builtin arithmetic function for \a name and
+ * \a arity, or null if there is no builtin arithmetic function.
+ *
+ * \ingroup database
+ * \sa p_db_arith, p_db_set_builtin_arith(), p_db_builtin_predicate()
+ */
+p_db_arith p_db_builtin_arith(const p_term *name, int arity)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 0;
+
+    /* Search for the arity's information block */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (info)
+        return info->arith_func;
+    else
+        return 0;
+}
+
+/**
+ * \brief Sets the \a builtin arithmetic function for \a name and
+ * \a arity.
+ *
+ * If \a builtin is null, then the previous builtin function
+ * association is removed.
+ *
+ * \ingroup database
+ * \sa p_db_arith, p_db_builtin_arith(), p_db_set_builtin_predicate()
+ */
+void p_db_set_builtin_arith
+    (p_term *name, int arity, p_db_arith builtin)
+{
+    p_database_info *info;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return;
+
+    /* Find or create an information block for the arity */
+    info = p_db_create_arity(name, (unsigned int)arity);
+    if (!info)
+        return;
+
+    /* Set the arithmetic builtin */
+    info->arith_func = builtin;
 }
 
 /* Extract the predicate name and arity from a clause */

@@ -26,6 +26,18 @@
 /**
  * \defgroup predicates Builtin predicates - Overview
  *
+ * \par Arithmetic
+ * \ref is_2 "is/2",
+ * \ref num_eq_2 "(=:=)/2",
+ * \ref num_ne_2 "(=!=)/2",
+ * \ref num_lt_2 "(&lt;)/2",
+ * \ref num_le_2 "(&lt;=)/2",
+ * \ref num_gt_2 "(&gt;)/2",
+ * \ref num_ge_2 "(&gt;=)/2",
+ * \ref fperror_1 "fperror/1",
+ * \ref isnan_1 "isnan/1",
+ * \ref isinf_1 "isinf/1"
+ *
  * \par Clause handling
  * \ref abolish_1 "abolish/1",
  * \ref asserta_1 "asserta/1",
@@ -111,7 +123,7 @@
 /*\@}*/
 
 /* Create a "type_error" term */
-static p_term *p_builtin_type_error
+p_term *p_builtin_type_error
     (p_context *context, const char *name, p_term *term)
 {
     p_term *error = p_term_create_functor
@@ -165,6 +177,13 @@ static void p_builtin_unbind_variables(p_term *list)
         list = p_term_deref(list->list.tail);
     }
 }
+
+/**
+ * \defgroup arithmetic Builtin predicates - Arithmetic
+ */
+/*\@{*/
+/* Predicates and functions for this group are defined in arith.c */
+/*\@}*/
 
 /**
  * \defgroup clause_handling Builtin predicates - Clause handling

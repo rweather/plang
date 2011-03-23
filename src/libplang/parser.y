@@ -518,7 +518,9 @@ static void p_context_import
 %token K_IF             "`if'"
 %token K_IN             "`in'"
 %token K_IS             "`is'"
+%token K_MOD            "`mod'"
 %token K_NEW            "`new'"
+%token K_REM            "`rem'"
 %token K_SWITCH         "`switch'"
 %token K_TRY            "`try'"
 %token K_WHILE          "`while'"
@@ -825,6 +827,12 @@ multiplicative_term
     | multiplicative_term '%' power_term {
             $$ = binary_term("%", $1, $3);
         }
+    | multiplicative_term K_MOD power_term {
+            $$ = binary_term("mod", $1, $3);
+        }
+    | multiplicative_term K_REM power_term {
+            $$ = binary_term("rem", $1, $3);
+        }
     | multiplicative_term K_SHIFT_LEFT power_term {
             $$ = binary_term("<<", $1, $3);
         }
@@ -848,9 +856,9 @@ power_term
     ;
 
 unary_term
-    : '-' primary_term              { $$ = unary_term("-", $2); }
-    | K_BITWISE_NOT primary_term    { $$ = unary_term("\\", $2); }
-    | '~' primary_term              { $$ = unary_term("\\", $2); }
+    : '-' unary_term                { $$ = unary_term("-", $2); }
+    | K_BITWISE_NOT unary_term      { $$ = unary_term("~", $2); }
+    | '~' unary_term                { $$ = unary_term("~", $2); }
     | primary_term                  { $$ = $1; }
     ;
 

@@ -189,7 +189,9 @@ NEG             (-?)
 "if"            { RETURNTOK(K_IF); }
 "in"            { RETURNTOK(K_IN); }
 "is"            { RETURNTOK(K_IS); }
+"mod"           { RETURNTOK(K_MOD); }
 "new"           { RETURNTOK(K_NEW); }
+"rem"           { RETURNTOK(K_REM); }
 "switch"        { RETURNTOK(K_SWITCH); }
 "try"           { RETURNTOK(K_TRY); }
 "while"         { RETURNTOK(K_WHILE); }
@@ -212,6 +214,10 @@ NEG             (-?)
     }
 
 {NEG}{DIGIT}+"."{DIGIT}+({EXPONENT}?) {
+        lval->term = p_term_create_real(context, atof(yytext));
+        RETURNTOK(K_REAL);
+    }
+{NEG}{DIGIT}+{EXPONENT}     {
         lval->term = p_term_create_real(context, atof(yytext));
         RETURNTOK(K_REAL);
     }

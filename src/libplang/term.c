@@ -317,7 +317,7 @@ p_term *p_term_create_atom(p_context *context, const char *name)
  * embedded NUL characters encoded as the sequence 0xC0 0x80.
  *
  * \ingroup term
- * \sa p_term_create_atom()
+ * \sa p_term_create_atom(), p_term_concat_string()
  */
 p_term *p_term_create_string(p_context *context, const char *str)
 {
@@ -2017,6 +2017,41 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
             return P_TERM_TRUE_BODY;
     }
     return 0;
+}
+
+/**
+ * \brief Concatenates \a str1 and \a str2 to create a new string.
+ *
+ * Returns the concatenated string, or null if \a str1 or \a str2
+ * is not a string.
+ *
+ * \ingroup term
+ * \sa p_term_create_string()
+ */
+p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2)
+{
+    size_t len;
+    struct p_term_string *term;
+    str1 = p_term_deref(str1);
+    str2 = p_term_deref(str2);
+    if (!str1 || str1->header.type != P_TERM_STRING)
+        return 0;
+    if (!str2 || str2->header.type != P_TERM_STRING)
+        return 0;
+    if (str1->header.size == 0)
+        return str2;
+    if (str2->header.size == 0)
+        return str1;
+    len = str1->header.size + str2->header.size;
+    term = p_term_malloc
+        (context, struct p_term_string, sizeof(struct p_term_string) + len);
+    if (!term)
+        return 0;
+    term->header.type = P_TERM_STRING;
+    term->header.size = (unsigned int)len;
+    strcpy(term->name, str1->string.name);
+    strcpy(term->name + str1->header.size, str2->string.name);
+    return (p_term *)term;
 }
 
 /*\@}*/

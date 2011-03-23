@@ -53,6 +53,7 @@ p_context *p_context_create(void)
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
+    _p_db_init_arith(context);
     return context;
 }
 

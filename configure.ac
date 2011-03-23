@@ -57,13 +57,14 @@ fi
 AC_SUBST(libdir)
 
 dnl Checks for library functions.
+AC_CHECK_LIB(m, sin)
 AC_FUNC_MEMCMP
 AC_CHECK_FUNCS(vsnprintf _vsnprintf strerror strerror_r fstat mmap munmap)
-AC_CHECK_FUNCS(fork execvp)
+AC_CHECK_FUNCS(fork execvp fmod remainder drem feclearexcept fetestexcept)
 AC_FUNC_ALLOCA
 
 AC_CHECK_LIB(gc, GC_gcollect)
-AC_CHECK_HEADERS(gc.h gc/gc.h)
+AC_CHECK_HEADERS(gc.h gc/gc.h fenv.h)
 
 AC_CONFIG_FILES([
   Makefile
@@ -73,5 +74,6 @@ AC_CONFIG_FILES([
   src/libplang/Makefile
   src/frontend/Makefile
   tests/Makefile
-  tests/libplang/Makefile])
+  tests/libplang/Makefile
+  tests/plang/Makefile])
 AC_OUTPUT
