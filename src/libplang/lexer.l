@@ -223,18 +223,28 @@ NEG             (-?)
     }
 
 {NEG}"0"[xX]{HEX}+      {
-        lval->term = p_term_create_integer
-            (context, strtol(yytext + 2, (char **)0, 16));
+        if (yytext[0] != '-') {
+            lval->term = p_term_create_integer
+                (context, (int)(strtol(yytext + 2, (char **)0, 16)));
+        } else {
+            lval->term = p_term_create_integer
+                (context, (int)(-strtol(yytext + 3, (char **)0, 16)));
+        }
         RETURNTOK(K_INTEGER);
     }
 {NEG}"0"{OCT}+      {
-        lval->term = p_term_create_integer
-            (context, strtol(yytext + 1, (char **)0, 8));
+        if (yytext[0] != '-') {
+            lval->term = p_term_create_integer
+                (context, (int)(strtol(yytext + 1, (char **)0, 8)));
+        } else {
+            lval->term = p_term_create_integer
+                (context, (int)(-strtol(yytext + 2, (char **)0, 8)));
+        }
         RETURNTOK(K_INTEGER);
     }
 {NEG}{DIGIT}+        {
         lval->term = p_term_create_integer
-            (context, strtol(yytext, (char **)0, 10));
+            (context, (int)(strtol(yytext, (char **)0, 10)));
         RETURNTOK(K_INTEGER);
     }
 
