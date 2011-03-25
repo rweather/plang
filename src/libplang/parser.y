@@ -673,6 +673,7 @@ atom
     : K_ATOM        { $$ = $1; }
     | K_VAR         { $$ = p_term_create_atom(context, "var"); }
     | K_CATCH       { $$ = p_term_create_atom(context, "catch"); }
+    | K_CLASS       { $$ = p_term_create_atom(context, "class"); }
     ;
 
 arguments

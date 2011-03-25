@@ -93,8 +93,8 @@
  * \par Type testing
  * \ref atom_1 "atom/1",
  * \ref atomic_1 "atomic/1",
- * \ref class_object_1 "class_object/1",
- * \ref class_object_2 "class_object/2",
+ * \ref class_1 "class/1",
+ * \ref class_2 "class/2",
  * \ref compound_1 "compound/1",
  * \ref float_1 "float/1",
  * \ref integer_1 "integer/1",
@@ -2184,8 +2184,8 @@ static p_goal_result p_builtin_unifiable
  *
  * \ref atom_1 "atom/1",
  * \ref atomic_1 "atomic/1",
- * \ref class_object_1 "class_object/1",
- * \ref class_object_2 "class_object/2",
+ * \ref class_1 "class/1",
+ * \ref class_2 "class/2",
  * \ref compound_1 "compound/1",
  * \ref float_1 "float/1",
  * \ref integer_1 "integer/1",
@@ -2289,35 +2289,35 @@ static p_goal_result p_builtin_atomic
 /**
  * \addtogroup type_testing
  * <hr>
- * \anchor class_object_1
- * \b class_object/1 - tests if a term is a class object or name.
+ * \anchor class_1
+ * \b class/1 - tests if a term is a class object or name.
  *
  * \par Usage
- * \b class_object(\em Term)
+ * \b class(\em Term)
  *
  * \par Description
  * If \em Term is a class object or an atom that names a class,
- * then \b class_object(\em Term) succeeds.  Fails otherwise.
+ * then \b class(\em Term) succeeds.  Fails otherwise.
  *
  * \par Examples
  * \code
  * class person { ... }
  * new person (P)
  *
- * class_object(person)         succeeds
- * class_object(people)         fails (assuming 'people' is not a class)
- * class_object(1.5)            fails
- * class_object(f(X))           fails
- * class_object(P)              fails
- * class_object(P.prototype)    succeeds (P's prototype is the person class)
- * class_object("person")       fails
+ * class(person)        succeeds
+ * class(people)        fails (assuming 'people' is not a class)
+ * class(1.5)           fails
+ * class(f(X))          fails
+ * class(P)             fails
+ * class(P.prototype)   succeeds (P's prototype is the person class)
+ * class("person")      fails
  * \endcode
  *
  * \par See Also
- * \ref class_object_2 "class_object/2",
+ * \ref class_2 "class/2",
  * \ref object_1 "object/1"
  */
-static p_goal_result p_builtin_class_object_1
+static p_goal_result p_builtin_class_1
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *term = p_term_deref(args[0]);
@@ -2336,12 +2336,12 @@ static p_goal_result p_builtin_class_object_1
 /**
  * \addtogroup type_testing
  * <hr>
- * \anchor class_object_2
- * \b class_object/2 - tests if a class name is associated with a
+ * \anchor class_2
+ * \b class/2 - tests if a class name is associated with a
  * specific class object.
  *
  * \par Usage
- * \b class_object(\em Name, \em Class)
+ * \b class(\em Name, \em Class)
  *
  * \par Description
  * If \em Name is an atom that names a class, then \em Class is
@@ -2359,19 +2359,19 @@ static p_goal_result p_builtin_class_object_1
  * class person { ... }
  * new person (P)
  *
- * class_object(person, C)          succeeds
- * class_object(people, C)          fails
- * class_object(1.5, C)             fails
- * class_object(P, C)               fails
- * class_object(P.className, C)     succeeds
- * class_object(Name, P.prototype)  succeeds
+ * class(person, C)         succeeds
+ * class(people, C)         fails
+ * class(1.5, C)            fails
+ * class(P, C)              fails
+ * class(P.className, C)    succeeds
+ * class(Name, P.prototype) succeeds
  * \endcode
  *
  * \par See Also
- * \ref class_object_1 "class_object/1",
+ * \ref class_1 "class/1",
  * \ref object_1 "object/1"
  */
-static p_goal_result p_builtin_class_object_2
+static p_goal_result p_builtin_class_2
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *name = p_term_deref(args[0]);
@@ -2623,7 +2623,7 @@ static p_goal_result p_builtin_number
  * \endcode
  *
  * \par See Also
- * \ref class_object_1 "class_object/1",
+ * \ref class_1 "class/1",
  * \ref object_2 "object/2"
  */
 static p_goal_result p_builtin_object_1
@@ -2667,7 +2667,7 @@ static p_goal_result p_builtin_object_1
  * \endcode
  *
  * \par See Also
- * \ref class_object_1 "class_object/1",
+ * \ref class_1 "class/1",
  * \ref object_1 "object/1"
  */
 static p_goal_result p_builtin_object_2
@@ -2838,8 +2838,8 @@ void _p_db_init_builtins(p_context *context)
         {"atomic", 1, p_builtin_atomic},
         {"call", 1, p_builtin_call},
         {"catch", 3, p_builtin_catch},
-        {"class_object", 1, p_builtin_class_object_1},
-        {"class_object", 2, p_builtin_class_object_2},
+        {"class", 1, p_builtin_class_1},
+        {"class", 2, p_builtin_class_2},
         {"compound", 1, p_builtin_compound},
         {"$$do", 3, p_builtin_do},
         {"dynamic", 1, p_builtin_dynamic},
