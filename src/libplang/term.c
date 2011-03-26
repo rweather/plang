@@ -1870,8 +1870,6 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
     case P_TERM_FUNCTOR: {
         /* Clone a functor term */
         unsigned int index;
-        if (p_term_is_ground(term))
-            break;
         clone = p_term_create_functor
             (context, term->functor.functor_name,
              (int)(term->header.size));
@@ -1889,8 +1887,6 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
         /* Clone a list term */
         p_term *head;
         p_term *tail = 0;
-        if (p_term_is_ground(term))
-            break;
         clone = 0;
         do {
             head = p_term_clone_inner(context, term->list.head);

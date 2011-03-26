@@ -1063,7 +1063,7 @@ loop_statement
             $$ = p_term_create_functor
                 (context, p_term_create_atom(context, "$$for"), 4);
             p_term_bind_functor_arg($$, 0, $2);
-            p_term_bind_functor_arg($$, 1, $4);
+            p_term_bind_functor_arg($$, 1, unary_term("$$loopvar", $4));
             p_term_bind_functor_arg($$, 2, $7);
             p_term_bind_functor_arg($$, 3, $9);
         }

@@ -177,6 +177,12 @@ static void p_builtin_unbind_variables(p_term *list)
         list = p_term_deref(list->list.tail);
     }
 }
+static p_goal_result p_builtin_unbind
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_builtin_unbind_variables(args[0]);
+    return P_RESULT_TRUE;
+}
 
 /**
  * \defgroup arithmetic Builtin predicates - Arithmetic
@@ -1146,26 +1152,15 @@ static p_goal_result p_builtin_cut
  * \ref for_stmt "for",
  * \ref while_stmt "while"
  */
-static p_goal_result p_builtin_do
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_goal_result result;
-    for (;;) {
-        if (args[0] != context->nil_atom)
-            p_builtin_unbind_variables(args[0]);
-        result = p_goal_call(context, args[1], error);
-        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-            return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
-            return result;
-        result = p_goal_call(context, args[2], error);
-        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-            break;
-        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
-            return result;
-    }
-    return P_RESULT_TRUE;
-}
+static char const p_builtin_do[] =
+    "'$$do'(Vars, Body, Cond)\n"
+    "{\n"
+    "    '$$unbind'(Vars);\n"
+    "    call(Body);\n"
+    "    !;\n"
+    "    if (call(Cond))\n"
+    "        '$$do'(Vars, Body, Cond);\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -1292,33 +1287,37 @@ static p_goal_result p_builtin_fail
  * \ref do_stmt "do",
  * \ref while_stmt "while"
  */
-static p_goal_result p_builtin_for
+static p_goal_result p_builtin_set_loop_var
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *list = p_term_deref(args[2]);
-    p_goal_result result;
-    for (;;) {
-        if (!list || (list->header.type & P_TERM_VARIABLE) != 0) {
-            *error = p_term_create_atom(context, "instantiation_error");
-            return P_RESULT_ERROR;
-        } else if (list == context->nil_atom) {
-            break;
-        } else if (list->header.type != P_TERM_LIST) {
-            *error = p_builtin_type_error(context, "list", list);
-            return P_RESULT_ERROR;
-        }
-        if (args[0] != context->nil_atom)
-            p_builtin_unbind_variables(args[0]);
-        p_builtin_set_variable(args[1], list->list.head);
-        result = p_goal_call(context, args[3], error);
-        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-            return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
-            return result;
-        list = p_term_deref(list->list.tail);
-    }
+    /* We expect the first argument to have the form $$loopvar(X) */
+    p_builtin_set_variable(p_term_arg(args[0], 0), args[1]);
     return P_RESULT_TRUE;
 }
+static char const p_builtin_for[] =
+    "'$$for'(Vars, LoopVar, List, Body)\n"
+    "{\n"
+    "    var(List);\n"
+    "    !;\n"
+    "    throw(instantiation_error);\n"
+    "}\n"
+    "'$$for'(Vars, LoopVar, [], Body)\n"
+    "{\n"
+    "    !;\n"
+    "}\n"
+    "'$$for'(Vars, LoopVar, [H|T], Body)\n"
+    "{\n"
+    "    !;\n"
+    "    '$$unbind'(Vars);\n"
+    "    '$$set_loop_var'(LoopVar, H);\n"
+    "    call(Body);\n"
+    "    !;\n"
+    "    '$$for'(Vars, LoopVar, T, Body);\n"
+    "}\n"
+    "'$$for'(Vars, LoopVar, List, Body)\n"
+    "{\n"
+    "    throw(type_error(list, List));\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -1722,26 +1721,16 @@ static p_goal_result p_builtin_true
  * \ref do_stmt "do",
  * \ref for_stmt "for"
  */
-static p_goal_result p_builtin_while
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_goal_result result;
-    for (;;) {
-        if (args[0] != context->nil_atom)
-            p_builtin_unbind_variables(args[0]);
-        result = p_goal_call(context, args[1], error);
-        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-            break;
-        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
-            return result;
-        result = p_goal_call(context, args[2], error);
-        if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-            return P_RESULT_FAIL;
-        else if (result == P_RESULT_ERROR || result == P_RESULT_HALT)
-            return result;
-    }
-    return P_RESULT_TRUE;
-}
+static char const p_builtin_while[] =
+    "'$$while'(Vars, Cond, Body)\n"
+    "{\n"
+    "    '$$unbind'(Vars);\n"
+    "    if (call(Cond)) {\n"
+    "        call(Body);\n"
+    "        !;\n"
+    "        '$$while'(Vars, Cond, Body);\n"
+    "    }\n"
+    "}\n";
 
 /*\@}*/
 
@@ -2841,12 +2830,10 @@ void _p_db_init_builtins(p_context *context)
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
         {"compound", 1, p_builtin_compound},
-        {"$$do", 3, p_builtin_do},
         {"dynamic", 1, p_builtin_dynamic},
         {"fail", 0, p_builtin_fail},
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
-        {"$$for", 4, p_builtin_for},
         {"halt", 0, p_builtin_halt_0},
         {"halt", 1, p_builtin_halt_1},
         {"import", 1, p_builtin_import},
@@ -2863,20 +2850,24 @@ void _p_db_init_builtins(p_context *context)
         {"$$println_error", 0, p_builtin_println_error},
         {"$$printq_error", 1, p_builtin_printq_error},
         {"retract", 1, p_builtin_retract},
+        {"$$set_loop_var", 2, p_builtin_set_loop_var},
         {"string", 1, p_builtin_string},
         {"$$switch", 3, p_builtin_switch},
         {"throw", 1, p_builtin_throw},
         {"true", 0, p_builtin_true},
         {"$$try", 2, p_builtin_try},
+        {"$$unbind", 1, p_builtin_unbind},
         {"unifiable", 2, p_builtin_unifiable},
         {"unify_with_occurs_check", 2, p_builtin_unify},
         {"var", 1, p_builtin_var},
-        {"$$while", 3, p_builtin_while},
         {0, 0, 0}
     };
     static const char * const builtin_sources[] = {
+        p_builtin_do,
+        p_builtin_for,
         p_builtin_once,
         p_builtin_repeat,
+        p_builtin_while,
         0
     };
     int index;

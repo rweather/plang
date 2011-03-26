@@ -40,8 +40,14 @@ static p_goal_result execute_goal(const char *source, const char *expected_error
         p_term *expected;
         p_context_consult_string(context, expected_error);
         expected = _p_context_test_goal(context);
-        if (!p_term_unify(context, error, expected, P_BIND_EQUALITY))
+        if (!p_term_unify(context, error, expected, P_BIND_EQUALITY)) {
+            fputs("actual error: ", stdout);
+            p_term_print(context, error, p_term_stdio_print_func, stdout);
+            fputs("\nexpected error: ", stdout);
+            p_term_print(context, expected, p_term_stdio_print_func, stdout);
+            putc('\n', stdout);
             P_FAIL("did not receive the expected error");
+        }
     }
     return result;
 }
@@ -180,6 +186,8 @@ static void test_logic_catch()
     P_COMPARE(run_stmt_error("try { throw(a); } catch(X) { throw(b); } catch(Z) { Y = caught; }", "b"), P_RESULT_ERROR);
     P_COMPARE(run_stmt("try { throw(a); } catch(b) { throw(b); } catch(Z) { Y = caught; }; Y == caught;"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("try { try { throw(a); } catch(X) { throw(b); } } catch(Z) { Y = caught; } Y == caught;"), P_RESULT_TRUE);
+
+    P_COMPARE(run_stmt_error("X = f(d); throw(type_error(list, X));", "type_error(list, f(d))"), P_RESULT_ERROR);
 }
 
 static void test_logic_do()
