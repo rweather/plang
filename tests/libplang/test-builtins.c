@@ -268,6 +268,7 @@ static void test_logic_switch()
     P_COMPARE(run_stmt("switch (a) { case X: Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("switch (f(a)) { case g(X): case f(X): Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("switch (f(a)) { case g(X): Y = c; case f(X): Y = b; } X == a; Y == b;"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("switch (f(a)) { case g(X): Y = c; case f(X): Y = b; case Z: Y = d; } X == a; Y == b;"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("switch (f(a)) { case g(X): Y = c; case h(X): Y = b; default: Y = d; } var(X); Y == d;"), P_RESULT_TRUE);
 }
 

@@ -1606,33 +1606,35 @@ static char const p_builtin_repeat[] =
  * \par See Also
  * \ref if_stmt "if"
  */
-static p_goal_result p_builtin_switch
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_term *list = p_term_deref(args[1]);
-    p_term *case_atom = p_term_create_atom(context, "$$case");
-    p_term *case_term;
-    p_term *label_list;
-    while (list && list->header.type == P_TERM_LIST) {
-        case_term = p_term_deref(list->list.head);
-        if (case_term && case_term->header.type == P_TERM_FUNCTOR &&
-                case_term->header.size == 2 &&
-                case_term->functor.functor_name == case_atom) {
-            label_list = p_term_deref(p_term_arg(case_term, 0));
-            while (label_list && label_list->header.type == P_TERM_LIST) {
-                if (p_term_unify(context, args[0],
-                                 label_list->list.head,
-                                 P_BIND_DEFAULT)) {
-                    return p_goal_call
-                        (context, p_term_arg(case_term, 1), error);
-                }
-                label_list = p_term_deref(label_list->list.tail);
-            }
-        }
-        list = p_term_deref(list->list.tail);
-    }
-    return p_goal_call(context, args[2], error);
-}
+static char const p_builtin_switch[] =
+    "'$$switch'(Value, [], Default)\n"
+    "{\n"
+    "    !;\n"
+    "    call(Default);\n"
+    "}\n"
+    "'$$switch'(Value, ['$$case'(Cases, Body)|Tail], Default)\n"
+    "{\n"
+    "    '$$switch_case_match'(Value, Cases);\n"
+    "    !;\n"
+    "    call(Body);\n"
+    "}\n"
+    "'$$switch'(Value, [Head|Tail], Default)\n"
+    "{\n"
+    "    '$$switch'(Value, Tail, Default);\n"
+    "}\n"
+    "'$$switch_case_match'(Value, [])\n"
+    "{\n"
+    "    !;\n"
+    "    fail;\n"
+    "}\n"
+    "'$$switch_case_match'(Value, [Value|Tail])\n"
+    "{\n"
+    "    !;\n"
+    "}\n"
+    "'$$switch_case_match'(Value, [Head|Tail])\n"
+    "{\n"
+    "    '$$switch_case_match'(Value, Tail);\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -2860,7 +2862,6 @@ void _p_db_init_builtins(p_context *context)
         {"retract", 1, p_builtin_retract},
         {"$$set_loop_var", 2, p_builtin_set_loop_var},
         {"string", 1, p_builtin_string},
-        {"$$switch", 3, p_builtin_switch},
         {"throw", 1, p_builtin_throw},
         {"true", 0, p_builtin_true},
         {"$$try", 2, p_builtin_try},
@@ -2876,6 +2877,7 @@ void _p_db_init_builtins(p_context *context)
         p_builtin_not_provable,
         p_builtin_once,
         p_builtin_repeat,
+        p_builtin_switch,
         p_builtin_while,
         0
     };
