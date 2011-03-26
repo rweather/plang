@@ -2072,7 +2072,7 @@ p_term *p_term_clone(p_context *context, p_term *term)
  * If the unification succeeds, then this function returns the
  * renamed body of \a clause.  Returns null if the unification fails.
  *
- * The special value P_TERM_TRUE_BODY is returned if \a clause
+ * The return value will be the atom \c true if \a clause
  * does not have a body and \a clause unifies with \a term.
  *
  * \ingroup term
@@ -2094,7 +2094,7 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
             return clone->functor.arg[1];
     } else {
         if (p_term_unify(context, term, clone, P_BIND_DEFAULT))
-            return P_TERM_TRUE_BODY;
+            return context->true_atom;
     }
     return 0;
 }

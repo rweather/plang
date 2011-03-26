@@ -52,6 +52,9 @@ p_context *p_context_create(void)
     context->line_atom = p_term_create_atom(context, "$$line");
     context->if_atom = p_term_create_atom(context, "->");
     context->slash_atom = p_term_create_atom(context, "/");
+    context->true_atom = p_term_create_atom(context, "true");
+    context->fail_atom = p_term_create_atom(context, "fail");
+    context->cut_atom = p_term_create_atom(context, "!");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -175,22 +178,6 @@ int p_term_lex_init_extra(p_input_stream *extra, yyscan_t *scanner);
 int p_term_lex_destroy(yyscan_t scanner);
 int p_term_parse(p_context *context, yyscan_t scanner);
 
-/* Dereference a term and strip out "$$line()" declarations */
-P_INLINE p_term *p_term_deref_line(p_context *context, p_term *term)
-{
-    for (;;) {
-        term = p_term_deref(term);
-        if (!term || term->header.type != P_TERM_FUNCTOR)
-            break;
-        if (term->functor.functor_name != context->line_atom)
-            break;
-        if (term->header.size != 3)
-            break;
-        term = p_term_arg(term, 2);
-    }
-    return term;
-}
-
 static int p_context_consult(p_context *context, p_input_stream *stream)
 {
     yyscan_t scanner;
@@ -224,7 +211,7 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
         p_term *test_goal_atom = p_term_create_atom(context, "\?\?--");
         p_term *decl;
         while (list->header.type == P_TERM_LIST) {
-            decl = p_term_deref_line(context, list->list.head);
+            decl = p_term_deref(list->list.head);
             if (decl && decl->header.type == P_TERM_FUNCTOR) {
                 if (decl->functor.functor_name == clause_atom) {
                     /* TODO: error reporting */
@@ -334,20 +321,6 @@ int p_context_consult_string(p_context *context, const char *str)
  */
 
 /**
- * \var P_RESULT_CUT_FAIL
- * \ingroup context
- * The goal failed but it contained a \ref cut_0 "!/0" declaration
- * to reduce further back-tracking at the caller's level.
- */
-
-/**
- * \var P_RESULT_CUT_TRUE
- * \ingroup context
- * The goal succeeded but it contained a \ref cut_0 "!/0" declaration
- * to reduce further back-tracking at the caller's level.
- */
-
-/**
  * \var P_RESULT_ERROR
  * \ingroup context
  * The goal resulted in a thrown error that has not been caught.
@@ -363,19 +336,20 @@ int p_context_consult_string(p_context *context, const char *str)
  * p_context_execute_goal().
  */
 
-/* Deterministic execution of goals - FIXME: non-determinism */
-static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term **error)
+/* Inner execution of goals - performs an operation deterministically
+ * or modifies the search tree according to the control predicate */
+static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_term **error)
 {
-    p_goal_result result;
     p_term *pred;
     p_term *name;
     unsigned int arity;
     p_db_builtin builtin;
     p_database_info *info;
-    void *marker;
+    p_exec_node *current;
+    p_exec_node *next;
 
     /* Bail out if the goal is a variable */
-    goal = p_term_deref_line(context, goal);
+    goal = p_term_deref(goal);
     if (!goal || (goal->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
@@ -386,32 +360,23 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
         name = goal;
         arity = 0;
     } else if (goal->header.type == P_TERM_FUNCTOR) {
-        /* Handle comma terms, assumed to be right-recursive */
         if (goal->header.size == 2 &&
                 goal->functor.functor_name == context->comma_atom) {
-            int have_cut = 0;
-            do {
-                result = p_goal_call(context, goal->functor.arg[0], error);
-                if (result == P_RESULT_CUT_TRUE)
-                    have_cut = 1;
-                else if (result == P_RESULT_FAIL && have_cut)
-                    return P_RESULT_CUT_FAIL;
-                else if (result != P_RESULT_TRUE)
-                    return result;
-                goal = p_term_deref(goal->functor.arg[1]);
-                if (!goal || goal->header.type != P_TERM_FUNCTOR)
-                    break;
-                if (goal->header.size != 2)
-                    break;
-            } while (goal->functor.functor_name == context->comma_atom);
-            result = p_goal_call(context, goal, error);
-            if (have_cut) {
-                if (result == P_RESULT_TRUE)
-                    result = P_RESULT_CUT_TRUE;
-                else if (result == P_RESULT_FAIL)
-                    result = P_RESULT_CUT_FAIL;
-            }
-            return result;
+            /* Handle comma terms, which are assumed to be
+             * right-recursive.  Replace the current goal with
+             * the left-hand part of the comma term, and create a
+             * new continuation node for the right-hand part */
+            current = context->current_node;
+            next = GC_NEW(p_exec_node);
+            if (!next)
+                return P_RESULT_FAIL;
+            next->goal = goal->functor.arg[1];
+            next->success_node = current->success_node;
+            next->cut_node = current->cut_node;
+            next->catch_node = current->catch_node;
+            current->goal = goal->functor.arg[0];
+            current->success_node = next;
+            return P_RESULT_TREE_CHANGE;
         }
         name = goal->functor.functor_name;
         arity = goal->header.size;
@@ -437,25 +402,30 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
         p_term *clause_list = info->clauses_head;
         p_term *body;
         while (clause_list != 0) {
-            /* Try each clause in turn and commit to the one that
-             * succeeds, throws an error, or fails with cut.
-             * TODO: non-determinism and backtracking */
-            marker = p_context_mark_trace(context);
+            /* Find the first clause whose head unifies with the goal */
             body = p_term_unify_clause
                 (context, goal, clause_list->list.head);
             if (body) {
-                if (body == P_TERM_TRUE_BODY)
-                    return P_RESULT_TRUE;
-                result = p_goal_call(context, body, error);
-                if (result == P_RESULT_TRUE ||
-                        result == P_RESULT_CUT_TRUE)
-                    return P_RESULT_TRUE;
-                else if (result == P_RESULT_CUT_FAIL)
-                    return P_RESULT_FAIL;
-                else if (result == P_RESULT_ERROR ||
-                         result == P_RESULT_HALT)
-                    return result;
-                p_context_backtrack_trace(context, marker);
+                current = context->current_node;
+                clause_list = clause_list->list.tail;
+                if (clause_list) {
+                    next = GC_NEW(p_exec_node);
+                    if (!next)
+                        return P_RESULT_FAIL;
+                    next->goal = current->goal;
+                    next->next_clause = clause_list;
+                    next->success_node = current->success_node;
+                    next->cut_node = context->fail_node;
+                    next->catch_node = current->catch_node;
+                    next->fail_marker = current->fail_marker;
+                    current->goal = body;
+                    current->cut_node = context->fail_node;
+                    context->fail_node = next;
+                } else {
+                    current->goal = body;
+                    current->cut_node = context->fail_node;
+                }
+                return P_RESULT_TREE_CHANGE;
             }
             clause_list = clause_list->list.tail;
         }
@@ -477,12 +447,157 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
     p_term_bind_functor_arg(*error, 1, pred);
     return P_RESULT_ERROR;
 }
-p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
+
+/* Defined in builtins.c */
+int p_builtin_handle_catch(p_context *context, p_term *error);
+
+/* Execution of top-level goals */
+static p_goal_result p_goal_execute(p_context *context, p_term **error)
 {
-    void *marker = p_context_mark_trace(context);
-    p_goal_result result = p_goal_call_inner(context, goal, error);
-    if (result != P_RESULT_TRUE && result != P_RESULT_CUT_TRUE)
-        p_context_backtrack_trace(context, marker);
+    p_term *goal;
+    p_goal_result result = P_RESULT_FAIL;
+    p_exec_node *current;
+
+    for (;;) {
+        /* Fetch the current goal */
+        current = context->current_node;
+        if (current->next_clause) {
+            /* We have backtracked into a new clause of a predicate.
+             * See if the clause, or one of the following clauses
+             * matches the current goal.  If no match, then fail */
+            p_term *clause_list = current->next_clause;
+            p_term *body = 0;
+            current->next_clause = 0;
+            while (clause_list != 0) {
+                body = p_term_unify_clause
+                    (context, current->goal, clause_list->list.head);
+                if (body)
+                    break;
+                clause_list = clause_list->list.tail;
+            }
+            if (body) {
+                clause_list = clause_list->list.tail;
+                if (clause_list) {
+                    p_exec_node *next = GC_NEW(p_exec_node);
+                    if (next) {
+                        next->goal = current->goal;
+                        next->next_clause = clause_list;
+                        next->success_node = current->success_node;
+                        next->cut_node = current->cut_node;
+                        next->catch_node = current->catch_node;
+                        next->fail_marker = current->fail_marker;
+                        current->goal = body;
+                        context->fail_node = next;
+                    } else {
+                        current->goal = context->fail_atom;
+                    }
+                } else {
+                    current->goal = body;
+                }
+            } else {
+                current->goal = context->fail_atom;
+            }
+        }
+        goal = p_term_deref(current->goal);
+
+        /* Debugging: output the goal details, including next goals */
+#ifdef P_GOAL_DEBUG
+        {
+            p_term_print(context, goal,
+                         p_term_stdio_print_func, stdout);
+            putc('\n', stdout);
+            if (context->current_node->success_node) {
+                fputs("\tsuccess: ", stdout);
+                p_term_print
+                    (context, context->current_node->success_node->goal,
+                     p_term_stdio_print_func, stdout);
+                putc('\n', stdout);
+            } else {
+                fputs("\tsuccess: top-level success\n", stdout);
+            }
+            if (context->fail_node) {
+                fputs("\tfail: ", stdout);
+                p_term_print
+                    (context, context->fail_node->goal,
+                     p_term_stdio_print_func, stdout);
+                putc('\n', stdout);
+            } else {
+                fputs("\tfail: top-level fail\n", stdout);
+            }
+            if (context->current_node->cut_node) {
+                fputs("\tcut: ", stdout);
+                p_term_print
+                    (context, context->current_node->cut_node->goal,
+                     p_term_stdio_print_func, stdout);
+                putc('\n', stdout);
+            } else {
+                fputs("\tcut: top-level fail\n", stdout);
+            }
+            if (context->current_node->catch_node) {
+                fputs("\tcatch: ", stdout);
+                p_term_print
+                    (context, context->current_node->catch_node->goal,
+                     p_term_stdio_print_func, stdout);
+                putc('\n', stdout);
+            }
+        }
+#endif
+
+        /* Determine what needs to be done next for this goal */
+        *error = 0;
+        current->fail_marker = p_context_mark_trace(context);
+        result = p_goal_execute_inner(context, goal, error);
+        if (result == P_RESULT_TRUE) {
+            /* Success of deterministic leaf goal */
+#ifdef P_GOAL_DEBUG
+            fputs("\tresult: true\n", stdout);
+#endif
+            current = context->current_node;
+            context->current_node = current->success_node;
+            if (!(context->current_node)) {
+                /* Top-level success.  Set the current node to
+                 * the fail node for re-executing the goal */
+                context->current_node = context->fail_node;
+                context->fail_node = 0;
+                break;
+            }
+        } else if (result == P_RESULT_FAIL) {
+            /* Failure of deterministic leaf goal */
+#ifdef P_GOAL_DEBUG
+            fputs("\tresult: fail\n", stdout);
+#endif
+            context->current_node = context->fail_node;
+            if (!(context->current_node))
+                break;      /* Final top-level goal failure */
+            context->fail_node = context->current_node->cut_node;
+            p_context_backtrack_trace
+                (context, context->current_node->fail_marker);
+        } else if (result == P_RESULT_ERROR) {
+            /* Find an enclosing "catch" block to handle the error */
+#ifdef P_GOAL_DEBUG
+            fputs("\tresult: throw(", stdout);
+            p_term_print
+                (context, *error, p_term_stdio_print_func, stdout);
+            fputs(")\n", stdout);
+#endif
+            if (!p_builtin_handle_catch(context, *error))
+                break;
+            *error = 0;
+        } else if (result == P_RESULT_HALT) {
+            /* Force execution to halt immediately */
+#ifdef P_GOAL_DEBUG
+            fputs("\tresult: halt(", stdout);
+            p_term_print
+                (context, *error, p_term_stdio_print_func, stdout);
+            fputs(")\n", stdout);
+#endif
+            break;
+        } else {
+            /* Assumed to be P_RESULT_TREE_CHANGE, which has
+             * already altered the current node */
+        }
+    }
+
     return result;
 }
 
@@ -501,7 +616,8 @@ p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error)
  * set to an integer term corresponding to the requested exit value.
  *
  * \ingroup context
- * \sa p_context_reexecute_goal(), p_context_abandon_goal()
+ * \sa p_context_reexecute_goal(), p_context_abandon_goal(),
+ * \ref execution_model "Plang execution model"
  */
 p_goal_result p_context_execute_goal
     (p_context *context, p_term *goal, p_term **error)
@@ -509,16 +625,25 @@ p_goal_result p_context_execute_goal
     p_term *error_term = 0;
     p_goal_result result;
     p_context_abandon_goal(context);
+#ifdef P_GOAL_DEBUG
+    fputs("top-level goal: ", stdout);
+    p_term_print(context, goal, p_term_stdio_print_func, stdout);
+    putc('\n', stdout);
+#endif
+    context->current_node = GC_NEW(p_exec_node);
+    if (!context->current_node)
+        return P_RESULT_FAIL;
+    context->current_node->goal = goal;
+    context->fail_node = 0;
     context->goal_active = 1;
-    context->goal = goal;
     context->goal_marker = p_context_mark_trace(context);
-    result = p_goal_call(context, goal, &error_term);
+    result = p_goal_execute(context, &error_term);
     if (error)
         *error = error_term;
-    if (result == P_RESULT_CUT_TRUE)
-        result = P_RESULT_TRUE;
-    else if (result == P_RESULT_CUT_FAIL)
-        result = P_RESULT_FAIL;
+    if (result != P_RESULT_TRUE) {
+        context->current_node = 0;
+        context->fail_node = 0;
+    }
     return result;
 }
 
@@ -528,8 +653,8 @@ p_goal_result p_context_execute_goal
  *
  * Returns a goal status of P_RESULT_FAIL, P_RESULT_TRUE,
  * P_RESULT_ERROR, or P_RESULT_HALT reporting the status of the
- * new solution found.  Once P_RESULT_FAIL is reported,
- * no further solutions are possible.
+ * new solution found.  If P_RESULT_TRUE is returned, then further
+ * solutions are possible.
  *
  * If \a error is not null, then it will be set to the error
  * term for P_RESULT_ERROR.
@@ -538,14 +663,25 @@ p_goal_result p_context_execute_goal
  * set to an integer term corresponding to the requested exit value.
  *
  * \ingroup context
- * \sa p_context_execute_goal(), p_context_abandon_goal()
+ * \sa p_context_execute_goal(), p_context_abandon_goal(),
+ * \ref execution_model "Plang execution model"
  */
 p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
 {
-    /* TODO */
+    p_term *error_term = 0;
+    p_goal_result result;
+    if (!context->current_node)
+        return P_RESULT_FAIL;
+    p_context_backtrack_trace
+        (context, context->current_node->fail_marker);
+    result = p_goal_execute(context, &error_term);
     if (error)
-        *error = 0;
-    return P_RESULT_FAIL;
+        *error = error_term;
+    if (result != P_RESULT_TRUE) {
+        context->current_node = 0;
+        context->fail_node = 0;
+    }
+    return result;
 }
 
 /**
@@ -564,8 +700,9 @@ void p_context_abandon_goal(p_context *context)
     if (context->goal_active) {
         p_context_backtrack_trace(context, context->goal_marker);
         context->goal_active = 0;
-        context->goal = 0;
         context->goal_marker = 0;
+        context->current_node = 0;
+        context->fail_node = 0;
     }
 }
 
@@ -575,9 +712,22 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
 {
     p_term *error = 0;
     void *marker = p_context_mark_trace(context);
-    p_goal_result result = p_goal_call(context, goal, &error);
+    p_goal_result result;
+    p_exec_node *current = context->current_node;
+    p_exec_node *fail = context->fail_node;
+    p_exec_node *goal_node = GC_NEW(p_exec_node);
+    if (goal_node) {
+        goal_node->goal = goal;
+        context->current_node = goal_node;
+        context->fail_node = 0;
+        result = p_goal_execute(context, &error);
+        context->current_node = current;
+        context->fail_node = fail;
+    } else {
+        result = P_RESULT_FAIL;
+    }
     p_context_backtrack_trace(context, marker);
-    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
+    if (result == P_RESULT_TRUE)
         return;
     goal = p_term_deref(goal);
     if (goal && goal->header.type == P_TERM_FUNCTOR &&

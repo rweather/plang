@@ -32,6 +32,10 @@ extern "C" {
 
 #define P_CONTEXT_HASH_SIZE     511
 
+/* Internal result code that indicates that a builtin predicate
+ * has modified the search tree */
+#define P_RESULT_TREE_CHANGE    ((p_goal_result)(P_RESULT_HALT + 5))
+
 typedef struct p_trace p_trace;
 
 struct p_path_list
@@ -39,6 +43,17 @@ struct p_path_list
     char **paths;
     size_t num_paths;
     size_t max_paths;
+};
+
+typedef struct p_exec_node p_exec_node;
+struct p_exec_node
+{
+    p_term *goal;
+    p_term *next_clause;
+    p_exec_node *success_node;
+    p_exec_node *cut_node;
+    p_exec_node *catch_node;
+    void *fail_marker;
 };
 
 struct p_context
@@ -52,6 +67,9 @@ struct p_context
     p_term *line_atom;
     p_term *if_atom;
     p_term *slash_atom;
+    p_term *true_atom;
+    p_term *fail_atom;
+    p_term *cut_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trace *trace;
@@ -61,8 +79,9 @@ struct p_context
     int debug : 1;
 
     int goal_active;
-    p_term *goal;
     void *goal_marker;
+    p_exec_node *current_node;
+    p_exec_node *fail_node;
 
     int allow_test_goals;
     p_term *test_goal;
@@ -83,7 +102,6 @@ struct p_trace
 int _p_context_record_in_trace(p_context *context, p_term *var);
 int _p_context_record_contents_in_trace(p_context *context, void **location);
 
-p_goal_result p_goal_call(p_context *context, p_term *goal, p_term **error);
 void p_goal_call_from_parser(p_context *context, p_term *goal);
 
 #define p_context_add_path(list,name)   \

@@ -98,9 +98,9 @@ int main(int argc, char *argv[])
     p_term_bind_functor_arg(goal, 0, args);
     error_term = 0;
     result = p_context_execute_goal(context, goal, &error_term);
-    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE) {
+    if (result == P_RESULT_TRUE) {
         exitval = 0;
-    } else if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL) {
+    } else if (result == P_RESULT_FAIL) {
         exitval = 1;
     } else if (result == P_RESULT_HALT) {
         exitval = p_term_integer_value(error_term);

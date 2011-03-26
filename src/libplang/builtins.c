@@ -902,29 +902,52 @@ static p_goal_result p_builtin_logical_or
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *term = p_term_deref(args[0]);
-    p_goal_result result;
+    p_exec_node *current;
+    p_exec_node *retry;
+    p_exec_node *cut;
+    p_exec_node *then;
     if (term->header.type == P_TERM_FUNCTOR &&
             term->header.size == 2 &&
             term->functor.functor_name == context->if_atom) {
         /* The term has the form (A -> B || C) */
-        result = p_goal_call(context, p_term_arg(term, 0), error);
-        if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
-            return p_goal_call(context, p_term_arg(term, 1), error);
-        else if (result == P_RESULT_FAIL)
-            return p_goal_call(context, args[1], error);
-        else if (result == P_RESULT_CUT_FAIL)
-            result = P_RESULT_FAIL;
-        return result;
+        current = context->current_node;
+        retry = GC_NEW(p_exec_node);
+        cut = GC_NEW(p_exec_node);
+        then = GC_NEW(p_exec_node);
+        if (!retry || !cut || !then)
+            return P_RESULT_FAIL;
+        retry->goal = args[1];
+        retry->success_node = current->success_node;
+        retry->cut_node = context->fail_node;
+        retry->catch_node = current->catch_node;
+        retry->fail_marker = current->fail_marker;
+        cut->goal = context->cut_atom;
+        cut->success_node = then;
+        cut->cut_node = context->fail_node;
+        then->goal = p_term_arg(term, 1);
+        then->success_node = current->success_node;
+        then->cut_node = context->fail_node;
+        then->catch_node = current->catch_node;
+        current->goal = p_term_arg(term, 0);
+        current->success_node = cut;
+        current->cut_node = context->fail_node;
+        context->fail_node = retry;
+        return P_RESULT_TREE_CHANGE;
     } else {
         /* Regular disjunction */
-        result = p_goal_call(context, term, error);
-        if (result == P_RESULT_FAIL)
-            result = p_goal_call(context, args[1], error);
-        else if (result == P_RESULT_CUT_FAIL)
-            result = P_RESULT_FAIL;
-        else if (result == P_RESULT_CUT_TRUE)
-            result = P_RESULT_TRUE;
-        return result;
+        current = context->current_node;
+        retry = GC_NEW(p_exec_node);
+        if (!retry)
+            return P_RESULT_FAIL;
+        retry->goal = args[1];
+        retry->success_node = current->success_node;
+        retry->cut_node = context->fail_node;
+        retry->catch_node = current->catch_node;
+        retry->fail_marker = current->fail_marker;
+        current->goal = term;
+        current->cut_node = context->fail_node;
+        context->fail_node = retry;
+        return P_RESULT_TREE_CHANGE;
     }
 }
 
@@ -980,12 +1003,10 @@ static p_goal_result p_builtin_logical_or
 static p_goal_result p_builtin_call
     (p_context *context, p_term **args, p_term **error)
 {
-    p_goal_result result = p_goal_call(context, args[0], error);
-    if (result == P_RESULT_CUT_FAIL)
-        result = P_RESULT_FAIL;
-    else if (result == P_RESULT_CUT_TRUE)
-        result = P_RESULT_TRUE;
-    return result;
+    p_exec_node *current = context->current_node;
+    current->goal = args[0];
+    current->cut_node = context->fail_node;
+    return P_RESULT_TREE_CHANGE;
 }
 
 /**
@@ -1025,40 +1046,67 @@ static p_goal_result p_builtin_call
  * \ref throw_1 "throw/1",
  * \ref call_1 "call/1"
  */
+int p_builtin_handle_catch(p_context *context, p_term *error)
+{
+    p_exec_node *catcher = context->current_node->catch_node;
+    p_term *catch_atom = p_term_create_atom(context, "catch");
+    p_term *catch_clause_atom = p_term_create_atom(context, "$$catch");
+    p_term *goal;
+    while (catcher != 0) {
+        p_context_backtrack_trace(context, catcher->fail_marker);
+        goal = p_term_deref(catcher->goal);
+        if (goal->functor.functor_name == catch_atom) {
+            /* "catch" block */
+            if (p_term_unify(context, error,
+                             goal->functor.arg[1], P_BIND_DEFAULT)) {
+                catcher->goal = goal->functor.arg[2];
+                context->current_node = catcher;
+                context->fail_node = catcher->cut_node;
+                return 1;
+            }
+        } else {
+            /* "try" block */
+            p_term *list = p_term_deref(goal->functor.arg[1]);
+            while (list && list->header.type == P_TERM_LIST) {
+                p_term *head = p_term_deref(p_term_head(list));
+                if (head->header.type == P_TERM_FUNCTOR &&
+                        head->header.size == 2 &&
+                        head->functor.functor_name
+                                == catch_clause_atom) {
+                    if (p_term_unify(context, p_term_arg(head, 0),
+                                     error, P_BIND_DEFAULT)) {
+                        catcher->goal = p_term_arg(head, 1);
+                        context->current_node = catcher;
+                        context->fail_node = catcher->cut_node;
+                        return 1;
+                    }
+                }
+                list = p_term_deref(p_term_tail(list));
+            }
+        }
+        catcher = catcher->catch_node;
+    }
+    context->current_node = 0;
+    context->fail_node = 0;
+    return 0;
+}
 static p_goal_result p_builtin_catch
     (p_context *context, p_term **args, p_term **error)
 {
-    p_goal_result result = p_goal_call(context, args[0], error);
-    if (result != P_RESULT_ERROR)
-        return result;
-    if (!p_term_unify(context, args[1], *error, P_BIND_DEFAULT))
-        return result;
-    *error = 0;
-    return p_goal_call(context, args[2], error);
-}
-static p_goal_result p_builtin_try
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_term *list, *head, *catch;
-    p_goal_result result = p_goal_call(context, args[0], error);
-    if (result != P_RESULT_ERROR)
-        return result;
-    catch = p_term_create_atom(context, "$$catch");
-    list = p_term_deref(args[1]);
-    while (list && list->header.type == P_TERM_LIST) {
-        head = p_term_deref(p_term_head(list));
-        if (head->header.type == P_TERM_FUNCTOR &&
-                head->header.size == 2 &&
-                head->functor.functor_name == catch) {
-            if (p_term_unify(context, p_term_arg(head, 0), *error,
-                             P_BIND_DEFAULT)) {
-                *error = 0;
-                return p_goal_call(context, p_term_arg(head, 1), error);
-            }
-        }
-        list = p_term_deref(p_term_tail(list));
-    }
-    return result;
+    p_exec_node *current = context->current_node;
+    p_exec_node *catcher = GC_NEW(p_exec_node);
+    if (!catcher)
+        return P_RESULT_FAIL;
+    catcher->goal = current->goal;
+    catcher->success_node = current->success_node;
+    catcher->cut_node = context->fail_node;
+    catcher->catch_node = current->catch_node;
+    catcher->fail_marker = current->fail_marker;
+    current->goal = args[0];
+    current->success_node = current->success_node;
+    current->cut_node = context->fail_node;
+    current->catch_node = catcher;
+    return P_RESULT_TREE_CHANGE;
 }
 
 /**
@@ -1089,7 +1137,8 @@ static p_goal_result p_builtin_try
 static p_goal_result p_builtin_cut
     (p_context *context, p_term **args, p_term **error)
 {
-    return P_RESULT_CUT_TRUE;
+    context->fail_node = context->current_node->cut_node;
+    return P_RESULT_TRUE;
 }
 
 /**
@@ -1435,13 +1484,22 @@ static p_goal_result p_builtin_halt_1
 static p_goal_result p_builtin_if
     (p_context *context, p_term **args, p_term **error)
 {
-    p_goal_result result = p_goal_call(context, args[0], error);
-    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
-        return p_goal_call(context, args[1], error);
-    else if (result == P_RESULT_CUT_FAIL)
+    p_exec_node *current = context->current_node;
+    p_exec_node *cut = GC_NEW(p_exec_node);
+    p_exec_node *then = GC_NEW(p_exec_node);
+    if (!cut || !then)
         return P_RESULT_FAIL;
-    else
-        return result;
+    cut->goal = context->cut_atom;
+    cut->success_node = then;
+    cut->cut_node = context->fail_node;
+    then->goal = args[1];
+    then->success_node = current->success_node;
+    then->cut_node = context->fail_node;
+    then->catch_node = current->catch_node;
+    current->goal = args[0];
+    current->success_node = then;
+    current->cut_node = context->fail_node;
+    return P_RESULT_TREE_CHANGE;
 }
 
 /**
@@ -3324,6 +3382,15 @@ static p_goal_result p_builtin_printq_error
     return P_RESULT_TRUE;
 }
 
+/* $$line(filename, number, goal) encountered in the code */
+static p_goal_result p_builtin_line
+    (p_context *context, p_term **args, p_term **error)
+{
+    /* Replace the current goal with the nested goal and retry */
+    context->current_node->goal = args[2];
+    return P_RESULT_TREE_CHANGE;
+}
+
 void _p_db_init_builtins(p_context *context)
 {
     static struct p_builtin const builtins[] = {
@@ -3366,6 +3433,7 @@ void _p_db_init_builtins(p_context *context)
         {"import", 1, p_builtin_import},
         {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},
+        {"$$line", 3, p_builtin_line},
         {"nonvar", 1, p_builtin_nonvar},
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
@@ -3381,7 +3449,7 @@ void _p_db_init_builtins(p_context *context)
         {"string", 1, p_builtin_string},
         {"throw", 1, p_builtin_throw},
         {"true", 0, p_builtin_true},
-        {"$$try", 2, p_builtin_try},
+        {"$$try", 2, p_builtin_catch},
         {"$$unbind", 1, p_builtin_unbind},
         {"unifiable", 2, p_builtin_unifiable},
         {"unify_with_occurs_check", 2, p_builtin_unify},

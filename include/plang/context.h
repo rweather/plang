@@ -39,10 +39,8 @@ int p_context_consult_string(p_context *context, const char *str);
 typedef enum {
     P_RESULT_FAIL       = 0,
     P_RESULT_TRUE       = 1,
-    P_RESULT_CUT_FAIL   = 2,
-    P_RESULT_CUT_TRUE   = 3,
-    P_RESULT_ERROR      = 4,
-    P_RESULT_HALT       = 5
+    P_RESULT_ERROR      = 2,
+    P_RESULT_HALT       = 3
 } p_goal_result;
 
 p_goal_result p_context_execute_goal

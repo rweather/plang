@@ -473,6 +473,47 @@ static void test_type_var()
     P_COMPARE(run_goal("var(\"foo\")"), P_RESULT_FAIL);
 }
 
+static void test_reexecute()
+{
+    P_COMPARE(run_goal("atom(a)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("atom(a) || atom(b)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("(atom(a) -> X = a || atom(b), X = b), X == a"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("(X = a || X = b), X == a"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("X = a || X = b"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("(X = a || X = b), atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    p_context_consult_string
+        (context, "bt(X) { X = a; }\n"
+                  "bt(X) { X = b; }\n");
+    P_COMPARE(run_goal("bt(X), atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    p_context_consult_string
+        (context, "btt(X) { X = a; }\n"
+                  "btt(X) { X = b; }\n"
+                  "btt(X) { X = 1; }\n");
+    P_COMPARE(run_goal("btt(X), integer(X)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-builtins");
@@ -511,6 +552,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(type_number);
     P_TEST_RUN(type_string);
     P_TEST_RUN(type_var);
+    P_TEST_RUN(reexecute);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

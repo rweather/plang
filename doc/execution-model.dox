@@ -1,0 +1,99 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file execution-model.dox
+\page execution_model Plang execution model
+
+Plang uses a continuation-based model for implementing
+p_context_execute_goal().  The mathematical foundations we
+adopted can be found in the following paper:
+
+\par
+E. Jahier, M. Ducasse, O. Ridoux,
+<a href="ftp://ftp.cs.man.ac.uk/pub/TR/UMCS-00-6-1-jahier.ps.Z">"Specifying Prolog Trace Models with a Continuation Semantics"</a>,
+LOPSTR 2000, Tenth International Workshop on Logic-based Synthesis
+and Transformation, 2000.
+
+Mathematically, a goal is a function that operates on three
+continuations: success, fail, and cut-fail.  Evaluating the goal
+produces a new set of success, fail, and cut-fail continuations.
+In Plang, goals are represented as nodes in a graph, with the
+success and cut-fail continuations represented as outgoing links
+to other nodes.  The fail continuation is a pointer to a node that
+is stored in the execution state with the pointer to the current node.
+
+The execution state has two node pointers: the current node to
+execute, and the "fail point" node.  A goal node operates on
+this state and outputs two new values for the current node and
+"fail point".
+
+Some examples of goal execution:
+
+- If the goal is atomic and deterministic (succeeds or fails but
+does not backtrack internally):
+    - If the goal succeeds, then the current node is set to "success",
+      and the "fail point" is left unchanged.
+    - If the goal fails, then a back-track occurs (see below).
+- If the goal is (A , B), then a new node is created for B that
+has the same "success" and "cut fail point" links as (A, B).
+The current node is replaced with A, with its "success" link pointing
+at B.  The current node and "fail point" are left unchanged, and the
+goal is re-executed as A.
+- If the goal is !, then the "fail point" is set to the
+"cut fail point" of the node, and then the current node is set
+to "success".
+- If the goal is (A || B), then a new node is created for B that
+has the same "success" link as (A || B).  The current node is
+replaced with A.  Both A and B's "cut fail point" links are set
+to the current "fail point".  The "fail point" is set to B,
+and then the current node is re-executed as A.
+
+Upon back-tracking, the current node is set to the "fail point",
+and the "fail point" is set to the "cut fail point" of the new
+current node.  If "fail point" is NULL when back-tracking is
+requested, then a top-level goal failure has occurred.
+
+Top-level goals are prepared for execution by creating a new
+current node for the goal G.  The "success" and "cut fail point"
+links on the goal node are set to NULL.  The "fail point" is
+also set to NULL.
+
+A top-level goal succeeds once the current node becomes NULL
+(because a "success" link was encountered that was NULL).
+The top-level goal is re-executed by setting the current node
+to "fail point", and "fail point" to NULL and then continuing
+execution.
+
+The paper above does not describe the handling of
+\ref catch_3 "catch/3" and \ref throw_1 "throw/1" in a Prolog
+environment.  We extend the mechanism by adding a "catch point"
+continuation link to every node.  When a catch/3 goal is executed,
+the "catch point" link is set to point at the catch/3 goal.
+This "catch point" link is copied into the nodes for sub-goals
+as execution proceeds.
+
+When a throw/1 is executed, a backtrack is performed
+to the "cut fail point" of the catch node.  Execution proceeds
+from the catch point with the recovery goal if the catch term
+matches.  If the catch term does not match, the process repeats
+to find the next-outer "catch point" node.  If the "catch point"
+is NULL, then the top-level goal has finished with a thrown error.
+
+*/
