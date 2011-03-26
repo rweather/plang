@@ -1193,18 +1193,17 @@ static char const p_builtin_do[] =
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2"
  */
-static p_goal_result p_builtin_not_provable
-    (p_context *context, p_term **args, p_term **error)
-{
-    void *marker = p_context_mark_trace(context);
-    p_goal_result result = p_goal_call(context, args[0], error);
-    p_context_backtrack_trace(context, marker);
-    if (result == P_RESULT_TRUE || result == P_RESULT_CUT_TRUE)
-        return P_RESULT_FAIL;
-    else if (result == P_RESULT_FAIL || result == P_RESULT_CUT_FAIL)
-        return P_RESULT_TRUE;
-    return result;
-}
+static char const p_builtin_not_provable[] =
+    "'!'(Goal)\n"
+    "{\n"
+    "    if (call(Goal))\n"
+    "        fail;\n"
+    "}\n"
+    "'\\\\+'(Goal)\n"
+    "{\n"
+    "    if (call(Goal))\n"
+    "        fail;\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -2814,8 +2813,6 @@ void _p_db_init_builtins(p_context *context)
         {"@>", 2, p_builtin_term_gt},
         {"@>=", 2, p_builtin_term_ge},
         {"!", 0, p_builtin_cut},
-        {"!", 1, p_builtin_not_provable},
-        {"\\+", 1, p_builtin_not_provable},
         {"||", 2, p_builtin_logical_or},
         {"->", 2, p_builtin_if},
         {"?-", 1, p_builtin_call},
@@ -2865,6 +2862,7 @@ void _p_db_init_builtins(p_context *context)
     static const char * const builtin_sources[] = {
         p_builtin_do,
         p_builtin_for,
+        p_builtin_not_provable,
         p_builtin_once,
         p_builtin_repeat,
         p_builtin_while,

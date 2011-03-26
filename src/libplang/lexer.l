@@ -291,7 +291,7 @@ NEG             (-?)
             buf = temp_buf; \
             bufmax *= 2; \
         } \
-        buf[buflen++] = (ch); \
+        buf[buflen++] = (char)(ch); \
     } while (0)
 
 /* Read a quoted string from the input stream */
@@ -306,7 +306,20 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
     p_term *term;
     while ((ch = input(scanner)) >= 0 && ch != quote) {
         if (ch == '\\') {
-            /* TODO: escape sequences */
+            ch = input(scanner);
+            if (ch == 'n') {
+                BUF_ADD_CHAR('\n');
+            } else if (ch == 'r') {
+                BUF_ADD_CHAR('\r');
+            } else if (ch == 't') {
+                BUF_ADD_CHAR('\t');
+            } else if (ch == 'f') {
+                BUF_ADD_CHAR('\f');
+            } else if (ch == 'v') {
+                BUF_ADD_CHAR('\v');
+            } else {
+                BUF_ADD_CHAR(ch);
+            }
         } else if (ch == '\r' || ch == '\n') {
             /* TODO: report an error for unexpected end of line */
             if (ch == '\n')
@@ -325,8 +338,7 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
     } else if (type == K_STRING) {
         term = p_term_create_string(context, buf);
     } else {
-        /* TODO: character constants */
-        term = p_term_create_integer(context, 0);
+        term = p_term_create_integer(context, ((int)(buf[0])) & 0xFF);
     }
     if (buf != static_buf)
         free(buf);

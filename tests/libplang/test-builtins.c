@@ -149,6 +149,8 @@ static void test_logic_not()
     P_COMPARE(run_goal("X = a, !(X = a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("X = a, \\+(X = a)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("\\+ fail"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("'\\\\+'(fail)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("'\\\\+'(true)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("! true"), P_RESULT_FAIL);
     P_COMPARE(run_goal_error("!X", "instantiation_error"), P_RESULT_ERROR);
 }
