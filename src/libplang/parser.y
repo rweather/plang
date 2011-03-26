@@ -1043,10 +1043,16 @@ compound_statement
 
 loop_statement
     : K_WHILE unbind_vars condition statement   {
-            $$ = ternary_term("$$while", $2, $3, $4);
+            if ($2 == p_term_nil_atom(context))
+                $$ = binary_term("$$while", $3, $4);
+            else
+                $$ = ternary_term("$$while", $2, $3, $4);
         }
     | K_DO unbind_vars compound_statement K_WHILE condition ';' {
-            $$ = ternary_term("$$do", $2, $3, $5);
+            if ($2 == p_term_nil_atom(context))
+                $$ = binary_term("$$do", $3, $5);
+            else
+                $$ = ternary_term("$$do", $2, $3, $5);
         }
     | K_FOR unbind_vars '(' K_VARIABLE  {
             if (p_term_lex_variable_count

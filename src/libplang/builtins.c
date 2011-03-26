@@ -168,19 +168,15 @@ P_INLINE void p_builtin_set_variable(p_term *var, p_term *value)
     var->var.value = value;
 }
 
-/* Unbinds a list of local loop variables */
-static void p_builtin_unbind_variables(p_term *list)
+/* Unbinds a list of local loop variables: $$unbind() predicate */
+static p_goal_result p_builtin_unbind
+    (p_context *context, p_term **args, p_term **error)
 {
-    list = p_term_deref(list);
+    p_term *list = p_term_deref(args[0]);
     while (list && list->header.type == P_TERM_LIST) {
         p_builtin_set_variable(list->list.head, 0);
         list = p_term_deref(list->list.tail);
     }
-}
-static p_goal_result p_builtin_unbind
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_builtin_unbind_variables(args[0]);
     return P_RESULT_TRUE;
 }
 
@@ -1160,6 +1156,13 @@ static char const p_builtin_do[] =
     "    !;\n"
     "    if (call(Cond))\n"
     "        '$$do'(Vars, Body, Cond);\n"
+    "}\n"
+    "'$$do'(Body, Cond)\n"
+    "{\n"
+    "    call(Body);\n"
+    "    !;\n"
+    "    if (call(Cond))\n"
+    "        '$$do'(Body, Cond);\n"
     "}\n";
 
 /**
@@ -1728,6 +1731,14 @@ static char const p_builtin_while[] =
     "        call(Body);\n"
     "        !;\n"
     "        '$$while'(Vars, Cond, Body);\n"
+    "    }\n"
+    "}\n"
+    "'$$while'(Cond, Body)\n"
+    "{\n"
+    "    if (call(Cond)) {\n"
+    "        call(Body);\n"
+    "        !;\n"
+    "        '$$while'(Cond, Body);\n"
     "    }\n"
     "}\n";
 
