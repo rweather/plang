@@ -85,7 +85,6 @@ static void test_operators()
         { 200, P_OP_FY,  1, "\\"},
         { 200, P_OP_FY,  1, "~"},
         { 100, P_OP_XFX, 2, ":"},
-        {  50, P_OP_YFX, 2, "."},
         {   0, P_OP_NONE,0, 0},
     };
     int index, priority;

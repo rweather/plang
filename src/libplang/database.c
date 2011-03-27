@@ -189,7 +189,6 @@ void _p_db_init(p_context *context)
         {"in",      P_OP_XFX,  700},    /* List membership test */
         {">>>",     P_OP_YFX,  400},    /* Unsigned shift right */
         {":",       P_OP_XFX,  100},    /* Type constraint */
-        {".",       P_OP_YFX,   50},    /* Member reference */
 
         {0,         0,           0}
     };

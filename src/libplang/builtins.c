@@ -84,6 +84,13 @@
  * \ref term_gt_2 "(\@>)/2",
  * \ref term_ge_2 "(\@>=)/2"
  *
+ * \par Term creation and decomposition
+ * \ref list_cons_2 "(.)/2",
+ * \ref univ_2 "(=..)/2",
+ * \ref arg_3 "arg/3",
+ * \ref copy_term_2 "copy_term/2",
+ * \ref functor_3 "functor/3"
+ *
  * \par Term unification
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
@@ -117,6 +124,11 @@
  * be compatible with the standard when there is no good reason
  * to diverge.  The documentation for the builtin predicates indicate
  * where they attempt compatibility with Standard Prolog.
+ * \par
+ * The following book is an excellent reference work on Standard
+ * Prolog, and the inspiration for Plang's documentation style:
+ * P. Debransart, A. Ed-Dbali, L. Cervoni, "Prolog: The Standard;
+ * Reference Manual", Springer-Verlag, 1996, ISBN 3-540-59304-7.
  */
 /*\@{*/
 
@@ -2041,6 +2053,551 @@ static p_goal_result p_builtin_term_ge
 /*\@}*/
 
 /**
+ * \defgroup create_and_decompose Builtin predicates - Term creation and decomposition
+ *
+ * Predicates in this group create and decompose terms dynamically.
+ *
+ * \ref list_cons_2 "(.)/2",
+ * \ref univ_2 "(=..)/2",
+ * \ref arg_3 "arg/3",
+ * \ref copy_term_2 "copy_term/2",
+ * \ref functor_3 "functor/3"
+ */
+/*\@{*/
+
+/**
+ * \addtogroup create_and_decompose
+ * <hr>
+ * \anchor list_cons_2
+ * <b>(.)/2</b>, <b>[_|_]/2</b> - constructs a list from head and
+ * tail terms.
+ *
+ * \par Usage
+ * \em X = [\em Head | \em Tail]
+ * \par
+ * \em X = <b>'.'</b>(\em Head, \em Tail)
+ *
+ * \par Description
+ * Unifies \em X with a list constructed from the specified
+ * \em Head and \em Tail terms.  The [\em Head | \em Tail] form
+ * is the recommended syntax for expressing list construction.
+ *
+ * \par Examples
+ * \code
+ * [H | T] = [a, b]             succeeds with H = a, T = [b]
+ * [a, b] = '.'(a, '.'(b, []))  succeeds
+ * \endcode
+ * \par
+ * A common use for <b>(.)/2</b> is to decompose a predicate argument
+ * into its head and tail components for walking every element
+ * in a list:
+ * \code
+ * is_member(X, [X|T]).
+ * is_member(X, [_|T]) { is_member(X, T); }
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref arg_3 "arg/3",
+ * \ref functor_3 "functor/3",
+ * \ref univ_2 "(=..)/2"
+ */
+
+/**
+ * \addtogroup create_and_decompose
+ * <hr>
+ * \anchor univ_2
+ * <b>(=..)/2</b> - decomposes a term into a list containing the
+ * term's functor name and arguments.
+ *
+ * \par Usage
+ * \em Term <b>=..</b> \em List
+ *
+ * \par Description
+ * If \em Term is an atomic term, then \em List is unified with
+ * [\em Term].
+ * \par
+ * If \em Term is a compound term, then \em List is unified with
+ * [\em Name, \em Arg1, ..., \em ArgN], where \em Name is the
+ * name of the functor of \em Term, and \em Arg1, ... \em ArgN
+ * are its arguments.
+ * \par
+ * If \em Term is a variable, and \em List contains a single atomic
+ * value then \em Term is unified with that atomic value.
+ * \par
+ * If \em Term is a variable, and \em List contains two or more
+ * members, and the first is an atom, then \em Term is unified
+ * with a new compound term with the first element as its name,
+ * and the remaining list members as its arguments.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Term is a variable
+ *     and \em List is not a list, or the tail of \em List is
+ *     not the <tt>[]</tt> atom.
+ * \li <tt>instantiation_error</tt> - \em Term is a variable and
+ *     the first member of \em List is also a variable.
+ * \li <tt>domain_error(non_empty_list, \em List)</tt> - \em Term
+ *     is a variable and \em List is an empty list.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Term is a variable,
+ *     \em List has two or more members, and the first member is
+ *     not an atom.
+ * \li <tt>type_error(atomic, \em Name)</tt> - \em Term is a variable,
+ *     \em List has one member, and it is not atomic.
+ * \li <tt>type_error(list, \em List)</tt> - \em Term is not a variable
+ *     and \em List is not a list or variable.
+ *
+ * \par Examples
+ * \code
+ * foo =.. [foo]                    succeeds
+ * 1.5 =.. [1.5]                    succeeds
+ * [a, b, c] =.. ['.', a, [b, c]]   succeeds
+ * f(a, b, c) =.. [f, X, Y, Z]      succeeds with X = a, Y = b, Z = c
+ * f(a, b) =.. List                 succeeds with List = [f, a, b]
+ * Term =.. [foo]                   succeeds with Term = foo
+ * Term =.. [1.5]                   succeeds with Term = 1.5
+ * Term =.. [f, a, b]               succeeds with Term = f(a, b)
+ * Term =.. ['.', a, []]            succeeds with Term = [a]
+ * Term =.. List                    instantiation_error
+ * Term =.. f(a, b)                 instantiation_error
+ * Term =.. [f|X]                   instantiation_error
+ * Term =.. []                      domain_error(non_empty_list, [])
+ * Term =.. [f(a, b)]               type_error(atomic, f(a, b))
+ * Term =.. [1.5, a, b]             type_error(atom, 1.5)
+ * f(a, b) =.. g(a)                 type_error(list, g(a))
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref list_cons_2 "(.)/2",
+ * \ref arg_3 "arg/3",
+ * \ref functor_3 "functor/3"
+ */
+static p_goal_result p_builtin_univ
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *term = p_term_deref(args[0]);
+    p_term *list = p_term_deref(args[1]);
+    p_term *new_term;
+    p_term *functor;
+    p_term *member;
+    p_term *list_args;
+    int index, length;
+    if ((term->header.type & P_TERM_VARIABLE) == 0) {
+        if (list->header.type != P_TERM_VARIABLE &&
+                list->header.type != P_TERM_LIST) {
+            *error = p_builtin_type_error(context, "list", list);
+            return P_RESULT_ERROR;
+        }
+        switch (term->header.type) {
+        case P_TERM_ATOM:
+        case P_TERM_INTEGER:
+        case P_TERM_REAL:
+        case P_TERM_STRING:
+        case P_TERM_OBJECT:
+            new_term = p_term_create_list
+                (context, term, context->nil_atom);
+            break;
+        case P_TERM_FUNCTOR:
+            new_term = context->nil_atom;
+            for (index = (int)(term->header.size - 1); index >= 0; --index) {
+                new_term = p_term_create_list
+                    (context, term->functor.arg[index], new_term);
+            }
+            new_term = p_term_create_list
+                (context, term->functor.functor_name, new_term);
+            break;
+        case P_TERM_LIST:
+            new_term = p_term_create_list
+                (context, context->dot_atom,
+                    p_term_create_list
+                        (context, term->list.head,
+                         p_term_create_list
+                            (context, term->list.tail,
+                             context->nil_atom)));
+            break;
+        default: return P_RESULT_FAIL;
+        }
+        if (p_term_unify(context, list, new_term, P_BIND_DEFAULT))
+            return P_RESULT_TRUE;
+        else
+            return P_RESULT_FAIL;
+    } else {
+        if (list == context->nil_atom) {
+            *error = p_builtin_domain_error
+                (context, "non_empty_list", list);
+            return P_RESULT_ERROR;
+        }
+        if (list->header.type != P_TERM_LIST) {
+            *error = p_term_create_atom(context, "instantiation_error");
+            return P_RESULT_ERROR;
+        }
+        length = 1;
+        member = p_term_deref(list->list.tail);
+        while (member != context->nil_atom) {
+            if (!member || member->header.type != P_TERM_LIST) {
+                *error = p_term_create_atom
+                    (context, "instantiation_error");
+                return P_RESULT_ERROR;
+            }
+            ++length;
+            member = p_term_deref(member->list.tail);
+        }
+        functor = p_term_deref(list->list.head);
+        if ((functor->header.type & P_TERM_VARIABLE) != 0) {
+            *error = p_term_create_atom(context, "instantiation_error");
+            return P_RESULT_ERROR;
+        }
+        list_args = p_term_deref(list->list.tail);
+        if (length == 1) {
+            switch (functor->header.type) {
+            case P_TERM_ATOM:
+            case P_TERM_INTEGER:
+            case P_TERM_REAL:
+            case P_TERM_STRING:
+            case P_TERM_OBJECT:
+                new_term = functor;
+                break;
+            default:
+                *error = p_builtin_type_error
+                    (context, "atomic", functor);
+                return P_RESULT_ERROR;
+            }
+        } else if (functor == context->dot_atom && length == 3) {
+            new_term = p_term_create_list
+                (context, list_args->list.head,
+                 p_term_deref(list_args->list.tail)->list.head);
+        } else if (functor->header.type != P_TERM_ATOM) {
+            *error = p_builtin_type_error(context, "atom", functor);
+            return P_RESULT_ERROR;
+        } else {
+            new_term = p_term_create_functor
+                (context, functor, length - 1);
+            for (index = 0; index < (length - 1); ++index) {
+                p_term_bind_functor_arg
+                    (new_term, index, list_args->list.head);
+                list_args = p_term_deref(list_args->list.tail);
+            }
+        }
+        if (p_term_unify(context, term, new_term, P_BIND_DEFAULT))
+            return P_RESULT_TRUE;
+        else
+            return P_RESULT_FAIL;
+    }
+}
+
+/**
+ * \addtogroup create_and_decompose
+ * <hr>
+ * \anchor arg_3
+ * <b>arg/3</b> - extracts the n'th argument from a term.
+ *
+ * \par Usage
+ * \b arg(\em N, \em Term, \em Arg)
+ *
+ * \par Description
+ * Unifies \em Arg with argument \em N of the compound \em Term.
+ * The first argument of \em Term is numbered 1.  Fails if \em N
+ * is out of range or \em Arg does not unify with the extracted
+ * argument.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em N or \em Term is a variable.
+ * \li <tt>type_error(integer, \em N)</tt> - \em N is not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em N)</tt> - \em N is
+ *     an integer that is less than zero.
+ * \li <tt>type_error(compound, \em Term)</tt> - \em Term is not a
+ *     compound term (functor or list).
+ *
+ * \par Examples
+ * \code
+ * arg(1, foo(a, b), X)         succeeds with X = a
+ * arg(2, foo(a, b), X)         succeeds with X = b
+ * arg(3, foo(a, b), X)         fails
+ * arg(0, foo(a, b), X)         fails
+ * arg(1, [a, b], X)            succeeds with X = a
+ * arg(2, [a, b], X)            succeeds with X = [b]
+ * arg(1, foo(a, b), a)         succeeds
+ * arg(1, foo(a, b), b)         fails
+ * arg(1, foo(X, b), f(X))      fails due to occurs check
+ * arg(N, foo(a, b), X)         instantiation_error
+ * arg(1, Term, X)              instantiation_error
+ * arg(a, [a, b], X)            type_error(integer, a)
+ * arg(-3, [a, b], X)           domain_error(not_less_than_zero, -3)
+ * arg(1, a, X)                 type_error(compound, a)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref list_cons_2 "(.)/2",
+ * \ref univ_2 "(=..)/2",
+ * \ref functor_3 "functor/3"
+ */
+static p_goal_result p_builtin_arg
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *number = p_term_deref(args[0]);
+    p_term *term = p_term_deref(args[1]);
+    p_term *arg;
+    int num;
+    if (!number || (number->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (!term || (term->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if (number->header.type != P_TERM_INTEGER) {
+        *error = p_builtin_type_error(context, "integer", number);
+        return P_RESULT_ERROR;
+    }
+    num = p_term_integer_value(number);
+    if (num < 0) {
+        *error = p_builtin_domain_error
+            (context, "not_less_than_zero", number);
+        return P_RESULT_ERROR;
+    }
+    if (term->header.type == P_TERM_FUNCTOR) {
+        if (num > 0 && num <= (int)(term->header.size))
+            arg = term->functor.arg[num - 1];
+        else
+            return P_RESULT_FAIL;
+    } else if (term->header.type == P_TERM_LIST) {
+        if (num == 1)
+            arg = term->list.head;
+        else if (num == 2)
+            arg = term->list.tail;
+        else
+            return P_RESULT_FAIL;
+    } else {
+        *error = p_builtin_type_error(context, "compound", term);
+        return P_RESULT_ERROR;
+    }
+    if (p_term_unify(context, args[2], arg, P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup create_and_decompose
+ * <hr>
+ * \anchor copy_term_2
+ * <b>copy_term/2</b> - unifies the second argument with a freshly
+ * renamed copy of the first.
+ *
+ * \par Usage
+ * \b copy_term(\em Term1, \em Term2)
+ *
+ * \par Description
+ * Creates a copy of \em Term1 where all variables have been
+ * replaced with freshly renamed variables, and then unifies
+ * the copy with \em Term2.
+ *
+ * \par Examples
+ * In the following examples X and Y are renamed to A and B
+ * respectively:
+ * \code
+ * copy_term(f(X, Y), Z)        succeeds with Z = f(A, B)
+ * copy_term(X, a)              succeeds with A = a, X still unbound
+ * copy_term(f(a, X), f(X, b))  succeeds with X = a
+ * copy_term(f(X, X), f(Y, Z))  succeeds with Y = Z
+ * copy_term(foo, bar)          fails
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ */
+static p_goal_result p_builtin_copy_term
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *renamed = p_term_clone(context, args[0]);
+    if (p_term_unify(context, renamed, args[1], P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup create_and_decompose
+ * <hr>
+ * \anchor functor_3
+ * <b>functor/3</b> - extracts the name and arity of a functor term.
+ *
+ * \par Usage
+ * \b functor(\em Term, \em Name, \em Arity)
+ *
+ * \par Description
+ * If \em Term is a compound functor term, then \em Name is unified
+ * with the name of the functor, and \em Arity with its arity.
+ * \par
+ * If \em Term is a list, then \em Name is unified with the atom
+ * "." and \em Arity is unified with 2.
+ * \par
+ * If \em Term is an atomic term, then \em Name is unified with
+ * \em Term, and \em Arity is unified with 0.
+ * \par
+ * If \em Term is a variable, \em Name is an atomic term,
+ * and \em Arity is zero, then \em Term is unified with \em Name.
+ * \par
+ * If \em Term is a variable and \em Name and \em Arity are not
+ * variables, then \em Term is bound to a new compound term
+ * of type \em Name / \em Arity, with new free variables as
+ * the arguments.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Term and \em Name are
+ *     both variables.
+ * \li <tt>instantiation_error</tt> - \em Term and \em Arity are
+ *     both variables.
+ * \li <tt>type_error(atomic, \em Name)</tt> - \em Name is not
+ *     an atomic term and \em Term is a variable.
+ * \li <tt>type_error(integer, \em Arity)</tt> - \em Arity is not
+ *     an integer and \em Term is a variable.
+ * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Arity
+ *     is an integer that is less than zero and \em Term is a variable.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not
+ *     an atom, \em Arity is not zero, and \em Term is a variable.
+ *
+ * \par Examples
+ * \code
+ * functor(a, Name, Arity)          succeeds with Name = a, Arity = 0
+ * functor(1.5, Name, Arity)        succeeds with Name = 1.5, Arity = 0
+ * functor(f(a, b), Name, Arity)    succeeds with Name = f, Arity = 2
+ * functor([H|T], Name, Arity)      succeeds with Name = '.', Arity = 2
+ * functor(Term, a, 0)              succeeds with Term = a
+ * functor(Term, 1.5, 0)            succeeds with Term = 1.5
+ * functor(Term, f, 2)              succeeds with Term = f(X, Y)
+ * functor(Term, '.', 2)            succeeds with Term = [X|Y]
+ * functor(Term, Name, 2)           instantiation_error
+ * functor(Term, f, Arity)          instantiation_error
+ * functor(Term, f(a), 1)           type_error(atomic, f(a))
+ * functor(Term, f, 1.5)            type_error(integer, 1.5)
+ * functor(Term, f, -1)             domain_error(not_less_than_zero, -1)
+ * functor(Term, 1.5, 1)            type_error(atom, 1.5)
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref list_cons_2 "(.)/2",
+ * \ref arg_3 "arg/3",
+ * \ref univ_2 "(=..)/2"
+ */
+static p_goal_result p_builtin_functor
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *term = p_term_deref(args[0]);
+    p_term *name = p_term_deref(args[1]);
+    p_term *arity = p_term_deref(args[2]);
+    p_term *new_term;
+    int arity_value, index;
+    if (!term || !name || !arity) {
+        *error = p_term_create_atom(context, "instantiation_error");
+        return P_RESULT_ERROR;
+    }
+    if ((term->header.type & P_TERM_VARIABLE) == 0) {
+        /* Existing term to be split into name and arity */
+        switch (term->header.type) {
+        case P_TERM_ATOM:
+        case P_TERM_INTEGER:
+        case P_TERM_REAL:
+        case P_TERM_STRING:
+        case P_TERM_OBJECT:
+            if (!p_term_unify(context, name, term, P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            if (!p_term_unify(context, arity,
+                              p_term_create_integer(context, 0),
+                              P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            return P_RESULT_TRUE;
+        case P_TERM_FUNCTOR:
+            if (!p_term_unify(context, name,
+                              term->functor.functor_name,
+                              P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            if (!p_term_unify(context, arity,
+                              p_term_create_integer
+                                (context, (int)(term->header.size)),
+                              P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            return P_RESULT_TRUE;
+        case P_TERM_LIST:
+            if (!p_term_unify(context, name, context->dot_atom,
+                              P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            if (!p_term_unify(context, arity,
+                              p_term_create_integer(context, 2),
+                              P_BIND_DEFAULT))
+                return P_RESULT_FAIL;
+            return P_RESULT_TRUE;
+        default: break;
+        }
+        return P_RESULT_FAIL;
+    } else {
+        /* Construct a term from name and arity */
+        if ((name->header.type & P_TERM_VARIABLE) != 0 ||
+                (arity->header.type & P_TERM_VARIABLE) != 0) {
+            *error = p_term_create_atom(context, "instantiation_error");
+            return P_RESULT_ERROR;
+        }
+        switch (name->header.type) {
+        case P_TERM_ATOM:
+        case P_TERM_INTEGER:
+        case P_TERM_REAL:
+        case P_TERM_STRING:
+        case P_TERM_OBJECT:
+            break;
+        default:
+            *error = p_builtin_type_error(context, "atomic", name);
+            return P_RESULT_ERROR;
+        }
+        if (arity->header.type != P_TERM_INTEGER) {
+            *error = p_builtin_type_error(context, "integer", arity);
+            return P_RESULT_ERROR;
+        }
+        arity_value = p_term_integer_value(arity);
+        if (arity_value < 0) {
+            *error = p_builtin_domain_error
+                (context, "not_less_than_zero", arity);
+            return P_RESULT_ERROR;
+        }
+        if (arity_value == 0) {
+            new_term = name;
+        } else if (name->header.type != P_TERM_ATOM) {
+            *error = p_builtin_type_error(context, "atom", name);
+            return P_RESULT_ERROR;
+        } else if (name == context->dot_atom && arity_value == 2) {
+            new_term = p_term_create_list
+                (context, p_term_create_variable(context),
+                 p_term_create_variable(context));
+        } else {
+            new_term = p_term_create_functor
+                (context, name, arity_value);
+            for (index = 0; index < arity_value; ++index) {
+                p_term_bind_functor_arg
+                    (new_term, index, p_term_create_variable(context));
+            }
+        }
+        if (!p_term_unify(context, term, new_term, P_BIND_DEFAULT))
+            return P_RESULT_FAIL;
+        return P_RESULT_TRUE;
+    }
+}
+
+/*\@}*/
+
+/**
  * \defgroup unification Builtin predicates - Term unification
  *
  * Predicates in this group take two terms as arguments and unifies
@@ -2830,7 +3387,9 @@ void _p_db_init_builtins(p_context *context)
         {"->", 2, p_builtin_if},
         {"?-", 1, p_builtin_call},
         {":-", 1, p_builtin_call},
+        {"=..", 2, p_builtin_univ},
         {"abolish", 1, p_builtin_abolish},
+        {"arg", 3, p_builtin_arg},
         {"asserta", 1, p_builtin_asserta},
         {"assertz", 1, p_builtin_assertz},
         {"atom", 1, p_builtin_atom},
@@ -2840,10 +3399,12 @@ void _p_db_init_builtins(p_context *context)
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
         {"compound", 1, p_builtin_compound},
+        {"copy_term", 2, p_builtin_copy_term},
         {"dynamic", 1, p_builtin_dynamic},
         {"fail", 0, p_builtin_fail},
         {"false", 0, p_builtin_fail},
         {"float", 1, p_builtin_float},
+        {"functor", 3, p_builtin_functor},
         {"halt", 0, p_builtin_halt_0},
         {"halt", 1, p_builtin_halt_1},
         {"import", 1, p_builtin_import},

@@ -662,6 +662,11 @@ callable_term
     : atom                          { $$ = $1; }
     | atom '(' ')'                  { $$ = $1; }
     | atom '(' arguments ')'        {
+            if ($1 == context->dot_atom && $3.num_args == 2) {
+                yyerror_printf
+                    (&(@1), context, yyscanner,
+                     "(.)/2 cannot be used as a predicate name");
+            }
             $$ = p_term_create_functor_with_args
                 (context, $1, $3.args, (int)($3.num_args));
             GC_FREE($3.args);
@@ -873,8 +878,13 @@ primary_term
             $$ = p_term_create_atom(context, "!");
         }
     | atom '(' arguments ')'  {
-            $$ = p_term_create_functor_with_args
-                (context, $1, $3.args, (int)($3.num_args));
+            if ($1 == context->dot_atom && $3.num_args == 2) {
+                $$ = p_term_create_list
+                    (context, $3.args[0], $3.args[1]);
+            } else {
+                $$ = p_term_create_functor_with_args
+                    (context, $1, $3.args, (int)($3.num_args));
+            }
             GC_FREE($3.args);
         }
     | atom '(' ')'              { $$ = $1; }
