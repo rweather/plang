@@ -346,8 +346,8 @@ static int p_builtin_num_cmp
         }
     } else if (value1.type == P_TERM_STRING) {
         if (value2.type == P_TERM_STRING) {
-            int cmp = strcmp(p_term_name(value1.string_value),
-                             p_term_name(value2.string_value));
+            int cmp = p_term_strcmp
+                (value1.string_value, value2.string_value);
             if (cmp < 0)
                 return -1;
             else if (cmp > 0)
@@ -452,7 +452,8 @@ static p_goal_result p_builtin_num_ne
  * If one of \em Expr1 or \em Expr2 evaluates to an integer and
  * the other evaluates to a floating-point value, then both will
  * be converted into floating-point values prior to comparison.
- * Strings are compared using the C function strcmp().
+ * Strings, which may contain embedded NUL's, are compared using
+ * the C function memcmp().
  *
  * \par Errors
  * Same as for \ref is_2 "is/2".
@@ -511,7 +512,8 @@ static p_goal_result p_builtin_num_lt
  * If one of \em Expr1 or \em Expr2 evaluates to an integer and
  * the other evaluates to a floating-point value, then both will
  * be converted into floating-point values prior to comparison.
- * Strings are compared using the C function strcmp().
+ * Strings, which may contain embedded NUL's, are compared using
+ * the C function memcmp().
  *
  * \par Errors
  * Same as for \ref is_2 "is/2".
@@ -569,7 +571,8 @@ static p_goal_result p_builtin_num_le
  * If one of \em Expr1 or \em Expr2 evaluates to an integer and
  * the other evaluates to a floating-point value, then both will
  * be converted into floating-point values prior to comparison.
- * Strings are compared using the C function strcmp().
+ * Strings, which may contain embedded NUL's, are compared using
+ * the C function memcmp().
  *
  * \par Errors
  * Same as for \ref is_2 "is/2".
@@ -625,7 +628,8 @@ static p_goal_result p_builtin_num_gt
  * If one of \em Expr1 or \em Expr2 evaluates to an integer and
  * the other evaluates to a floating-point value, then both will
  * be converted into floating-point values prior to comparison.
- * Strings are compared using the C function strcmp().
+ * Strings, which may contain embedded NUL's, are compared using
+ * the C function memcmp().
  *
  * \par Errors
  * Same as for \ref is_2 "is/2".

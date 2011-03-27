@@ -1875,7 +1875,7 @@ static p_goal_result p_builtin_term_ne
 static p_goal_result p_builtin_term_lt
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_precedes(args[0], args[1]) < 0)
+    if (p_term_precedes(context, args[0], args[1]) < 0)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -1921,7 +1921,7 @@ static p_goal_result p_builtin_term_lt
 static p_goal_result p_builtin_term_le
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_precedes(args[0], args[1]) <= 0)
+    if (p_term_precedes(context, args[0], args[1]) <= 0)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -1964,7 +1964,7 @@ static p_goal_result p_builtin_term_le
 static p_goal_result p_builtin_term_gt
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_precedes(args[0], args[1]) > 0)
+    if (p_term_precedes(context, args[0], args[1]) > 0)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -2007,7 +2007,7 @@ static p_goal_result p_builtin_term_gt
 static p_goal_result p_builtin_term_ge
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_precedes(args[0], args[1]) >= 0)
+    if (p_term_precedes(context, args[0], args[1]) >= 0)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;

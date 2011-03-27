@@ -391,10 +391,12 @@ static void test_string()
     P_VERIFY(string1 != 0);
     P_VERIFY(strcmp(p_term_name(string1), "foo") == 0);
     P_COMPARE(p_term_type(string1), P_TERM_STRING);
+    P_COMPARE(p_term_name_length(string1), 3);
 
     string2 = p_term_create_string(context, "foo");
     P_VERIFY(string1 != string2);   /* Strings are not hashed */
     P_VERIFY(strcmp(p_term_name(string2), "foo") == 0);
+    P_COMPARE(p_term_name_length(string2), 3);
 
     string3 = p_term_create_string(context, "bar");
     P_VERIFY(string3 != 0);
@@ -403,12 +405,19 @@ static void test_string()
     P_VERIFY(strcmp(p_term_name(string1), "foo") == 0);
     P_VERIFY(strcmp(p_term_name(string2), "foo") == 0);
     P_VERIFY(strcmp(p_term_name(string3), "bar") == 0);
+    P_COMPARE(p_term_name_length(string3), 3);
 
     string4 = p_term_create_string(context, 0);
     P_VERIFY(strcmp(p_term_name(string4), "") == 0);
+    P_COMPARE(p_term_name_length(string4), 0);
 
     string4 = p_term_create_string(context, "");
     P_VERIFY(strcmp(p_term_name(string4), "") == 0);
+    P_COMPARE(p_term_name_length(string4), 0);
+
+    string4 = p_term_create_string_n(context, "foo\0bar", 7);
+    P_VERIFY(memcmp(p_term_name(string4), "foo\0bar", 7) == 0);
+    P_COMPARE(p_term_name_length(string4), 7);
 }
 
 static void test_integer()
@@ -991,7 +1000,7 @@ static void test_precedes()
         term2 = precedes_data[index].term2
                     ? parse_term(precedes_data[index].term2) : 0;
         expected = precedes_data[index].result;
-        precedes_result = p_term_precedes(term1, term2);
+        precedes_result = p_term_precedes(context, term1, term2);
         if (expected != 2) {
             P_COMPARE(precedes_result, expected);
         } else {

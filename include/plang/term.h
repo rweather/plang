@@ -21,6 +21,7 @@
 #define PLANG_TERM_H
 
 #include <plang/context.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +57,9 @@ p_term *p_term_create_functor_with_args(p_context *context, p_term *name, p_term
 p_term *p_term_create_list(p_context *context, p_term *head, p_term *tail);
 void p_term_set_tail(p_term *list, p_term *tail);
 p_term *p_term_create_atom(p_context *context, const char *name);
+p_term *p_term_create_atom_n(p_context *context, const char *name, size_t len);
 p_term *p_term_create_string(p_context *context, const char *str);
+p_term *p_term_create_string_n(p_context *context, const char *str, size_t len);
 p_term *p_term_create_variable(p_context *context);
 p_term *p_term_create_named_variable(p_context *context, const char *name);
 p_term *p_term_create_member_variable(p_context *context, p_term *object, p_term *name, int auto_create);
@@ -72,6 +75,7 @@ p_term *p_term_deref(const p_term *term);
 int p_term_type(const p_term *term);
 int p_term_arg_count(const p_term *term);
 const char *p_term_name(const p_term *term);
+size_t p_term_name_length(const p_term *term);
 p_term *p_term_functor(const p_term *term);
 p_term *p_term_arg(const p_term *term, int index);
 int p_term_integer_value(const p_term *term);
@@ -99,7 +103,7 @@ void p_term_stdio_print_func(void *data, const char *format, ...);
 void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
 void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
 
-int p_term_precedes(const p_term *term1, const p_term *term2);
+int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2);
 
 #define P_TERM_TRUE_BODY    ((p_term *)~0L)
 
@@ -107,6 +111,7 @@ int p_term_is_ground(const p_term *term);
 p_term *p_term_clone(p_context *context, p_term *term);
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause);
 
+int p_term_strcmp(const p_term *str1, const p_term *str2);
 p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2);
 
 #ifdef __cplusplus

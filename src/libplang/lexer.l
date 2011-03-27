@@ -317,6 +317,8 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
                 BUF_ADD_CHAR('\f');
             } else if (ch == 'v') {
                 BUF_ADD_CHAR('\v');
+            } else if (ch == '0') {
+                BUF_ADD_CHAR('\0');
             } else {
                 BUF_ADD_CHAR(ch);
             }
@@ -325,7 +327,7 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
             if (ch == '\n')
                 ++yylineno;
             break;
-        } else if (ch != '\0') {
+        } else {
             BUF_ADD_CHAR(ch);
         }
     }
@@ -334,9 +336,9 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
     }
     BUF_ADD_CHAR('\0');
     if (type == K_ATOM) {
-        term = p_term_create_atom(context, buf);
+        term = p_term_create_atom_n(context, buf, buflen - 1);
     } else if (type == K_STRING) {
-        term = p_term_create_string(context, buf);
+        term = p_term_create_string_n(context, buf, buflen - 1);
     } else {
         term = p_term_create_integer(context, ((int)(buf[0])) & 0xFF);
     }

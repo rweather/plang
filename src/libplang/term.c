@@ -259,33 +259,56 @@ void p_term_set_tail(p_term *list, p_term *tail)
  * of terms.  Atoms typically represent identifiers in the program,
  * whereas strings represent human-readable data for the program.
  *
- * The \a name should be encoded in the UTF-8 character set with
- * embedded NUL characters encoded as the sequence 0xC0 0x80.
+ * The \a name should be encoded in the UTF-8 character set.
+ * Use p_term_create_atom_n() for names with embedded NUL's.
  *
  * \ingroup term
- * \sa p_term_nil_atom(), p_term_create_string()
+ * \sa p_term_nil_atom(), p_term_create_string(), p_term_create_atom_n()
  */
 p_term *p_term_create_atom(p_context *context, const char *name)
 {
+    return p_term_create_atom_n(context, name, name ? strlen(name) : 0);
+}
+
+/**
+ * \brief Creates an atom within \a context with the \a len bytes
+ * at \a name as its atom name.
+ *
+ * Returns the atom term.  The same term will be returned every
+ * time this function is called for the same \a name on \a context.
+ * This allows atoms to be quickly compared for equality by
+ * comparing their pointers.  By comparison, p_term_create_string()
+ * creates a new term every time it is called.
+ *
+ * Atoms and strings are not unifiable as they are different types
+ * of terms.  Atoms typically represent identifiers in the program,
+ * whereas strings represent human-readable data for the program.
+ *
+ * The \a name should be encoded in the UTF-8 character.
+ *
+ * \ingroup term
+ * \sa p_term_create_atom()
+ */
+p_term *p_term_create_atom_n(p_context *context, const char *name, size_t len)
+{
     unsigned int hash;
-    size_t len;
     const char *n;
+    size_t nlen;
     p_term *atom;
 
     /* Look for the name in the context's atom hash */
     hash = 0;
-    len = 0;
-    if (!name)
-        name = "";
     n = name;
-    while (*n != '\0') {
+    nlen = len;
+    while (nlen > 0) {
         hash = hash * 5 + (((unsigned int)(*n++)) & 0xFF);
-        ++len;
+        --nlen;
     }
     hash %= P_CONTEXT_HASH_SIZE;
     atom = context->atom_hash[hash];
     while (atom != 0) {
-        if (!strcmp(atom->atom.name, name))
+        if (atom->header.size == len &&
+                !memcmp(atom->atom.name, name, len))
             return atom;
         atom = atom->atom.next;
     }
@@ -298,13 +321,16 @@ p_term *p_term_create_atom(p_context *context, const char *name)
     atom->header.type = P_TERM_ATOM;
     atom->header.size = (unsigned int)len;
     atom->atom.next = context->atom_hash[hash];
-    strcpy(atom->atom.name, name);
+    if (len > 0)
+        memcpy(atom->atom.name, name, len);
+    atom->atom.name[len] = '\0';
     context->atom_hash[hash] = atom;
     return atom;
 }
 
 /**
- * \brief Creates a string within \a context with the specified \a name.
+ * \brief Creates a string within \a context with the specified
+ * \a str value.
  *
  * Returns the string term.  Unlike p_term_create_atom(), a new term
  * is returned every time this function is called.
@@ -313,11 +339,13 @@ p_term *p_term_create_atom(p_context *context, const char *name)
  * of terms.  Atoms typically represent identifiers in the program,
  * whereas strings represent human-readable data for the program.
  *
- * The \a name should be encoded in the UTF-8 character set with
- * embedded NUL characters encoded as the sequence 0xC0 0x80.
+ * The \a str should be encoded in the UTF-8 character set.
+ * Use p_term_create_string_n() for strings with embedded
+ * NUL characters.
  *
  * \ingroup term
  * \sa p_term_create_atom(), p_term_concat_string()
+ * \sa p_term_create_string_n()
  */
 p_term *p_term_create_string(p_context *context, const char *str)
 {
@@ -328,10 +356,39 @@ p_term *p_term_create_string(p_context *context, const char *str)
         return 0;
     term->header.type = P_TERM_STRING;
     term->header.size = (unsigned int)len;
-    if (str)
-        strcpy(term->name, str);
-    else
-        term->name[0] = '\0';
+    if (len > 0)
+        memcpy(term->name, str, len);
+    term->name[len] = '\0';
+    return (p_term *)term;
+}
+
+/**
+ * \brief Creates a string within \a context with the \a len
+ * bytes from the specified \a str buffer.
+ *
+ * Returns the string term.  Unlike p_term_create_atom(), a new term
+ * is returned every time this function is called.
+ *
+ * Atoms and strings are not unifiable as they are different types
+ * of terms.  Atoms typically represent identifiers in the program,
+ * whereas strings represent human-readable data for the program.
+ *
+ * The \a str should be encoded in the UTF-8 character set.
+ *
+ * \ingroup term
+ * \sa p_term_create_string(), p_term_name_length()
+ */
+p_term *p_term_create_string_n(p_context *context, const char *str, size_t len)
+{
+    struct p_term_string *term = p_term_malloc
+        (context, struct p_term_string, sizeof(struct p_term_string) + len);
+    if (!term)
+        return 0;
+    term->header.type = P_TERM_STRING;
+    term->header.size = (unsigned int)len;
+    if (len > 0)
+        memcpy(term->name, str, len);
+    term->name[len] = '\0';
     return (p_term *)term;
 }
 
@@ -570,6 +627,7 @@ int p_term_arg_count(const p_term *term)
  *
  * \ingroup term
  * \sa p_term_type(), p_term_create_functor(), p_term_create_atom()
+ * \sa p_term_name_length()
  */
 const char *p_term_name(const p_term *term)
 {
@@ -584,11 +642,40 @@ const char *p_term_name(const p_term *term)
     case P_TERM_STRING:
         return term->string.name;
     case P_TERM_VARIABLE:
-        if (term->var.header.size > 0)
+        if (term->header.size > 0)
             return (const char *)(&(term->var) + 1);
         break;
     case P_TERM_MEMBER_VARIABLE:
         return p_term_name(term->member_var.name);
+    default: break;
+    }
+    return 0;
+}
+
+/**
+ * \brief Returns the length of the name of the functor, atom,
+ * or variable contained in \a term, or zero if \a term does
+ * not have a name.
+ *
+ * The \a term is automatically dereferenced.
+ *
+ * \ingroup term
+ * \sa p_term_name()
+ */
+size_t p_term_name_length(const p_term *term)
+{
+    if (!term)
+        return 0;
+    term = p_term_deref_non_null(term);
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR:
+        return p_term_name_length(term->functor.functor_name);
+    case P_TERM_ATOM:
+    case P_TERM_STRING:
+    case P_TERM_VARIABLE:
+        return term->header.size;
+    case P_TERM_MEMBER_VARIABLE:
+        return p_term_name_length(term->member_var.name);
     default: break;
     }
     return 0;
@@ -1332,7 +1419,8 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
         /* Compare two strings */
         if (term2->header.type == P_TERM_STRING &&
                 term1->header.size == term2->header.size &&
-                !strcmp(term1->string.name, term2->string.name))
+                !memcmp(term1->string.name, term2->string.name,
+                        term1->header.size))
             return 1;
         break;
     case P_TERM_INTEGER:
@@ -1671,7 +1759,7 @@ void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_
 /**
  * \brief Returns -1, 0, or 1 depending upon whether \a term1 is
  * less than, equal to, or greater than \a term2 using the
- * "precedes" relationship.
+ * "precedes" relationship.  The terms are compared within \a context.
  *
  * Variables precede all floating-point reals, which precede
  * all integers, which precede all strings, which precede all
@@ -1685,7 +1773,7 @@ void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_
  *
  * \ingroup term
  */
-int p_term_precedes(const p_term *term1, const p_term *term2)
+int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2)
 {
     int group1, group2, cmp;
     static unsigned char const precedes_ordering[] = {
@@ -1724,22 +1812,22 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
     switch (term1->header.type) {
     case P_TERM_FUNCTOR:
     case P_TERM_LIST: {
-        const char *name1;
-        const char *name2;
+        p_term *name1;
+        p_term *name2;
         unsigned int index;
         if (term1->header.size < term2->header.size)
             return -1;
         else if (term1->header.size > term2->header.size)
             return 1;
         if (term1->header.type == P_TERM_FUNCTOR)
-            name1 = p_term_name(term1->functor.functor_name);
+            name1 = term1->functor.functor_name;
         else
-            name1 = ".";
+            name1 = context->dot_atom;
         if (term2->header.type == P_TERM_FUNCTOR)
-            name2 = p_term_name(term2->functor.functor_name);
+            name2 = term2->functor.functor_name;
         else
-            name2 = ".";
-        cmp = strcmp(name1, name2);
+            name2 = context->dot_atom;
+        cmp = p_term_strcmp(name1, name2);
         if (cmp < 0)
             return -1;
         else if (cmp > 0)
@@ -1747,7 +1835,8 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
         if (term1->header.type == P_TERM_FUNCTOR &&
                 term2->header.type == P_TERM_FUNCTOR) {
             for (index = 0; index < term1->header.size; ++index) {
-                cmp = p_term_precedes(term1->functor.arg[index],
+                cmp = p_term_precedes(context,
+                                      term1->functor.arg[index],
                                       term2->functor.arg[index]);
                 if (cmp != 0)
                     return cmp;
@@ -1756,7 +1845,7 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
                    term2->header.type == P_TERM_LIST) {
             do {
                 cmp = p_term_precedes
-                    (term1->list.head, term2->list.head);
+                    (context, term1->list.head, term2->list.head);
                 if (cmp != 0)
                     return cmp;
                 term1 = term1->list.tail;
@@ -1767,7 +1856,7 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
                 term2 = p_term_deref_non_null(term2);
             } while (term1->header.type == P_TERM_LIST &&
                      term2->header.type == P_TERM_LIST);
-            return p_term_precedes(term1, term2);
+            return p_term_precedes(context, term1, term2);
         } else {
             /* Shouldn't get here, because parsers will normally
              * convert '.' functors into list terms.  Have to do
@@ -1777,12 +1866,7 @@ int p_term_precedes(const p_term *term1, const p_term *term2)
         break; }
     case P_TERM_ATOM:
     case P_TERM_STRING:
-        cmp = strcmp(p_term_name(term1), p_term_name(term2));
-        if (cmp < 0)
-            return -1;
-        else if (cmp > 0)
-            return 1;
-        break;
+        return p_term_strcmp(term1, term2);
     case P_TERM_INTEGER:
 #if defined(P_TERM_64BIT)
         if (((int)(term1->header.size)) < ((int)(term2->header.size)))
@@ -2016,6 +2100,69 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
 }
 
 /**
+ * \brief Compares \a str1 and \a str2 and returns a comparison code.
+ *
+ * The \a str1 and \a str2 terms are assumed to be either atoms
+ * or strings.  The result is undefined if this assumption does
+ * not hold.
+ * 
+ * This comparison function is safe on strings that have embedded NUL
+ * characters as it uses memcmp() internally.
+ *
+ * \ingroup term
+ * \sa p_term_create_string()
+ */
+int p_term_strcmp(const p_term *str1, const p_term *str2)
+{
+    const char *s1;
+    unsigned int s1len;
+    const char *s2;
+    unsigned int s2len;
+    int cmp;
+    if (!str1 || !str2)
+        return 0;
+    str1 = p_term_deref_non_null(str1);
+    str2 = p_term_deref_non_null(str2);
+    if (str1->header.type == P_TERM_ATOM) {
+        s1 = str1->atom.name;
+        s1len = str1->header.size;
+    } else if (str1->header.type == P_TERM_STRING) {
+        s1 = str1->string.name;
+        s1len = str1->header.size;
+    } else {
+        return 0;
+    }
+    if (str2->header.type == P_TERM_ATOM) {
+        s2 = str2->atom.name;
+        s2len = str2->header.size;
+    } else if (str2->header.type == P_TERM_STRING) {
+        s2 = str2->string.name;
+        s2len = str2->header.size;
+    } else {
+        return 0;
+    }
+    if (!s1len)
+        return s2len ? -1 : 0;
+    if (!s2len)
+        return s1len ? 1 : 0;
+    if (s1len == s2len) {
+        return memcmp(s1, s2, s1len);
+    } else if (s1len < s2len) {
+        cmp = memcmp(s1, s2, s1len);
+        if (cmp != 0)
+            return cmp;
+        else
+            return -1;
+    } else {
+        cmp = memcmp(s1, s2, s2len);
+        if (cmp != 0)
+            return cmp;
+        else
+            return 1;
+    }
+}
+
+/**
  * \brief Concatenates \a str1 and \a str2 to create a new string.
  *
  * Returns the concatenated string, or null if \a str1 or \a str2
@@ -2045,8 +2192,8 @@ p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2)
         return 0;
     term->header.type = P_TERM_STRING;
     term->header.size = (unsigned int)len;
-    strcpy(term->name, str1->string.name);
-    strcpy(term->name + str1->header.size, str2->string.name);
+    memcpy(term->name, str1->string.name, str1->header.size);
+    memcpy(term->name + str1->header.size, str2->string.name, str2->header.size);
     return (p_term *)term;
 }
 
