@@ -19,6 +19,7 @@
 
 #include <plang/database.h>
 #include "term-priv.h"
+#include "database-priv.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -3540,87 +3541,71 @@ static p_goal_result p_arith_tan
 
 void _p_db_init_arith(p_context *context)
 {
-    struct p_arith
-    {
-        const char *name;
-        int arity;
-        p_db_builtin builtin_func;
-        p_db_arith arith_func;
-    };
-    static struct p_arith const builtins[] = {
+    static struct p_builtin const builtins[] = {
         /* Predicates */
-        {"is", 2, p_builtin_is, 0},
-        {"=:=", 2, p_builtin_num_eq, 0},
-        {"=!=", 2, p_builtin_num_ne, 0},
-        {"=\\=", 2, p_builtin_num_ne, 0},
-        {"<", 2, p_builtin_num_lt, 0},
-        {"<=", 2, p_builtin_num_le, 0},
-        {"=<", 2, p_builtin_num_le, 0},
-        {">", 2, p_builtin_num_gt, 0},
-        {">=", 2, p_builtin_num_ge, 0},
-        {"fperror", 1, p_builtin_fperror, 0},
-        {"isnan", 1, p_builtin_isnan, 0},
-        {"isinf", 1, p_builtin_isinf, 0},
-
-        /* Functions */
-        {"+", 2, 0, p_arith_add},
-        {"-", 1, 0, p_arith_neg},
-        {"-", 2, 0, p_arith_sub},
-        {"*", 2, 0, p_arith_mul},
-        {"/", 2, 0, p_arith_div},
-        {"%", 2, 0, p_arith_mod},
-        {"**", 2, 0, p_arith_pow},
-        {"/\\", 2, 0, p_arith_and},
-        {"\\/", 2, 0, p_arith_or},
-        {"^", 2, 0, p_arith_xor},
-        {"~", 1, 0, p_arith_not},
-        {"\\", 1, 0, p_arith_not},
-        {"<<", 2, 0, p_arith_lshift},
-        {">>", 2, 0, p_arith_rshift},
-        {">>>", 2, 0, p_arith_rushift},
-        {"abs", 1, 0, p_arith_abs},
-        {"acos", 1, 0, p_arith_acos},
-        {"asin", 1, 0, p_arith_asin},
-        {"atan", 1, 0, p_arith_atan},
-        {"atan2", 2, 0, p_arith_atan2},
-        {"ceil", 1, 0, p_arith_ceil},
-        {"ceiling", 1, 0, p_arith_ceil},
-        {"cos", 1, 0, p_arith_cos},
-        {"e", 0, 0, p_arith_e},
-        {"exp", 1, 0, p_arith_exp},
-        {"float", 1, 0, p_arith_float},
-        {"float_fractional_part", 1, 0, p_arith_float_fractional_part},
-        {"float_integer_part", 1, 0, p_arith_float_integer_part},
-        {"floor", 1, 0, p_arith_floor},
-        {"inf", 0, 0, p_arith_inf},
-        {"integer", 1, 0, p_arith_integer},
-        {"log", 1, 0, p_arith_log},
-        {"mod", 2, 0, p_arith_mod},
-        {"nan", 0, 0, p_arith_nan},
-        {"pi", 0, 0, p_arith_pi},
-        {"pow", 2, 0, p_arith_pow},
-        {"rem", 2, 0, p_arith_rem},
-        {"round", 1, 0, p_arith_round},
-        {"sign", 1, 0, p_arith_sign},
-        {"sin", 1, 0, p_arith_sin},
-        {"sqrt", 1, 0, p_arith_sqrt},
-        {"string", 1, 0, p_arith_string},
-        {"string", 2, 0, p_arith_string_2},
-        {"tan", 1, 0, p_arith_tan},
-        {"truncate", 1, 0, p_arith_integer},
-        {0, 0, 0, 0}
+        {"is", 2, p_builtin_is},
+        {"=:=", 2, p_builtin_num_eq},
+        {"=!=", 2, p_builtin_num_ne},
+        {"=\\=", 2, p_builtin_num_ne},
+        {"<", 2, p_builtin_num_lt},
+        {"<=", 2, p_builtin_num_le},
+        {"=<", 2, p_builtin_num_le},
+        {">", 2, p_builtin_num_gt},
+        {">=", 2, p_builtin_num_ge},
+        {"fperror", 1, p_builtin_fperror},
+        {"isnan", 1, p_builtin_isnan},
+        {"isinf", 1, p_builtin_isinf},
+        {0, 0, 0}
     };
-    int index;
-    for (index = 0; builtins[index].name != 0; ++index) {
-        if (builtins[index].builtin_func) {
-            p_db_set_builtin_predicate
-                (p_term_create_atom(context, builtins[index].name),
-                 builtins[index].arity, builtins[index].builtin_func);
-        }
-        if (builtins[index].arith_func) {
-            p_db_set_builtin_arith
-                (p_term_create_atom(context, builtins[index].name),
-                 builtins[index].arity, builtins[index].arith_func);
-        }
-    }
+    static struct p_arith const ariths[] = {
+        /* Functions */
+        {"+", 2, p_arith_add},
+        {"-", 1, p_arith_neg},
+        {"-", 2, p_arith_sub},
+        {"*", 2, p_arith_mul},
+        {"/", 2, p_arith_div},
+        {"%", 2, p_arith_mod},
+        {"**", 2, p_arith_pow},
+        {"/\\", 2, p_arith_and},
+        {"\\/", 2, p_arith_or},
+        {"^", 2, p_arith_xor},
+        {"~", 1, p_arith_not},
+        {"\\", 1, p_arith_not},
+        {"<<", 2, p_arith_lshift},
+        {">>", 2, p_arith_rshift},
+        {">>>", 2, p_arith_rushift},
+        {"abs", 1, p_arith_abs},
+        {"acos", 1, p_arith_acos},
+        {"asin", 1, p_arith_asin},
+        {"atan", 1, p_arith_atan},
+        {"atan2", 2, p_arith_atan2},
+        {"ceil", 1, p_arith_ceil},
+        {"ceiling", 1, p_arith_ceil},
+        {"cos", 1, p_arith_cos},
+        {"e", 0, p_arith_e},
+        {"exp", 1, p_arith_exp},
+        {"float", 1, p_arith_float},
+        {"float_fractional_part", 1, p_arith_float_fractional_part},
+        {"float_integer_part", 1, p_arith_float_integer_part},
+        {"floor", 1, p_arith_floor},
+        {"inf", 0, p_arith_inf},
+        {"integer", 1, p_arith_integer},
+        {"log", 1, p_arith_log},
+        {"mod", 2, p_arith_mod},
+        {"nan", 0, p_arith_nan},
+        {"pi", 0, p_arith_pi},
+        {"pow", 2, p_arith_pow},
+        {"rem", 2, p_arith_rem},
+        {"round", 1, p_arith_round},
+        {"sign", 1, p_arith_sign},
+        {"sin", 1, p_arith_sin},
+        {"sqrt", 1, p_arith_sqrt},
+        {"string", 1, p_arith_string},
+        {"string", 2, p_arith_string_2},
+        {"tan", 1, p_arith_tan},
+        {"truncate", 1, p_arith_integer},
+        {0, 0, 0}
+    };
+    _p_db_register_builtins(context, builtins);
+    _p_db_register_ariths(context, ariths);
 }

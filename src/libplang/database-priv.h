@@ -56,6 +56,24 @@ struct p_database_info
     p_term *global_object;
 };
 
+struct p_builtin
+{
+    const char *name;
+    int arity;
+    p_db_builtin func;
+};
+
+struct p_arith
+{
+    const char *name;
+    int arity;
+    p_db_arith arith_func;
+};
+
+void _p_db_register_builtins(p_context *context, const struct p_builtin *builtins);
+void _p_db_register_ariths(p_context *context, const struct p_arith *ariths);
+void _p_db_register_sources(p_context *context, const char * const *sources);
+
 void _p_db_init(p_context *context);
 void _p_db_init_builtins(p_context *context);
 void _p_db_init_arith(p_context *context);

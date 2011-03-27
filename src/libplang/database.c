@@ -376,6 +376,17 @@ void p_db_set_builtin_predicate(p_term *name, int arity, p_db_builtin builtin)
         info->flags &= ~P_PREDICATE_BUILTIN;
 }
 
+/* Register a table of builtin predicates */
+void _p_db_register_builtins(p_context *context, const struct p_builtin *builtins)
+{
+    while (builtins->name != 0) {
+        p_db_set_builtin_predicate
+            (p_term_create_atom(context, builtins->name),
+             builtins->arity, builtins->func);
+        ++builtins;
+    }
+}
+
 /**
  * \typedef p_db_arith
  * \ingroup database
@@ -446,6 +457,26 @@ void p_db_set_builtin_arith
 
     /* Set the arithmetic builtin */
     info->arith_func = builtin;
+}
+
+/* Register a table of builtin arithmetic functions */
+void _p_db_register_ariths(p_context *context, const struct p_arith *ariths)
+{
+    while (ariths->name != 0) {
+        p_db_set_builtin_arith
+            (p_term_create_atom(context, ariths->name),
+             ariths->arity, ariths->arith_func);
+        ++ariths;
+    }
+}
+
+/* Register a table of Plang source strings for builtin predicates */
+void _p_db_register_sources(p_context *context, const char * const *sources)
+{
+    while (*sources != 0) {
+        p_context_consult_string(context, *sources);
+        ++sources;
+    }
 }
 
 /* Extract the predicate name and arity from a clause */

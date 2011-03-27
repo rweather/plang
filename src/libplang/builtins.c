@@ -3364,12 +3364,6 @@ static p_goal_result p_builtin_printq_error
 
 void _p_db_init_builtins(p_context *context)
 {
-    struct p_builtin
-    {
-        const char *name;
-        int arity;
-        p_db_builtin func;
-    };
     static struct p_builtin const builtins[] = {
         {"=", 2, p_builtin_unify},
         {"!=", 2, p_builtin_not_unifiable},
@@ -3442,16 +3436,6 @@ void _p_db_init_builtins(p_context *context)
         p_builtin_while,
         0
     };
-    int index;
-
-    /* Register predicates that are implemented in C */
-    for (index = 0; builtins[index].name != 0; ++index) {
-        p_db_set_builtin_predicate
-            (p_term_create_atom(context, builtins[index].name),
-             builtins[index].arity, builtins[index].func);
-    }
-
-    /* Register predicates that are implemented in Plang */
-    for (index = 0; builtin_sources[index] != 0; ++index)
-        p_context_consult_string(context, builtin_sources[index]);
+    _p_db_register_builtins(context, builtins);
+    _p_db_register_sources(context, builtin_sources);
 }
