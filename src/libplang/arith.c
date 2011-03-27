@@ -20,6 +20,7 @@
 #include <plang/database.h>
 #include "term-priv.h"
 #include "database-priv.h"
+#include "errors-priv.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -102,18 +103,6 @@
  * \ref func_string_2 "string/2"
  */
 
-p_term *p_builtin_type_error
-    (p_context *context, const char *name, p_term *term);
-
-static p_term *p_arith_int_overflow(p_context *context)
-{
-    p_term *error = p_term_create_functor
-        (context, p_term_create_atom(context, "evaluation_error"), 1);
-    p_term_bind_functor_arg
-        (error, 0, p_term_create_atom(context, "int_overflow"));
-    return error;
-}
-
 /* Internal expression evaluator */
 static p_goal_result p_arith_eval
     (p_context *context, p_arith_value *result,
@@ -121,7 +110,7 @@ static p_goal_result p_arith_eval
 {
     expr = p_term_deref(expr);
     if (!expr || (expr->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     switch (expr->header.type) {
@@ -169,7 +158,7 @@ static p_goal_result p_arith_eval
         return P_RESULT_TRUE;
     default: break;
     }
-    *error = p_builtin_type_error(context, "evaluable", expr);
+    *error = p_create_type_error(context, "evaluable", expr);
     return P_RESULT_ERROR;
 }
 
@@ -332,7 +321,7 @@ static int p_builtin_num_cmp
             else
                 return 0;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return -2;
         }
     } else if (value1.type == P_TERM_REAL) {
@@ -352,7 +341,7 @@ static int p_builtin_num_cmp
             else
                 return 0;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return -2;
         }
     } else if (value1.type == P_TERM_STRING) {
@@ -366,11 +355,11 @@ static int p_builtin_num_cmp
             else
                 return 0;
         } else {
-            *error = p_builtin_type_error(context, "string", args[1]);
+            *error = p_create_type_error(context, "string", args[1]);
             return -2;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return -2;
     }
 }
@@ -729,11 +718,11 @@ static p_goal_result p_builtin_fperror
 {
     p_term *type = p_term_deref(args[0]);
     if (!type || (type->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (type->header.type != P_TERM_ATOM) {
-        *error = p_builtin_type_error(context, "atom", args[0]);
+        *error = p_create_type_error(context, "atom", args[0]);
         return P_RESULT_ERROR;
     }
 #if defined(HAVE_FENV_H) && defined(HAVE_FECLEAREXCEPT) && \
@@ -817,7 +806,7 @@ static p_goal_result p_builtin_isnan
         else
             return P_RESULT_FAIL;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -875,7 +864,7 @@ static p_goal_result p_builtin_isinf
         else
             return P_RESULT_FAIL;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -942,7 +931,7 @@ static p_goal_result p_arith_add
                 values[0].integer_value + values[1].real_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -957,7 +946,7 @@ static p_goal_result p_arith_add
                 values[0].real_value + values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_STRING) {
@@ -968,7 +957,7 @@ static p_goal_result p_arith_add
                  values[1].string_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "string", args[1]);
+            *error = p_create_type_error(context, "string", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
@@ -1034,7 +1023,7 @@ static p_goal_result p_arith_neg
         result->real_value = -(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1095,7 +1084,7 @@ static p_goal_result p_arith_sub
                 values[0].integer_value - values[1].real_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -1110,11 +1099,11 @@ static p_goal_result p_arith_sub
                 values[0].real_value - values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1175,7 +1164,7 @@ static p_goal_result p_arith_mul
                 values[0].integer_value * values[1].real_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -1190,11 +1179,11 @@ static p_goal_result p_arith_mul
                 values[0].real_value * values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1274,7 +1263,7 @@ static p_goal_result p_arith_div
                 values[0].integer_value / values[1].real_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -1289,17 +1278,14 @@ static p_goal_result p_arith_div
                 values[0].real_value / values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
-    *error = p_term_create_functor
-        (context, p_term_create_atom(context, "evaluation_error"), 1);
-    p_term_bind_functor_arg
-        (*error, 0, p_term_create_atom(context, "zero_divisor"));
+    *error = p_create_evaluation_error(context, "zero_divisor");
     return P_RESULT_ERROR;
 }
 
@@ -1389,7 +1375,7 @@ static p_goal_result p_arith_mod
                              values[1].real_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -1406,17 +1392,14 @@ static p_goal_result p_arith_mod
                              values[1].integer_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
-    *error = p_term_create_functor
-        (context, p_term_create_atom(context, "evaluation_error"), 1);
-    p_term_bind_functor_arg
-        (*error, 0, p_term_create_atom(context, "zero_divisor"));
+    *error = p_create_evaluation_error(context, "zero_divisor");
     return P_RESULT_ERROR;
 }
 
@@ -1513,7 +1496,7 @@ static p_goal_result p_arith_rem
                              values[1].real_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -1530,17 +1513,14 @@ static p_goal_result p_arith_rem
                              values[1].integer_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
-    *error = p_term_create_functor
-        (context, p_term_create_atom(context, "evaluation_error"), 1);
-    p_term_bind_functor_arg
-        (*error, 0, p_term_create_atom(context, "zero_divisor"));
+    *error = p_create_evaluation_error(context, "zero_divisor");
     return P_RESULT_ERROR;
 }
 
@@ -1594,11 +1574,11 @@ static p_goal_result p_arith_and
                 values[0].integer_value & values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1653,11 +1633,11 @@ static p_goal_result p_arith_or
                 values[0].integer_value | values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1712,11 +1692,11 @@ static p_goal_result p_arith_xor
                 values[0].integer_value ^ values[1].integer_value;
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1768,7 +1748,7 @@ static p_goal_result p_arith_not
         result->integer_value = ~(values[0].integer_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1825,11 +1805,11 @@ static p_goal_result p_arith_lshift
                     (values[1].integer_value & 31);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1892,11 +1872,11 @@ static p_goal_result p_arith_rshift
                     (values[1].integer_value & 31);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -1952,11 +1932,11 @@ static p_goal_result p_arith_rushift
                             (values[1].integer_value & 31));
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "integer", args[1]);
+            *error = p_create_type_error(context, "integer", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2005,7 +1985,7 @@ static p_goal_result p_arith_abs
     if (values[0].type == P_TERM_INTEGER) {
         result->type = P_TERM_INTEGER;
         if (values[0].integer_value == (int)(-0x7fffffff - 1)) {
-            *error = p_arith_int_overflow(context);
+            *error = p_create_evaluation_error(context, "int_overflow");
             return P_RESULT_ERROR;
         } else if (values[0].integer_value < 0) {
             result->integer_value = -(values[0].integer_value);
@@ -2018,7 +1998,7 @@ static p_goal_result p_arith_abs
         result->real_value = fabs(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2071,7 +2051,7 @@ static p_goal_result p_arith_acos
         result->real_value = acos(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2124,7 +2104,7 @@ static p_goal_result p_arith_asin
         result->real_value = asin(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2180,7 +2160,7 @@ static p_goal_result p_arith_atan
         result->real_value = atan(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2242,7 +2222,7 @@ static p_goal_result p_arith_atan2
                 atan2(values[0].integer_value, values[1].real_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -2257,11 +2237,11 @@ static p_goal_result p_arith_atan2
                 atan2(values[0].real_value, values[1].integer_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2321,7 +2301,7 @@ static p_goal_result p_arith_ceil
         result->real_value = ceil(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2378,7 +2358,7 @@ static p_goal_result p_arith_cos
         result->real_value = cos(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2435,7 +2415,7 @@ static p_goal_result p_arith_exp
         result->real_value = exp(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2523,7 +2503,7 @@ static p_goal_result p_arith_float
         val = strtod(str, &endptr);
         if (errno == ERANGE || endptr == str) {
             /* No conversion performed or value is out of range */
-            *error = p_builtin_type_error(context, "number", args[0]);
+            *error = p_create_type_error(context, "number", args[0]);
             return P_RESULT_ERROR;
         }
         while (*endptr == ' ' || *endptr == '\t' ||
@@ -2531,14 +2511,14 @@ static p_goal_result p_arith_float
             ++endptr;
         if (*endptr != '\0') {
             /* Trailing characters other than whitespace */
-            *error = p_builtin_type_error(context, "number", args[0]);
+            *error = p_create_type_error(context, "number", args[0]);
             return P_RESULT_ERROR;
         }
         result->type = P_TERM_REAL;
         result->real_value = val;
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2594,7 +2574,7 @@ static p_goal_result p_arith_float_fractional_part
         result->real_value = modf(values[0].real_value, &ipart);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2649,7 +2629,7 @@ static p_goal_result p_arith_float_integer_part
         modf(values[0].real_value, &(result->real_value));
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2705,7 +2685,7 @@ static p_goal_result p_arith_floor
         result->real_value = floor(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2801,7 +2781,7 @@ static p_goal_result p_arith_integer
     } else if (values[0].type == P_TERM_REAL) {
         if (values[0].real_value >= 2147483648.0 ||
                 values[0].real_value <= -2147483649.0) {
-            *error = p_arith_int_overflow(context);
+            *error = p_create_evaluation_error(context, "int_overflow");
             return P_RESULT_ERROR;
         }
         result->type = P_TERM_INTEGER;
@@ -2815,11 +2795,11 @@ static p_goal_result p_arith_integer
         val = strtol(str, &endptr, 0);
         if (errno == ERANGE) {
             /* Value is out of range */
-            *error = p_arith_int_overflow(context);
+            *error = p_create_evaluation_error(context, "int_overflow");
             return P_RESULT_ERROR;
         } else if (endptr == str) {
             /* No conversion performed - data is not an integer */
-            *error = p_builtin_type_error(context, "integer", args[0]);
+            *error = p_create_type_error(context, "integer", args[0]);
             return P_RESULT_ERROR;
         }
         while (*endptr == ' ' || *endptr == '\t' ||
@@ -2827,19 +2807,19 @@ static p_goal_result p_arith_integer
             ++endptr;
         if (*endptr != '\0') {
             /* Trailing characters other than whitespace */
-            *error = p_builtin_type_error(context, "integer", args[0]);
+            *error = p_create_type_error(context, "integer", args[0]);
             return P_RESULT_ERROR;
         }
         if (val != (int)val) {
             /* Value is out of range for a 32-bit integer */
-            *error = p_arith_int_overflow(context);
+            *error = p_create_evaluation_error(context, "int_overflow");
             return P_RESULT_ERROR;
         }
         result->type = P_TERM_INTEGER;
         result->integer_value = (int)val;
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "integer", args[0]);
+        *error = p_create_type_error(context, "integer", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -2897,7 +2877,7 @@ static p_goal_result p_arith_log
         result->real_value = log(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3042,7 +3022,7 @@ static p_goal_result p_arith_pow
                 pow(values[0].integer_value, values[1].real_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else if (values[0].type == P_TERM_REAL) {
@@ -3057,11 +3037,11 @@ static p_goal_result p_arith_pow
                 pow(values[0].real_value, values[1].integer_value);
             return P_RESULT_TRUE;
         } else {
-            *error = p_builtin_type_error(context, "number", args[1]);
+            *error = p_create_type_error(context, "number", args[1]);
             return P_RESULT_ERROR;
         }
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3144,7 +3124,7 @@ static p_goal_result p_arith_round
             p_arith_round_nearest(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3209,7 +3189,7 @@ static p_goal_result p_arith_sign
             result->integer_value = 0;
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3266,7 +3246,7 @@ static p_goal_result p_arith_sin
         result->real_value = sin(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3322,7 +3302,7 @@ static p_goal_result p_arith_sqrt
         result->real_value = sqrt(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3398,7 +3378,7 @@ static p_goal_result p_arith_string
         result->string_value = values[0].string_value;
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "string", args[0]);
+        *error = p_create_type_error(context, "string", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3446,7 +3426,7 @@ static p_goal_result p_arith_string_2
     char prec[64];
     char buffer[128];
     if (values[1].type != P_TERM_INTEGER) {
-        *error = p_builtin_type_error(context, "integer", args[1]);
+        *error = p_create_type_error(context, "integer", args[1]);
         return P_RESULT_ERROR;
     }
     if (values[0].type == P_TERM_INTEGER) {
@@ -3480,7 +3460,7 @@ static p_goal_result p_arith_string_2
         result->string_value = values[0].string_value;
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "string", args[0]);
+        *error = p_create_type_error(context, "string", args[0]);
         return P_RESULT_ERROR;
     }
 }
@@ -3534,7 +3514,7 @@ static p_goal_result p_arith_tan
         result->real_value = tan(values[0].real_value);
         return P_RESULT_TRUE;
     } else {
-        *error = p_builtin_type_error(context, "number", args[0]);
+        *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
 }

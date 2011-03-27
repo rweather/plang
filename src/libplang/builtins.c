@@ -22,6 +22,7 @@
 #include "term-priv.h"
 #include "database-priv.h"
 #include "context-priv.h"
+#include "errors-priv.h"
 
 /**
  * \defgroup predicates Builtin predicates - Overview
@@ -134,44 +135,6 @@
 
 /*\@}*/
 
-/* Create a "type_error" term */
-p_term *p_builtin_type_error
-    (p_context *context, const char *name, p_term *term)
-{
-    p_term *error = p_term_create_functor
-        (context, p_term_create_atom(context, "type_error"), 2);
-    p_term_bind_functor_arg
-        (error, 0, p_term_create_atom(context, name));
-    p_term_bind_functor_arg(error, 1, p_term_clone(context, term));
-    return error;
-}
-
-/* Create a "domain_error" term */
-static p_term *p_builtin_domain_error
-    (p_context *context, const char *name, p_term *term)
-{
-    p_term *error = p_term_create_functor
-        (context, p_term_create_atom(context, "domain_error"), 2);
-    p_term_bind_functor_arg
-        (error, 0, p_term_create_atom(context, name));
-    p_term_bind_functor_arg(error, 1, p_term_clone(context, term));
-    return error;
-}
-
-/* Create a "permission_error" term */
-static p_term *p_builtin_permission_error
-    (p_context *context, const char *name1, const char *name2, p_term *term)
-{
-    p_term *error = p_term_create_functor
-        (context, p_term_create_atom(context, "permission_error"), 3);
-    p_term_bind_functor_arg
-        (error, 0, p_term_create_atom(context, name1));
-    p_term_bind_functor_arg
-        (error, 1, p_term_create_atom(context, name2));
-    p_term_bind_functor_arg(error, 2, p_term_clone(context, term));
-    return error;
-}
-
 /* Destructively sets a variable to a value */
 P_INLINE void p_builtin_set_variable(p_term *var, p_term *value)
 {
@@ -219,36 +182,36 @@ static p_term *p_builtin_parse_indicator
     p_term *arity_term;
     pred = p_term_deref(pred);
     if (!pred || (pred->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return 0;
     } else if (pred->header.type != P_TERM_FUNCTOR ||
                pred->header.size != 2 ||
                pred->functor.functor_name != context->slash_atom) {
-        *error = p_builtin_type_error
+        *error = p_create_type_error
             (context, "predicate_indicator", pred);
         return 0;
     }
     name_term = p_term_deref(pred->functor.arg[0]);
     arity_term = p_term_deref(pred->functor.arg[1]);
     if (!name_term || (name_term->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return 0;
     }
     if (!arity_term || (arity_term->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return 0;
     }
     if (arity_term->header.type != P_TERM_INTEGER) {
-        *error = p_builtin_type_error(context, "integer", arity_term);
+        *error = p_create_type_error(context, "integer", arity_term);
         return 0;
     }
     if (name_term->header.type != P_TERM_ATOM) {
-        *error = p_builtin_type_error(context, "atom", name_term);
+        *error = p_create_type_error(context, "atom", name_term);
         return 0;
     }
     *arity = p_term_integer_value(arity_term);
     if (*arity < 0) {
-        *error = p_builtin_domain_error
+        *error = p_create_domain_error
             (context, "not_less_than_zero", arity_term);
         return 0;
     }
@@ -318,7 +281,7 @@ static p_goal_result p_builtin_abolish
     if (!name)
         return P_RESULT_ERROR;
     if (!p_db_clause_abolish(context, name, arity)) {
-        *error = p_builtin_permission_error
+        *error = p_create_permission_error
             (context, "modify", "static_procedure", args[0]);
         return P_RESULT_ERROR;
     }
@@ -391,7 +354,7 @@ static p_goal_result p_builtin_assert
     p_term *head;
     p_term *pred;
     if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (clause->header.type == P_TERM_FUNCTOR &&
@@ -407,12 +370,12 @@ static p_goal_result p_builtin_assert
             (clause, 1, p_term_create_atom(context, "true"));
     }
     if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (head->header.type != P_TERM_ATOM &&
             head->header.type != P_TERM_FUNCTOR) {
-        *error = p_builtin_type_error(context, "callable", head);
+        *error = p_create_type_error(context, "callable", head);
         return P_RESULT_ERROR;
     }
     clause = p_term_clone(context, clause);
@@ -434,7 +397,7 @@ static p_goal_result p_builtin_assert
             (pred, 1, p_term_create_integer
                             (context, (int)(head->header.size)));
     }
-    *error = p_builtin_permission_error
+    *error = p_create_permission_error
         (context, "modify", "static_procedure", pred);
     return P_RESULT_ERROR;
 }
@@ -518,7 +481,7 @@ static p_goal_result p_builtin_retract
     p_term *pred;
     int result;
     if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (clause->header.type == P_TERM_FUNCTOR &&
@@ -534,12 +497,12 @@ static p_goal_result p_builtin_retract
             (clause, 1, p_term_create_atom(context, "true"));
     }
     if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (head->header.type != P_TERM_ATOM &&
             head->header.type != P_TERM_FUNCTOR) {
-        *error = p_builtin_type_error(context, "callable", head);
+        *error = p_create_type_error(context, "callable", head);
         return P_RESULT_ERROR;
     }
     result = p_db_clause_retract(context, clause);
@@ -558,7 +521,7 @@ static p_goal_result p_builtin_retract
             (pred, 1, p_term_create_integer
                             (context, (int)(head->header.size)));
     }
-    *error = p_builtin_permission_error
+    *error = p_create_permission_error
         (context, "modify", "static_procedure", pred);
     return P_RESULT_ERROR;
 }
@@ -724,7 +687,7 @@ static p_goal_result p_builtin_dynamic
         return P_RESULT_ERROR;
     flags = p_db_predicate_flags(context, name, arity);
     if (flags & (P_PREDICATE_COMPILED | P_PREDICATE_BUILTIN)) {
-        *error = p_builtin_permission_error
+        *error = p_create_permission_error
             (context, "modify", "static_procedure", args[0]);
         return P_RESULT_ERROR;
     }
@@ -1412,11 +1375,11 @@ static p_goal_result p_builtin_halt_1
 {
     p_term *exitval = p_term_deref(args[0]);
     if (!exitval || (exitval->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (exitval->header.type != P_TERM_INTEGER) {
-        *error = p_builtin_type_error(context, "integer", exitval);
+        *error = p_create_type_error(context, "integer", exitval);
         return P_RESULT_ERROR;
     }
     *error = exitval;
@@ -2190,7 +2153,7 @@ static p_goal_result p_builtin_univ
     if ((term->header.type & P_TERM_VARIABLE) == 0) {
         if (list->header.type != P_TERM_VARIABLE &&
                 list->header.type != P_TERM_LIST) {
-            *error = p_builtin_type_error(context, "list", list);
+            *error = p_create_type_error(context, "list", list);
             return P_RESULT_ERROR;
         }
         switch (term->header.type) {
@@ -2228,20 +2191,19 @@ static p_goal_result p_builtin_univ
             return P_RESULT_FAIL;
     } else {
         if (list == context->nil_atom) {
-            *error = p_builtin_domain_error
+            *error = p_create_domain_error
                 (context, "non_empty_list", list);
             return P_RESULT_ERROR;
         }
         if (list->header.type != P_TERM_LIST) {
-            *error = p_term_create_atom(context, "instantiation_error");
+            *error = p_create_instantiation_error(context);
             return P_RESULT_ERROR;
         }
         length = 1;
         member = p_term_deref(list->list.tail);
         while (member != context->nil_atom) {
             if (!member || member->header.type != P_TERM_LIST) {
-                *error = p_term_create_atom
-                    (context, "instantiation_error");
+                *error = p_create_instantiation_error(context);
                 return P_RESULT_ERROR;
             }
             ++length;
@@ -2249,7 +2211,7 @@ static p_goal_result p_builtin_univ
         }
         functor = p_term_deref(list->list.head);
         if ((functor->header.type & P_TERM_VARIABLE) != 0) {
-            *error = p_term_create_atom(context, "instantiation_error");
+            *error = p_create_instantiation_error(context);
             return P_RESULT_ERROR;
         }
         list_args = p_term_deref(list->list.tail);
@@ -2263,7 +2225,7 @@ static p_goal_result p_builtin_univ
                 new_term = functor;
                 break;
             default:
-                *error = p_builtin_type_error
+                *error = p_create_type_error
                     (context, "atomic", functor);
                 return P_RESULT_ERROR;
             }
@@ -2272,7 +2234,7 @@ static p_goal_result p_builtin_univ
                 (context, list_args->list.head,
                  p_term_deref(list_args->list.tail)->list.head);
         } else if (functor->header.type != P_TERM_ATOM) {
-            *error = p_builtin_type_error(context, "atom", functor);
+            *error = p_create_type_error(context, "atom", functor);
             return P_RESULT_ERROR;
         } else {
             new_term = p_term_create_functor
@@ -2348,20 +2310,20 @@ static p_goal_result p_builtin_arg
     p_term *arg;
     int num;
     if (!number || (number->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (!term || (term->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if (number->header.type != P_TERM_INTEGER) {
-        *error = p_builtin_type_error(context, "integer", number);
+        *error = p_create_type_error(context, "integer", number);
         return P_RESULT_ERROR;
     }
     num = p_term_integer_value(number);
     if (num < 0) {
-        *error = p_builtin_domain_error
+        *error = p_create_domain_error
             (context, "not_less_than_zero", number);
         return P_RESULT_ERROR;
     }
@@ -2378,7 +2340,7 @@ static p_goal_result p_builtin_arg
         else
             return P_RESULT_FAIL;
     } else {
-        *error = p_builtin_type_error(context, "compound", term);
+        *error = p_create_type_error(context, "compound", term);
         return P_RESULT_ERROR;
     }
     if (p_term_unify(context, args[2], arg, P_BIND_DEFAULT))
@@ -2503,7 +2465,7 @@ static p_goal_result p_builtin_functor
     p_term *new_term;
     int arity_value, index;
     if (!term || !name || !arity) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
     if ((term->header.type & P_TERM_VARIABLE) == 0) {
@@ -2548,7 +2510,7 @@ static p_goal_result p_builtin_functor
         /* Construct a term from name and arity */
         if ((name->header.type & P_TERM_VARIABLE) != 0 ||
                 (arity->header.type & P_TERM_VARIABLE) != 0) {
-            *error = p_term_create_atom(context, "instantiation_error");
+            *error = p_create_instantiation_error(context);
             return P_RESULT_ERROR;
         }
         switch (name->header.type) {
@@ -2559,23 +2521,23 @@ static p_goal_result p_builtin_functor
         case P_TERM_OBJECT:
             break;
         default:
-            *error = p_builtin_type_error(context, "atomic", name);
+            *error = p_create_type_error(context, "atomic", name);
             return P_RESULT_ERROR;
         }
         if (arity->header.type != P_TERM_INTEGER) {
-            *error = p_builtin_type_error(context, "integer", arity);
+            *error = p_create_type_error(context, "integer", arity);
             return P_RESULT_ERROR;
         }
         arity_value = p_term_integer_value(arity);
         if (arity_value < 0) {
-            *error = p_builtin_domain_error
+            *error = p_create_domain_error
                 (context, "not_less_than_zero", arity);
             return P_RESULT_ERROR;
         }
         if (arity_value == 0) {
             new_term = name;
         } else if (name->header.type != P_TERM_ATOM) {
-            *error = p_builtin_type_error(context, "atom", name);
+            *error = p_create_type_error(context, "atom", name);
             return P_RESULT_ERROR;
         } else if (name == context->dot_atom && arity_value == 2) {
             new_term = p_term_create_list

@@ -22,6 +22,7 @@
 #include "term-priv.h"
 #include "database-priv.h"
 #include "parser-priv.h"
+#include "errors-priv.h"
 #include <errno.h>
 #include <string.h>
 
@@ -376,7 +377,7 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
     /* Bail out if the goal is a variable */
     goal = p_term_deref_line(context, goal);
     if (!goal || (goal->header.type & P_TERM_VARIABLE) != 0) {
-        *error = p_term_create_atom(context, "instantiation_error");
+        *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
     }
 
@@ -416,11 +417,7 @@ static p_goal_result p_goal_call_inner(p_context *context, p_term *goal, p_term 
         arity = goal->header.size;
     } else {
         /* Not an atom or functor, so not a callable term */
-        *error = p_term_create_functor
-            (context, p_term_create_atom(context, "type_error"), 2);
-        p_term_bind_functor_arg
-            (*error, 0, p_term_create_atom(context, "callable"));
-        p_term_bind_functor_arg(*error, 1, p_term_clone(context, goal));
+        *error = p_create_type_error(context, "callable", goal);
         return P_RESULT_ERROR;
     }
 
