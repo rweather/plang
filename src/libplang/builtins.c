@@ -18,11 +18,11 @@
  */
 
 #include <plang/database.h>
+#include <plang/errors.h>
 #include <stdio.h>
 #include "term-priv.h"
 #include "database-priv.h"
 #include "context-priv.h"
-#include "errors-priv.h"
 
 /**
  * \defgroup predicates Builtin predicates - Overview

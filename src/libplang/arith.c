@@ -18,9 +18,9 @@
  */
 
 #include <plang/database.h>
+#include <plang/errors.h>
 #include "term-priv.h"
 #include "database-priv.h"
-#include "errors-priv.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>

@@ -18,11 +18,11 @@
  */
 
 #include <plang/context.h>
+#include <plang/errors.h>
 #include "context-priv.h"
 #include "term-priv.h"
 #include "database-priv.h"
 #include "parser-priv.h"
-#include "errors-priv.h"
 #include <errno.h>
 #include <string.h>
 
@@ -324,7 +324,9 @@ int p_context_consult_string(p_context *context, const char *str)
  * \var P_RESULT_ERROR
  * \ingroup context
  * The goal resulted in a thrown error that has not been caught.
- * Further back-tracking may be possible.
+ * Further back-tracking may be possible.  The error term should
+ * be generated with one of the functions in the
+ * \ref errors "Error Creation" module.
  */
 
 /**

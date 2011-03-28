@@ -17,8 +17,8 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PLANG_ERRORS_PRIV_H
-#define PLANG_ERRORS_PRIV_H
+#ifndef PLANG_ERRORS_H
+#define PLANG_ERRORS_H
 
 #include <plang/term.h>
 
@@ -26,17 +26,17 @@
 extern "C" {
 #endif
 
-/** @cond */
-
 p_term *p_create_instantiation_error(p_context *context);
-p_term *p_create_type_error(p_context *context, const char *name, p_term *term);
-p_term *p_create_domain_error(p_context *context, const char *name, p_term *term);
-p_term *p_create_existence_error(p_context *context, const char *name, p_term *term);
-p_term *p_create_permission_error(p_context *context, const char *name1, const char *name2, p_term *term);
-p_term *p_create_evaluation_error(p_context *context, const char *name);
+p_term *p_create_type_error(p_context *context, const char *expected_type, p_term *culprit);
+p_term *p_create_domain_error(p_context *context, const char *expected_domain, p_term *culprit);
+p_term *p_create_existence_error(p_context *context, const char *object_type, p_term *culprit);
+p_term *p_create_permission_error(p_context *context, const char *operation, const char *permission_type, p_term *culprit);
+p_term *p_create_representation_error(p_context *context, const char *flag);
+p_term *p_create_evaluation_error(p_context *context, const char *eval_type);
+p_term *p_create_resource_error(p_context *context, p_term *resource);
+p_term *p_create_syntax_error(p_context *context, p_term *term);
 p_term *p_create_system_error(p_context *context);
-
-/** @endcond */
+p_term *p_create_generic_error(p_context *context, p_term *term);
 
 #ifdef __cplusplus
 };
