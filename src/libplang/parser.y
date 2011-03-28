@@ -650,9 +650,6 @@ clause
             $$ = binary_term
                 (":-", $1, p_term_create_atom(context, "true"));
         }
-    | callable_term K_COLON_DASH term K_DOT_TERMINATOR  {
-            $$ = binary_term(":-", $1, $3);
-        }
     | callable_term compound_statement  {
             $$ = binary_term(":-", $1, $2);
         }

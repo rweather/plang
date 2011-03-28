@@ -149,10 +149,10 @@ static void test_user_predicate()
 {
     static char const user_source[] =
         "a(b).\n"
-        "a(c) :- true.\n"
-        "a(X) :- b(X).\n"
+        "a(c) { true; }\n"
+        "a(X) { b(X); }\n"
         "b(e).\n"
-        "b(f) :- c(f).\n"
+        "b(f) { c(f); }\n"
         "b(g) { throw(foo); }\n"
         ;
     P_VERIFY(p_context_consult_string(context, user_source) == 0);
