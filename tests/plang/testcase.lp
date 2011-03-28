@@ -78,7 +78,7 @@ verify_error(Goal, ExpectedError)
 {
     try {
         call(Goal);
-    } catch (Error) {
+    } catch (error(Error, _)) {
         if (Error !== ExpectedError)
             fail(Goal, Error);
         SawError = true;

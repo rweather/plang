@@ -752,7 +752,7 @@ static p_goal_result p_builtin_import
     /* Importing is only allowed when parsing a source file
      * because it isn't possible to know the filename of the
      * parent when executed from within a normal predicate */
-    *error = p_term_create_atom(context, "system_error");
+    *error = p_create_system_error(context);
     return P_RESULT_ERROR;
 }
 

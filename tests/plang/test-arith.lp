@@ -38,7 +38,7 @@ eval_error(Expr, Expected)
 {
     try {
         X is Expr;
-    } catch (Error) {
+    } catch (error(Error, _)) {
         if (Error !== Expected)
             fail(Expr, Error);
         SawError = true;

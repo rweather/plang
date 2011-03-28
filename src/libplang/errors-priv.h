@@ -31,8 +31,10 @@ extern "C" {
 p_term *p_create_instantiation_error(p_context *context);
 p_term *p_create_type_error(p_context *context, const char *name, p_term *term);
 p_term *p_create_domain_error(p_context *context, const char *name, p_term *term);
+p_term *p_create_existence_error(p_context *context, const char *name, p_term *term);
 p_term *p_create_permission_error(p_context *context, const char *name1, const char *name2, p_term *term);
 p_term *p_create_evaluation_error(p_context *context, const char *name);
+p_term *p_create_system_error(p_context *context);
 
 /** @endcond */
 

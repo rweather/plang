@@ -435,16 +435,12 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     /* The predicate does not exist - throw an error or fail */
     if (context->fail_on_unknown)
         return P_RESULT_FAIL;
-    *error = p_term_create_functor
-        (context, p_term_create_atom(context, "existence_error"), 2);
-    p_term_bind_functor_arg
-        (*error, 0, p_term_create_atom(context, "procedure"));
     pred = p_term_create_functor
         (context, p_term_create_atom(context, "/"), 2);
     p_term_bind_functor_arg(pred, 0, name);
     p_term_bind_functor_arg
         (pred, 1, p_term_create_integer(context, (int)arity));
-    p_term_bind_functor_arg(*error, 1, pred);
+    *error = p_create_existence_error(context, "procedure", pred);
     return P_RESULT_ERROR;
 }
 

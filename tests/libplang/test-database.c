@@ -108,16 +108,32 @@ static p_goal_result execute_goal(const char *source, const char *expected_error
     p_goal_result result;
     _p_context_test_goal(context);          /* Allow goal saving */
     if (p_context_consult_string(context, source) != 0)
-        return (p_goal_result)(P_RESULT_ERROR + 1);
+        return (p_goal_result)(P_RESULT_HALT + 1);
     goal = _p_context_test_goal(context);   /* Fetch test goal */
     error = 0;
     result = p_context_execute_goal(context, goal, &error);
-    if (result == P_RESULT_ERROR && expected_error) {
+    if ((result == P_RESULT_ERROR || result == P_RESULT_HALT)
+            && expected_error) {
         p_term *expected;
+        p_term *wrapped;
         p_context_consult_string(context, expected_error);
         expected = _p_context_test_goal(context);
-        if (!p_term_unify(context, error, expected, P_BIND_EQUALITY))
+        if (p_term_unify(context, error, expected, P_BIND_DEFAULT))
+            return result;
+        wrapped = p_term_create_functor
+            (context, p_term_create_atom(context, "error"), 2);
+        p_term_bind_functor_arg(wrapped, 0, expected);
+        p_term_bind_functor_arg
+            (wrapped, 1, p_term_create_variable(context));
+        expected = wrapped;
+        if (!p_term_unify(context, error, expected, P_BIND_DEFAULT)) {
+            fputs("actual error: ", stdout);
+            p_term_print(context, error, p_term_stdio_print_func, stdout);
+            fputs("\nexpected error: ", stdout);
+            p_term_print(context, expected, p_term_stdio_print_func, stdout);
+            putc('\n', stdout);
             P_FAIL("did not receive the expected error");
+        }
     }
     return result;
 }
