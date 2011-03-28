@@ -101,6 +101,12 @@
  * \ref func_integer_1 "integer/1",
  * \ref func_string_1 "string/1",
  * \ref func_string_2 "string/2"
+ *
+ * String functions:
+ * \ref func_left_2 "left/2",
+ * \ref func_mid_2 "mid/2",
+ * \ref func_mid_3 "mid/3",
+ * \ref func_right_2 "right/2"
  */
 
 /* Internal expression evaluator */
@@ -142,6 +148,23 @@ static p_goal_result p_arith_eval
             if (goal_result != P_RESULT_TRUE)
                 return goal_result;
             return (*func)(context, result, args, expr->functor.arg, error);
+        } else {
+            unsigned int index;
+            p_arith_value *args = GC_MALLOC
+                (sizeof(p_arith_value) * expr->header.size);
+            if (!args)
+                break;
+            for (index = 0; index < expr->header.size; ++index) {
+                goal_result = p_arith_eval
+                    (context, args + index,
+                     expr->functor.arg[index], error);
+                if (goal_result != P_RESULT_TRUE)
+                    return goal_result;
+            }
+            goal_result = (*func)
+                (context, result, args, expr->functor.arg, error);
+            GC_FREE(args);
+            return goal_result;
         }
         break; }
     case P_TERM_INTEGER:
@@ -2831,6 +2854,88 @@ static p_goal_result p_arith_integer
 /**
  * \addtogroup arithmetic
  * <hr>
+ * \anchor func_left_2
+ * <b>left/2</b> - extract the left portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b left(\em Expr, \em Length)
+ *
+ * \par Description
+ * Evaluates \em Expr \em Length.  Returns the \em Length bytes
+ * at the beginning of the string.
+ * \par
+ * If \em Length is greater than the length of \em Expr,
+ * then the whole string is returned.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is left("foobar", 3)       X is set to "foo"
+ * X is left("foobar", 10)      X is set to "foobar"
+ * X is left("foobar", 0)       X is set to ""
+ * X is left(1.5, 1)            type_error(string, 1.5)
+ * X is left("foobar", 1.0)     type_error(integer, 1.0)
+ * X is left("foobar", -1)      domain_error(not_less_than_zero, -1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_mid_2 "mid/2",
+ * \ref func_mid_3 "mid/3",
+ * \ref func_right_2 "right/2"
+ */
+static p_term *p_arith_mid
+    (p_context *context, p_term *str, unsigned int start,
+     unsigned int length)
+{
+    if (!str->header.size)
+        return str;
+    if (start >= str->header.size)
+        return p_term_create_string_n(context, "", 0);
+    if (start == 0 && length >= str->header.size)
+        return str;
+    if (length > (str->header.size - start))
+        length = str->header.size - start;
+    return p_term_create_string_n
+        (context, str->string.name + start, length);
+}
+static p_goal_result p_arith_left
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int length;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    length = values[1].integer_value;
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid
+        (context, str, 0, (unsigned int)length);
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
  * \anchor func_log_1
  * <b>log/1</b> - base-\em e logarithm of an arithmetic term.
  *
@@ -2884,6 +2989,128 @@ static p_goal_result p_arith_log
         *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_mid_2
+ * \anchor func_mid_3
+ * <b>mid/2</b>, <b>mid/3</b> - extract the middle portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b mid(\em Expr, \em Start, \em Length)
+ * \par
+ * \em Var \b is \b mid(\em Expr, \em Start)
+ *
+ * \par Description
+ * Evaluates \em Expr, \em Start, and \em Length.  Returns the
+ * \em Length bytes starting at index \em Start within \em Expr.
+ * The first byte is at index 0.
+ * \par
+ * If \em Length is omited, then the returned string starts at
+ * \em Start and extends to the end of \em Expr.
+ * \par
+ * If \em Start is beyond the end of \em Expr, then the empty
+ * string is returned.
+ * \par
+ * If (\em Start + \em Length) is greater than the length of
+ * \em Expr, then as many bytes as are available are returned,
+ * starting at \em Start.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Start)</tt> - \em Start is
+ *     not an integer.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Start)</tt> -
+ *     \em Start is an integer that is less than zero.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is mid("foobar", 1, 4)     X is set to "ooba"
+ * X is mid("foobar", 1, 0)     X is set to ""
+ * X is mid("foobar", 10, 3)    X is set to ""
+ * X is mid("foobar", 4, 3)     X is set to "ar"
+ * X is mid("foobar", 4)        X is set to "ar"
+ * X is mid(1.5, 1)             type_error(string, 1.5)
+ * X is mid("foobar", 1.0, 4)   type_error(integer, 1.0)
+ * X is mid("foobar", 1, 4.0)   type_error(integer, 4.0)
+ * X is mid("foobar", -1)       domain_error(not_less_than_zero, -1)
+ * X is mid("foobar", 1, -4)    domain_error(not_less_than_zero, -4)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_left_2 "left/2",
+ * \ref func_right_2 "right/2"
+ */
+static p_goal_result p_arith_mid_2
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int start;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    start = values[1].integer_value;
+    if (start < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid
+        (context, str, (unsigned int)start, str->header.size);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_arith_mid_3
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int start;
+    int length;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    if (values[2].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[2]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    start = values[1].integer_value;
+    length = values[2].integer_value;
+    if (start < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[2]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid
+        (context, str, (unsigned int)start, (unsigned int)length);
+    return P_RESULT_TRUE;
 }
 
 /**
@@ -3048,6 +3275,78 @@ static p_goal_result p_arith_pow
         *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_right_2
+ * <b>right/2</b> - extract the right portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b right(\em Expr, \em Length)
+ *
+ * \par Description
+ * Evaluates \em Expr \em Length.  Returns the \em Length bytes
+ * at the end of the string.
+ * \par
+ * If \em Length is greater than the length of \em Expr,
+ * then the whole string is returned.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is right("foobar", 3)      X is set to "bar"
+ * X is right("foobar", 10)     X is set to "foobar"
+ * X is right("foobar", 0)      X is set to ""
+ * X is right(1.5, 1)           type_error(string, 1.5)
+ * X is right("foobar", 1.0)    type_error(integer, 1.0)
+ * X is right("foobar", -1)     domain_error(not_less_than_zero, -1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_left_2 "left/2",
+ * \ref func_mid_2 "mid/2",
+ * \ref func_mid_3 "mid/3"
+ */
+static p_goal_result p_arith_right
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int length;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    length = values[1].integer_value;
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    if (length >= str->header.size) {
+        result->string_value = str;
+    } else {
+        result->string_value = p_arith_mid
+            (context, str, str->header.size - (unsigned int)length,
+             (unsigned int)length);
+    }
+    return P_RESULT_TRUE;
 }
 
 /* Standardized rounding function that avoids system-specific
@@ -3574,12 +3873,16 @@ void _p_db_init_arith(p_context *context)
         {"floor", 1, p_arith_floor},
         {"inf", 0, p_arith_inf},
         {"integer", 1, p_arith_integer},
+        {"left", 2, p_arith_left},
         {"log", 1, p_arith_log},
+        {"mid", 2, p_arith_mid_2},
+        {"mid", 3, p_arith_mid_3},
         {"mod", 2, p_arith_mod},
         {"nan", 0, p_arith_nan},
         {"pi", 0, p_arith_pi},
         {"pow", 2, p_arith_pow},
         {"rem", 2, p_arith_rem},
+        {"right", 2, p_arith_right},
         {"round", 1, p_arith_round},
         {"sign", 1, p_arith_sign},
         {"sin", 1, p_arith_sin},

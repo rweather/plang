@@ -917,6 +917,56 @@ tan()
     eval_error(tan('3'), type_error(evaluable, '3'));
 }
 
+mid()
+{
+    eval(mid("foobar", 1, 4), "ooba");
+    eval(mid("foobar", 1, 0), "");
+    eval(mid("foobar", 10, 3), "");
+    eval(mid("foobar", 0, 6), "foobar");
+    eval(mid("foobar", 4, 3), "ar");
+    eval(mid("", 0, 0), "");
+    eval(mid("", 4, 2), "");
+
+    eval(mid("foobar", 1), "oobar");
+    eval(mid("foobar", 0), "foobar");
+
+    eval_error(mid(foobar, 1, 4), type_error(evaluable, foobar));
+    eval_error(mid(1.5, 1, 4), type_error(string, 1.5));
+    eval_error(mid("foobar", 1.0, 4), type_error(integer, 1.0));
+    eval_error(mid("foobar", 1, 4.0), type_error(integer, 4.0));
+    eval_error(mid("foobar", -1, 4), domain_error(not_less_than_zero, -1));
+    eval_error(mid("foobar", 1, -4), domain_error(not_less_than_zero, -4));
+
+    eval_error(mid(foobar, 1), type_error(evaluable, foobar));
+    eval_error(mid(1.5, 1), type_error(string, 1.5));
+    eval_error(mid("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(mid("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
+left()
+{
+    eval(left("foobar", 3), "foo");
+    eval(left("foobar", 10), "foobar");
+    eval(left("foobar", 0), "");
+
+    eval_error(left(foobar, 1), type_error(evaluable, foobar));
+    eval_error(left(1.5, 1), type_error(string, 1.5));
+    eval_error(left("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(left("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
+right()
+{
+    eval(right("foobar", 3), "bar");
+    eval(right("foobar", 10), "foobar");
+    eval(right("foobar", 0), "");
+
+    eval_error(right(foobar, 1), type_error(evaluable, foobar));
+    eval_error(right(1.5, 1), type_error(string, 1.5));
+    eval_error(right("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(right("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
 other()
 {
     verify(!(2 is 1 + 3));
@@ -979,6 +1029,9 @@ main(_)
     run(cos);
     run(sin);
     run(tan);
+    run(mid);
+    run(left);
+    run(right);
     run(other);
     report();
 }
