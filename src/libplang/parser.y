@@ -733,13 +733,9 @@ argument_and_term
     ;
 
 not_term
-    : K_NOT compare_term        {
-            $$ = add_debug(@1, unary_term("!", $2));
-        }
-    | '!' compare_term          {
-            $$ = add_debug(@1, unary_term("!", $2));
-        }
-    | compare_term              { $$ = add_debug(@1, $1); }
+    : K_NOT compare_term        { $$ = unary_term("!", $2); }
+    | '!' compare_term          { $$ = unary_term("!", $2); }
+    | compare_term              { $$ = $1; }
     ;
 
 compare_term

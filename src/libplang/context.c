@@ -212,6 +212,10 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
         p_term *decl;
         while (list->header.type == P_TERM_LIST) {
             decl = p_term_deref(list->list.head);
+            if (decl && decl->header.type == P_TERM_FUNCTOR &&
+                    decl->header.size == 3 &&
+                    decl->functor.functor_name == context->line_atom)
+                decl = p_term_deref(p_term_arg(decl, 2));
             if (decl && decl->header.type == P_TERM_FUNCTOR) {
                 if (decl->functor.functor_name == clause_atom) {
                     /* TODO: error reporting */
