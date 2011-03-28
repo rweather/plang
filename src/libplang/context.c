@@ -437,8 +437,7 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     /* The predicate does not exist - throw an error or fail */
     if (context->fail_on_unknown)
         return P_RESULT_FAIL;
-    pred = p_term_create_functor
-        (context, p_term_create_atom(context, "/"), 2);
+    pred = p_term_create_functor(context, context->slash_atom, 2);
     p_term_bind_functor_arg(pred, 0, name);
     p_term_bind_functor_arg
         (pred, 1, p_term_create_integer(context, (int)arity));

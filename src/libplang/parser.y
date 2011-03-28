@@ -592,7 +592,7 @@ declaration
     | object_declaration        { $$ = $1; }
     | error K_DOT_TERMINATOR    {
             /* Replace the error term with "?- true." */
-            $$ = unary_term("?-", p_term_create_atom(context, "true"));
+            $$ = unary_term("?-", context->true_atom);
         }
     ;
 
@@ -647,8 +647,7 @@ goal
 
 clause
     : callable_term K_DOT_TERMINATOR    {
-            $$ = binary_term
-                (":-", $1, p_term_create_atom(context, "true"));
+            $$ = binary_term(":-", $1, context->true_atom);
         }
     | callable_term compound_statement  {
             $$ = binary_term(":-", $1, $2);
@@ -1007,7 +1006,7 @@ statement
     | try_statement         { $$ = $1; }
     | switch_statement      { $$ = $1; }
     | ';'       {
-            $$ = add_debug(@1, p_term_create_atom(context, "true"));
+            $$ = add_debug(@1, context->true_atom);
         }
     ;
 
@@ -1021,8 +1020,7 @@ if_statement
             $$ = p_term_create_functor
                 (context, p_term_create_atom(context, "||"), 2);
             p_term_bind_functor_arg($$, 0, if_stmt);
-            p_term_bind_functor_arg
-                ($$, 1, p_term_create_atom(context, "true"));
+            p_term_bind_functor_arg($$, 1, context->true_atom);
         }
     | K_IF condition statement K_ELSE statement {
             /* Convert the if statement into (A -> B || C) form */
@@ -1038,14 +1036,14 @@ if_statement
     ;
 
 condition
-    : '(' term ')'      { $$ = $2; }
-    | '(' error ')'     { $$ = p_term_create_atom(context, "fail"); }
+    : '(' term ')'          { $$ = $2; }
+    | '(' error ')'         { $$ = context->fail_atom; }
     ;
 
 compound_statement
-    : '{' statements '}'        { $$ = finalize_r_list($2); }
-    | '{' '}'           { $$ = p_term_create_atom(context, "true"); }
-    | '{' error '}'     { $$ = p_term_create_atom(context, "fail"); }
+    : '{' statements '}'    { $$ = finalize_r_list($2); }
+    | '{' '}'               { $$ = context->true_atom; }
+    | '{' error '}'         { $$ = context->true_atom; }
     ;
 
 loop_statement
@@ -1123,11 +1121,11 @@ switch_body
             if ($1.default_case)
                 $$.default_case = $1.default_case;
             else
-                $$.default_case = p_term_create_atom(context, "fail");
+                $$.default_case = context->fail_atom;
         }
     | /* empty */       {
             $$.case_list = p_term_nil_atom(context);
-            $$.default_case = p_term_create_atom(context, "fail");
+            $$.default_case = context->fail_atom;
         }
     ;
 

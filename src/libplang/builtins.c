@@ -366,8 +366,7 @@ static p_goal_result p_builtin_assert
         clause = p_term_create_functor
             (context, context->clause_atom, 2);
         p_term_bind_functor_arg(clause, 0, head);
-        p_term_bind_functor_arg
-            (clause, 1, p_term_create_atom(context, "true"));
+        p_term_bind_functor_arg(clause, 1, context->true_atom);
     }
     if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
@@ -493,8 +492,7 @@ static p_goal_result p_builtin_retract
         clause = p_term_create_functor
             (context, context->clause_atom, 2);
         p_term_bind_functor_arg(clause, 0, head);
-        p_term_bind_functor_arg
-            (clause, 1, p_term_create_atom(context, "true"));
+        p_term_bind_functor_arg(clause, 1, context->true_atom);
     }
     if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
