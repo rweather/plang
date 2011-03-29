@@ -1510,10 +1510,69 @@ static const p_term *p_term_deref_limited(const p_term *term)
     return term;
 }
 
+/* Print a quoted atom or string */
+static void p_term_print_quoted(const p_term *term, p_term_print_func print_func, void *print_data, int quote)
+{
+    const char *str = p_term_name(term);
+    size_t len = p_term_name_length(term);
+    int ch;
+    (*print_func)(print_data, "%c", quote);
+    while (len-- > 0) {
+        ch = ((int)(*str++)) & 0xFF;
+        if (ch == quote || ch == '\\')
+            (*print_func)(print_data, "\\%c", ch);
+        else if (ch >= 0x20)
+            (*print_func)(print_data, "%c", ch);
+        else if (ch == '\t')
+            (*print_func)(print_data, "\\t");
+        else if (ch == '\n')
+            (*print_func)(print_data, "\\n");
+        else if (ch == '\r')
+            (*print_func)(print_data, "\\r");
+        else if (ch == '\f')
+            (*print_func)(print_data, "\\f");
+        else if (ch == '\v')
+            (*print_func)(print_data, "\\v");
+        else if (ch == '\0')
+            (*print_func)(print_data, "\\0");
+        else
+            (*print_func)(print_data, "\\x%02x", ch);
+    }
+    (*print_func)(print_data, "%c", quote);
+}
+
 /* Print an atom name */
 static void p_term_print_atom(const p_term *atom, p_term_print_func print_func, void *print_data)
 {
-    (*print_func)(print_data, "%s", p_term_name(atom));
+    const char *name = p_term_name(atom);
+    int ok;
+    if (*name >= 'a' && *name <= 'z') {
+        ++name;
+        while (*name != '\0') {
+            if (*name >= 'a' && *name <= 'z')
+                ++name;
+            else if (*name >= 'Z' && *name <= 'Z')
+                ++name;
+            else if (*name >= '0' && *name <= '9')
+                ++name;
+            else if (*name == '_')
+                ++name;
+            else if (*name == ':' && name[1] == ':')
+                name += 2;
+            else
+                break;
+        }
+        ok = (name == (atom->atom.name + atom->header.size));
+    } else if (*name == '[' && name[1] == ']' && name[2] == '\0' &&
+               atom->header.size == 2) {
+        ok = 1;
+    } else {
+        ok = 0;
+    }
+    if (ok)
+        (*print_func)(print_data, "%s", p_term_name(atom));
+    else
+        p_term_print_quoted(atom, print_func, print_data, '\'');
 }
 
 static void p_term_print_inner(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data, int level, int prec)
@@ -1649,13 +1708,13 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
         p_term_print_atom(term, print_func, print_data);
         break;
     case P_TERM_STRING:
-        (*print_func)(print_data, "\"%s\"", p_term_name(term));
+        p_term_print_quoted(term, print_func, print_data, '"');
         break;
     case P_TERM_INTEGER:
         (*print_func)(print_data, "%d", p_term_integer_value(term));
         break;
     case P_TERM_REAL:
-        (*print_func)(print_data, "%g", p_term_real_value(term));
+        (*print_func)(print_data, "%.10g", p_term_real_value(term));
         break;
     case P_TERM_OBJECT: {
         p_term *name = p_term_property
