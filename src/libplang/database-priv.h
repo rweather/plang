@@ -51,8 +51,7 @@ struct p_database_info
     p_db_builtin builtin_func;
     p_db_arith arith_func;
     p_class_info *class_info;
-    p_term *clauses_head;
-    p_term *clauses_tail;
+    p_term *predicate;
     p_term *global_object;
 };
 
@@ -77,6 +76,9 @@ void _p_db_register_sources(p_context *context, const char * const *sources);
 void _p_db_init(p_context *context);
 void _p_db_init_builtins(p_context *context);
 void _p_db_init_arith(p_context *context);
+
+p_database_info *_p_db_find_arity(const p_term *atom, unsigned int arity);
+p_database_info *_p_db_create_arity(p_term *atom, unsigned int arity);
 
 /** @endcond */
 

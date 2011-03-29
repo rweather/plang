@@ -37,6 +37,7 @@ enum {
     P_TERM_INTEGER,
     P_TERM_REAL,
     P_TERM_OBJECT,
+    P_TERM_PREDICATE,
 
     P_TERM_VARIABLE         = 16,   /* Used as a flag for all vars */
     P_TERM_MEMBER_VARIABLE,
@@ -94,6 +95,12 @@ int p_term_is_class_object(p_context *context, const p_term *term);
 int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2);
 int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2);
 
+p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count);
+void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause);
+void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause);
+p_term *p_term_clauses(const p_term *predicate);
+p_term *p_term_next_clause(p_term **clauses);
+
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
 int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags);
 
@@ -108,6 +115,7 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
 int p_term_is_ground(const p_term *term);
 p_term *p_term_clone(p_context *context, p_term *term);
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause);
+p_term *p_term_unify_member_clause(p_context *context, p_term *term, p_term *clause);
 
 int p_term_strcmp(const p_term *str1, const p_term *str2);
 p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2);

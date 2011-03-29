@@ -110,6 +110,7 @@
  * \ref number_1 "number/1",
  * \ref object_1 "object/1",
  * \ref object_2 "object/2",
+ * \ref predicate_2 "predicate/2",
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
  *
@@ -2218,6 +2219,7 @@ static p_goal_result p_builtin_univ
         case P_TERM_REAL:
         case P_TERM_STRING:
         case P_TERM_OBJECT:
+        case P_TERM_PREDICATE:
             new_term = p_term_create_list
                 (context, term, context->nil_atom);
             break;
@@ -2278,6 +2280,7 @@ static p_goal_result p_builtin_univ
             case P_TERM_REAL:
             case P_TERM_STRING:
             case P_TERM_OBJECT:
+            case P_TERM_PREDICATE:
                 new_term = functor;
                 break;
             default:
@@ -2532,6 +2535,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_REAL:
         case P_TERM_STRING:
         case P_TERM_OBJECT:
+        case P_TERM_PREDICATE:
             if (!p_term_unify(context, name, term, P_BIND_DEFAULT))
                 return P_RESULT_FAIL;
             if (!p_term_unify(context, arity,
@@ -2575,6 +2579,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_REAL:
         case P_TERM_STRING:
         case P_TERM_OBJECT:
+        case P_TERM_PREDICATE:
             break;
         default:
             *error = p_create_type_error(context, "atomic", name);
@@ -2769,6 +2774,7 @@ static p_goal_result p_builtin_unifiable
  * \ref number_1 "number/1",
  * \ref object_1 "object/1",
  * \ref object_2 "object/2",
+ * \ref predicate_2 "predicate/2",
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
  */
@@ -3265,6 +3271,100 @@ static p_goal_result p_builtin_object_2
 /**
  * \addtogroup type_testing
  * <hr>
+ * \anchor predicate_2
+ * \b predicate/2 - tests if a term is a predicate with a
+ * specific name.
+ *
+ * \par Usage
+ * \b predicate(\em Term, \em Pred)
+ *
+ * \par Description
+ * If \em Term is a predicate, then \em Pred is unified with its
+ * predicate indicator.  The indicator will have the form
+ * \em Name / \em Arity.
+ * \par
+ * If \em Term is a variable and \em Pred has the form
+ * \em Name / \em Arity, then \em Term is unified with the
+ * predicate corresponding to \em Pred.  Fails if \em Pred
+ * does not exist.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Term is a variable and
+ *     one of \em Pred, \em Name, or \em Arity, is also a variable.
+ * \li <tt>type_error(predicate_indicator, \em Pred)</tt> - \em Term
+ *     is a variable and \em Pred does not have the form
+ *     \em Name / \em Arity.
+ * \li <tt>type_error(integer, \em Arity)</tt> - \em Term is a variable
+ *     and \em Arity is not an integer.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Term is a variable
+ *     and \em Name is not an atom.
+ * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Term
+ *     is a variable and \em Arity is less than zero.
+ *
+ * \par Examples
+ * \code
+ * foo(X, Y) { ... }
+ *
+ * predicate(Term, foo/2)
+ *      succeeds with Term set to the predicate foo/2
+ * predicate(Term, Pred)
+ *      succeeds with Pred = foo/2 if Term is the predicate foo/2
+ * predicate(Term2, person::age/1)
+ *      sets Term2 to the method age/1 within the person class.
+ *      Note: the single argument is the "Self" pointer.
+ * \endcode
+ *
+ * \par See Also
+ * \ref predicate_2 "predicate/2"
+ */
+static p_goal_result p_builtin_predicate
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *term = p_term_deref(args[0]);
+    if (!term) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if ((term->header.type & P_TERM_VARIABLE) != 0) {
+        p_term *name;
+        int arity;
+        p_database_info *info;
+        name = p_builtin_parse_indicator
+            (context, args[1], &arity, error);
+        if (!name)
+            return P_RESULT_ERROR;
+        info = _p_db_find_arity(name, arity);
+        if (info && info->predicate) {
+            if (p_term_unify(context, term, info->predicate,
+                             P_BIND_DEFAULT))
+                return P_RESULT_TRUE;
+        } else if (info && info->builtin_func) {
+            /* Create a predicate term for the builtin */
+            p_term *pred = p_term_create_predicate
+                (context, name, arity);
+            info->predicate = pred;
+            if (p_term_unify(context, term, pred, P_BIND_DEFAULT))
+                return P_RESULT_TRUE;
+        }
+        return P_RESULT_FAIL;
+    } else {
+        p_term *pred = p_term_create_functor
+            (context, context->slash_atom, 2);
+        p_term_bind_functor_arg(pred, 0, term->predicate.name);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer
+                (context, (int)(term->header.size)));
+        if (p_term_unify(context, args[1], pred, P_BIND_DEFAULT))
+            return P_RESULT_TRUE;
+        else
+            return P_RESULT_FAIL;
+    }
+}
+
+/**
+ * \addtogroup type_testing
+ * <hr>
  * \anchor string_1
  * \b string/1 - tests if a term is a string.
  *
@@ -3436,6 +3536,7 @@ void _p_db_init_builtins(p_context *context)
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
+        {"predicate", 2, p_builtin_predicate},
         {"$$print", 1, p_builtin_print},
         {"$$println", 0, p_builtin_println},
         {"$$printq", 1, p_builtin_printq},

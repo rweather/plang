@@ -55,6 +55,7 @@ p_context *p_context_create(void)
     context->true_atom = p_term_create_atom(context, "true");
     context->fail_atom = p_term_create_atom(context, "fail");
     context->cut_atom = p_term_create_atom(context, "!");
+    context->call_member_atom = p_term_create_atom(context, "$$call_member");
     context->trace_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -404,8 +405,8 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     }
 
     /* Look for a user-defined predicate to handle the functor */
-    if (info && info->clauses_head) {
-        p_term *clause_list = info->clauses_head;
+    if (info && info->predicate) {
+        p_term *clause_list = info->predicate->predicate.clauses_head;
         p_term *body;
         while (clause_list != 0) {
             /* Find the first clause whose head unifies with the goal */

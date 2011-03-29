@@ -208,6 +208,11 @@ P_INLINE p_database_info *p_db_find_arity(const p_term *atom, unsigned int arity
     return info;
 }
 
+p_database_info *_p_db_find_arity(const p_term *atom, unsigned int arity)
+{
+    return p_db_find_arity(atom, arity);
+}
+
 P_INLINE p_database_info *p_db_create_arity(p_term *atom, unsigned int arity)
 {
     p_database_info *info = p_db_find_arity(atom, arity);
@@ -220,6 +225,11 @@ P_INLINE p_database_info *p_db_create_arity(p_term *atom, unsigned int arity)
         atom->atom.db_info = info;
     }
     return info;
+}
+
+p_database_info *_p_db_create_arity(p_term *atom, unsigned int arity)
+{
+    return _p_db_create_arity(atom, arity);
 }
 
 /**
@@ -520,7 +530,7 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
     p_database_info *info;
     p_term *name;
     int arity;
-    p_term *list;
+    p_term *predicate;
 
     /* Fetch the clause name and arity */
     name = p_db_predicate_name(context, clause, &arity);
@@ -537,14 +547,14 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
         return 0;
 
     /* Add the clause to the head of the list */
-    if (info->clauses_head) {
-        list = p_term_create_list(context, clause, info->clauses_head);
-        info->clauses_head = list;
-    } else {
-        list = p_term_create_list(context, clause, 0);
-        info->clauses_head = list;
-        info->clauses_tail = list;
+    predicate = info->predicate;
+    if (!predicate) {
+        predicate = p_term_create_predicate(context, name, arity);
+        if (!predicate)
+            return 0;
+        info->predicate = predicate;
     }
+    p_term_add_clause_first(context, predicate, clause);
     return 1;
 }
 
@@ -566,7 +576,7 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
     p_database_info *info;
     p_term *name;
     int arity;
-    p_term *list;
+    p_term *predicate;
 
     /* Fetch the clause name and arity */
     name = p_db_predicate_name(context, clause, &arity);
@@ -583,15 +593,14 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
         return 0;
 
     /* Add the clause to the tail of the list */
-    if (info->clauses_head) {
-        list = p_term_create_list(context, clause, 0);
-        p_term_set_tail(info->clauses_tail, list);
-        info->clauses_tail = list;
-    } else {
-        list = p_term_create_list(context, clause, 0);
-        info->clauses_head = list;
-        info->clauses_tail = list;
+    predicate = info->predicate;
+    if (!predicate) {
+        predicate = p_term_create_predicate(context, name, arity);
+        if (!predicate)
+            return 0;
+        info->predicate = predicate;
     }
+    p_term_add_clause_last(context, predicate, clause);
     return 1;
 }
 
@@ -615,6 +624,7 @@ int p_db_clause_retract(p_context *context, p_term *clause)
     int arity;
     p_term *list;
     p_term *prev;
+    p_term *predicate;
 
     /* Fetch the clause name and arity */
     name = p_db_predicate_name(context, clause, &arity);
@@ -631,7 +641,10 @@ int p_db_clause_retract(p_context *context, p_term *clause)
         return 0;
 
     /* Retract the first clause that unifies */
-    list = info->clauses_head;
+    predicate = info->predicate;
+    if (!predicate)
+        return -1;
+    list = predicate->predicate.clauses_head;
     prev = 0;
     while (list) {
         if (p_term_unify(context, clause, list->list.head,
@@ -639,9 +652,11 @@ int p_db_clause_retract(p_context *context, p_term *clause)
             if (prev)
                 p_term_set_tail(prev, list->list.tail);
             else
-                info->clauses_head = list->list.tail;
+                predicate->predicate.clauses_head = list->list.tail;
             if (!list->list.tail)
-                info->clauses_tail = prev;
+                predicate->predicate.clauses_tail = prev;
+            if (!predicate->predicate.clauses_head)
+                info->predicate = 0;    /* Completely removed */
             return 1;
         }
         prev = list;
@@ -680,8 +695,7 @@ int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
         return 0;
 
     /* Retract all of the clauses */
-    info->clauses_head = 0;
-    info->clauses_tail = 0;
+    info->predicate = 0;
     return 1;
 }
 

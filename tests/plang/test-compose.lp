@@ -48,9 +48,9 @@ arg()
 copy_term()
 {
     verify((copy_term(f(X, Y), Z), compound(Z)));
-    verify((copy_term(X, a), var(X)));
-    verify((copy_term(f(a, X), f(X, b)), X == a));
-    verify((copy_term(f(X, X), f(Y, Z)), Y == Z));
+    verify((copy_term(X1, a), var(X1)));
+    verify((copy_term(f(a, X2), f(X2, b)), X2 == a));
+    verify((copy_term(f(X3, X3), f(Y1, Z1)), Y1 == Z1));
     verify(!copy_term(foo, bar));
 }
 

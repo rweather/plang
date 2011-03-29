@@ -127,6 +127,15 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  */
 
 /**
+ * \var P_TERM_PREDICATE
+ * \ingroup term
+ * The term is a reference to a set of clauses that make up a
+ * predicate.  Predicate terms typically arise in references
+ * to class members.
+ * \sa p_term_create_predicate()
+ */
+
+/**
  * \brief Creates a functor term within \a ontext with the specified
  * \a name and \a arg_count.  Returns the new functor.
  *
@@ -597,8 +606,9 @@ int p_term_type(const p_term *term)
 }
 
 /**
- * \brief Returns the number of arguments for a functor \a term,
- * or zero if \a term is not a functor.
+ * \brief Returns the number of arguments for a functor or
+ * predicate \a term, or zero if \a term is not a functor
+ * or predicate.
  *
  * The \a term is automatically dereferenced.
  *
@@ -609,18 +619,20 @@ int p_term_arg_count(const p_term *term)
 {
     if (!term)
         return 0;
-    /* Short-cut: avoid the dereference if already a functor */
-    if (term->header.type == P_TERM_FUNCTOR)
+    /* Short-cut: avoid dereference if already a functor/predicate */
+    if (term->header.type == P_TERM_FUNCTOR ||
+            term->header.type == P_TERM_PREDICATE)
         return (int)(term->header.size);
     term = p_term_deref_non_null(term);
-    if (term->header.type == P_TERM_FUNCTOR)
+    if (term->header.type == P_TERM_FUNCTOR ||
+            term->header.type == P_TERM_PREDICATE)
         return (int)(term->header.size);
     else
         return 0;
 }
 
 /**
- * \brief Returns the name of the functor, atom, or variable
+ * \brief Returns the name of the functor, predicate, atom, or variable
  * contained in \a term, or null if \a term does not have a name.
  *
  * The \a term is automatically dereferenced.
@@ -641,6 +653,8 @@ const char *p_term_name(const p_term *term)
         return term->atom.name;
     case P_TERM_STRING:
         return term->string.name;
+    case P_TERM_PREDICATE:
+        return p_term_name(term->predicate.name);
     case P_TERM_VARIABLE:
         if (term->header.size > 0)
             return (const char *)(&(term->var) + 1);
@@ -653,8 +667,8 @@ const char *p_term_name(const p_term *term)
 }
 
 /**
- * \brief Returns the length of the name of the functor, atom,
- * or variable contained in \a term, or zero if \a term does
+ * \brief Returns the length of the name of the functor, predicate,
+ * atom, or variable contained in \a term, or zero if \a term does
  * not have a name.
  *
  * The \a term is automatically dereferenced.
@@ -670,6 +684,8 @@ size_t p_term_name_length(const p_term *term)
     switch (term->header.type) {
     case P_TERM_FUNCTOR:
         return p_term_name_length(term->functor.functor_name);
+    case P_TERM_PREDICATE:
+        return p_term_name_length(term->predicate.name);
     case P_TERM_ATOM:
     case P_TERM_STRING:
     case P_TERM_VARIABLE:
@@ -682,8 +698,8 @@ size_t p_term_name_length(const p_term *term)
 }
 
 /**
- * \brief Returns the atom name of the functor \a term, or null
- * if \a term is not a functor.
+ * \brief Returns the atom name of the functor or predicate \a term,
+ * or null if \a term is not a functor or predicate.
  *
  * The \a term is automatically dereferenced.
  *
@@ -694,13 +710,17 @@ p_term *p_term_functor(const p_term *term)
 {
     if (!term)
         return 0;
-    /* Short-cut: avoid the dereference if already a functor */
-    if (term->header.type != P_TERM_FUNCTOR) {
-        term = p_term_deref_non_null(term);
-        if (term->header.type != P_TERM_FUNCTOR)
-            return 0;
-    }
-    return term->functor.functor_name;
+    /* Short-cut: avoid dereference if already a functor or predicate */
+    if (term->header.type == P_TERM_FUNCTOR)
+        return term->functor.functor_name;
+    else if (term->header.type == P_TERM_PREDICATE)
+        return term->predicate.name;
+    term = p_term_deref_non_null(term);
+    if (term->header.type == P_TERM_FUNCTOR)
+        return term->functor.functor_name;
+    else if (term->header.type == P_TERM_PREDICATE)
+        return term->predicate.name;
+    return 0;
 }
 
 /**
@@ -1157,6 +1177,144 @@ int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term 
     return p_term_inherits(context, term1, term2);
 }
 
+/**
+ * \brief Creates a new predicate instance within \a context
+ * with the specified \a name and \a arg_count arguments.
+ *
+ * The predicate will initially have no clauses.  Use
+ * p_term_add_clause_first() and p_term_add_clause_last()
+ * to add clauses to the predicate.
+ *
+ * \ingroup term
+ * \sa p_term_create_class_object(), p_term_add_clause_first()
+ * \sa p_term_add_clause_last(), p_term_clauses()
+ */
+p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
+{
+    struct p_term_predicate *term;
+
+    /* Bail out if the parameters are invalid */
+    if (!name || arg_count < 0)
+        return 0;
+    if (name->header.type != P_TERM_ATOM) {
+        name = p_term_deref_non_null(name);
+        if (name->header.type != P_TERM_ATOM)
+            return 0;
+    }
+
+    /* Create the predicate term */
+    term = p_term_new(context, struct p_term_predicate);
+    if (!term)
+        return 0;
+    term->header.type = P_TERM_PREDICATE;
+    term->header.size = (unsigned int)arg_count;
+    term->name = name;
+    return (p_term *)term;
+}
+
+/**
+ * \brief Adds \a clause to \a predicate within \a context at
+ * the front of the predicate's clause list.
+ *
+ * The \a predicate is assumed to be of type P_TERM_PREDICATE
+ * and already dereferenced.
+ *
+ * The \a clause is assumed to have functor <b>(:-)/2</b> and
+ * to have the same number of arguments as \a predicate.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), p_term_add_clause_last()
+ * \sa p_term_clauses()
+ */
+void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause)
+{
+    p_term *list;
+    if (predicate->predicate.clauses_head) {
+        list = p_term_create_list
+            (context, clause, predicate->predicate.clauses_head);
+        predicate->predicate.clauses_head = list;
+    } else {
+        list = p_term_create_list(context, clause, 0);
+        predicate->predicate.clauses_head = list;
+        predicate->predicate.clauses_tail = list;
+    }
+}
+
+/**
+ * \brief Adds \a clause to \a predicate within \a context at
+ * the end of the predicate's clause list.
+ *
+ * The \a predicate is assumed to be of type P_TERM_PREDICATE
+ * and already dereferenced.
+ *
+ * The \a clause is assumed to have functor <b>(:-)/2</b> and
+ * to have the same number of arguments as \a predicate.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), p_term_add_clause_first()
+ * \sa p_term_clauses()
+ */
+void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause)
+{
+    p_term *list;
+    if (predicate->predicate.clauses_head) {
+        list = p_term_create_list(context, clause, 0);
+        p_term_set_tail(predicate->predicate.clauses_tail, list);
+        predicate->predicate.clauses_tail = list;
+    } else {
+        list = p_term_create_list(context, clause, 0);
+        predicate->predicate.clauses_head = list;
+        predicate->predicate.clauses_tail = list;
+    }
+}
+
+/**
+ * \brief Returns the list of clauses associated with \a predicate;
+ * or null if \a predicate does not have any clauses.
+ *
+ * Use p_term_next_clause() to iterate through the list.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), \sa p_term_next_clause()
+ */
+p_term *p_term_clauses(const p_term *predicate)
+{
+    if (!predicate)
+        return 0;
+    /* Short-cut: avoid the dereference if already a predicate */
+    if (predicate->header.type == P_TERM_PREDICATE)
+        return predicate->predicate.clauses_head;
+    predicate = p_term_deref_non_null(predicate);
+    if (predicate->header.type == P_TERM_PREDICATE)
+        return predicate->predicate.clauses_head;
+    else
+        return 0;
+}
+
+/**
+ * \brief Returns the next clause in the specified \a clauses list.
+ *
+ * The value at \a clauses is updated to point to the tail portion
+ * of the \a clauses list.
+ *
+ * The behavior is undefined if the list of clauses is modified
+ * with p_term_add_clause_first() or p_term_add_clause_last()
+ * while the list is being traversed.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), p_term_clauses()
+ */
+p_term *p_term_next_clause(p_term **clauses)
+{
+    p_term *list = *clauses;
+    if (list) {
+        p_term *head = list->list.head;
+        *clauses = list->list.tail;
+        return head;
+    }
+    return 0;
+}
+
 /* Perform an occurs check */
 static int p_term_occurs_in(const p_term *var, const p_term *value)
 {
@@ -1440,8 +1598,10 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
             return term1->real.value == term2->real.value;
         break;
     case P_TERM_OBJECT:
-        /* Objects can unify only if their pointers are identical.
-         * Identity has already been checked, so fail */
+    case P_TERM_PREDICATE:
+        /* Objects and predicates can unify only if their
+         * pointers are identical.  Identity has already been
+         * checked, so fail */
         break;
     default: break;
     }
@@ -1546,6 +1706,8 @@ static void p_term_print_atom(const p_term *atom, p_term_print_func print_func, 
 {
     const char *name = p_term_name(atom);
     int ok;
+    if (!name)
+        return;
     if (*name >= 'a' && *name <= 'z') {
         ++name;
         while (*name != '\0') {
@@ -1747,6 +1909,11 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
         } while (term != 0);
         (*print_func)(print_data, "}");
         break; }
+    case P_TERM_PREDICATE:
+        (*print_func)(print_data, "predicate ");
+        p_term_print_atom(term->predicate.name, print_func, print_data);
+        (*print_func)(print_data, "/%d", (int)(term->header.size));
+        break;
     case P_TERM_VARIABLE:
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
@@ -1823,12 +1990,13 @@ void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_
  * Variables precede all floating-point reals, which precede
  * all integers, which precede all strings, which precede all
  * atoms, which precede all functors (including lists), which
- * precede all objects.
+ * precede all objects, which precede all predicates.
  *
- * Variables and objects are compared by pointer.  Reals, integers,
- * strings, and atoms are compared by value.  Functors order on
- * arity, then name, and then the arguments from left-to-right.
- * Lists are assumed to have arity 2 and "." as their functor name.
+ * Variables, objects, and pedicates are compared by pointer.
+ * Reals, integers, strings, and atoms are compared by value.
+ * Functors order on arity, then name, and then the arguments
+ * from left-to-right.  Lists are assumed to have arity 2
+ * and "." as their functor name.
  *
  * \ingroup term
  */
@@ -1844,7 +2012,8 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
         3, /* 5: P_TERM_INTEGER */
         2, /* 6: P_TERM_REAL */
         7, /* 7: P_TERM_OBJECT */
-        0, 0, 0, 0, 0, 0, 0, 0,
+        8, /* 8: P_TERM_PREDICATE */
+        0, 0, 0, 0, 0, 0, 0,
         1, /* 16: P_TERM_VARIABLE */
         1  /* 17: P_TERM_MEMBER_VARIABLE */
     };
@@ -1946,6 +2115,7 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
             return 1;
         break;
     case P_TERM_OBJECT:
+    case P_TERM_PREDICATE:
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
         return (term1 < term2) ? -1 : 1;
@@ -1992,6 +2162,7 @@ int p_term_is_ground(const p_term *term)
     case P_TERM_INTEGER:
     case P_TERM_REAL:
     case P_TERM_OBJECT:
+    case P_TERM_PREDICATE:
         return 1;
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
@@ -2057,6 +2228,7 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
     case P_TERM_INTEGER:
     case P_TERM_REAL:
     case P_TERM_OBJECT:
+    case P_TERM_PREDICATE:
         /* Constant and object terms are cloned as themselves */
         break;
     case P_TERM_VARIABLE:
@@ -2135,7 +2307,7 @@ p_term *p_term_clone(p_context *context, p_term *term)
  * does not have a body and \a clause unifies with \a term.
  *
  * \ingroup term
- * \sa p_term_unify(), p_term_clone()
+ * \sa p_term_unify(), p_term_clone(), p_term_unify_member_clause()
  */
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
 {
@@ -2156,6 +2328,64 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
             return context->true_atom;
     }
     return 0;
+}
+
+/**
+ * \brief Unifies \a term with the renamed head of a member
+ * \a clause.
+ *
+ * If the unification succeeds, then this function returns the
+ * renamed body of \a clause.  Returns null if the unification fails.
+ *
+ * The \a term must have the form
+ * <tt>$$call_member(\em X, \em name(\em Args))</tt> where \em X
+ * will be passed to the member clause as the \em Self argument.
+ *
+ * The \a clause must have the functor <b>(:-)/3</b> with
+ * the arguments \em Head, \em Self, and \em Body.  The \em Head
+ * does not need to have the same functor as \em name, but it must
+ * have the same number of arguments as in \em Args.
+ *
+ * \ingroup term
+ * \sa p_term_unify(), p_term_clone(), p_term_unify_member_clause()
+ */
+p_term *p_term_unify_member_clause(p_context *context, p_term *term, p_term *clause)
+{
+    p_term *clone;
+    p_term *self;
+    p_term *head;
+    void *marker;
+    unsigned int index;
+
+    /* Check that the argument count matches in the term and clause */
+    self = term->functor.arg[0];
+    term = p_term_deref(term->functor.arg[1]);
+    if (!term || term->header.type != P_TERM_FUNCTOR)
+        return 0;
+    if (term->header.size != clause->functor.arg[0]->header.size)
+        return 0;
+
+    /* Clone the clause and unify against the head and Self */
+    clone = p_term_clone(context, clause);
+    head = clone->functor.arg[0];
+    if (!head)
+        return 0;
+    marker = p_context_mark_trace(context);
+    for (index = 0; index < term->header.size; ++index) {
+        if (!p_term_unify(context, term->functor.arg[index],
+                          head->functor.arg[index], P_BIND_DEFAULT)) {
+            p_context_backtrack_trace(context, marker);
+            return 0;
+        }
+    }
+    if (!p_term_unify(context, self, clone->functor.arg[1],
+                      P_BIND_DEFAULT)) {
+        p_context_backtrack_trace(context, marker);
+        return 0;
+    }
+
+    /* Return the body of the cloned clause to the caller */
+    return clone->functor.arg[2];
 }
 
 /**

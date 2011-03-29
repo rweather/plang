@@ -792,6 +792,24 @@ static void test_object()
     P_VERIFY(!p_term_own_property(context, obj2, obj1));
 }
 
+static void test_predicate()
+{
+    p_term *pred1;
+    p_term *name;
+
+    name = p_term_create_atom(context, "foo");
+
+    P_VERIFY(p_term_create_predicate(context, 0, 0) == 0);
+    P_VERIFY(p_term_create_predicate(context, name, -1) == 0);
+    P_VERIFY(p_term_create_predicate(context, p_term_create_variable(context), 0) == 0);
+
+    pred1 = p_term_create_predicate(context, name, 3);
+    P_COMPARE(p_term_type(pred1), P_TERM_PREDICATE);
+    P_VERIFY(p_term_functor(pred1) == name);
+    P_COMPARE(p_term_arg_count(pred1), 3);
+    P_VERIFY(strcmp(p_term_name(pred1), "foo") == 0);
+}
+
 #define P_BIND_FAIL         0x1000
 #define P_BIND_NO_REVERSE   0x2000
 
@@ -1029,6 +1047,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(member_variable);
     P_TEST_RUN(functor);
     P_TEST_RUN(object);
+    P_TEST_RUN(predicate);
     P_TEST_RUN(unify);
     P_TEST_RUN(precedes);
 

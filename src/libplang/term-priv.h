@@ -126,6 +126,13 @@ struct p_term_object {
     struct p_term_property properties[P_TERM_MAX_PROPS];
 };
 
+struct p_term_predicate {
+    struct p_term_header header;
+    p_term *name;                       /* Must be an atom */
+    p_term *clauses_head;
+    p_term *clauses_tail;
+};
+
 struct p_term_rename {
     struct p_term_header header;
     p_term *var;
@@ -142,6 +149,7 @@ union p_term {
     struct p_term_integer       integer;
     struct p_term_real          real;
     struct p_term_object        object;
+    struct p_term_predicate     predicate;
     struct p_term_rename        rename;
 };
 

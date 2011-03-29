@@ -61,7 +61,9 @@ warning(Message)
 
 verify(Goal)
 {
-    if (!call(Goal)) {
+    if (call(Goal)) {
+        true;
+    } else {
         current_suite(Suite);
         current_test(Name);
         stdout::write(Suite);
