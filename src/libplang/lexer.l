@@ -192,6 +192,7 @@ NEG             (-?)
 "mod"           { RETURNTOK(K_MOD); }
 "new"           { RETURNTOK(K_NEW); }
 "rem"           { RETURNTOK(K_REM); }
+"static"        { RETURNTOK(K_STATIC); }
 "switch"        { RETURNTOK(K_SWITCH); }
 "try"           { RETURNTOK(K_TRY); }
 "while"         { RETURNTOK(K_WHILE); }

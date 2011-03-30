@@ -176,27 +176,20 @@ static p_term *make_ternary_term(p_context *context, const char *name, p_term *t
     (p_term_set_tail((list).l_tail, (tail)), (list).l_head)
 
 /* Create a class declaration goal, which is equivalent to:
- * ?- new_class(class_name, parent, vars, clauses, X), assertz(X). */
+ * ?- $$new_class(class_name, parent, vars, clauses).
+ * Note: the class_name may be wrapped with a $$line() marker */
 static p_term *make_class_declaration
     (p_context *context, p_term *name, p_term *parent,
      p_term *vars, p_term *clauses)
 {
-    p_term *var;
     p_term *term;
-    p_term *term2;
-    var = p_term_create_variable(context);
     term = p_term_create_functor
-        (context, p_term_create_atom(context, "new_class"), 5);
+        (context, p_term_create_atom(context, "$$new_class"), 4);
     p_term_bind_functor_arg(term, 0, name);
     p_term_bind_functor_arg(term, 1, parent);
     p_term_bind_functor_arg(term, 2, vars);
     p_term_bind_functor_arg(term, 3, clauses);
-    p_term_bind_functor_arg(term, 4, var);
-    term2 = p_term_create_functor_with_args
-        (context, p_term_create_atom(context, "assertz"),
-         &var, 1);
-    return make_unary_term
-        (context, "?-", make_binary_term(context, ",", term, term2));
+    return make_unary_term(context, "?-", term);
 }
 
 /* Clear the lexer's variable list */
@@ -404,6 +397,51 @@ static void p_context_import
                    "cannot locate import `%s'", name);
 }
 
+/* Create a concatenated member name */
+static p_term *create_member_name
+    (p_context *context, p_term *class_name, p_term *member_name)
+{
+    size_t clen = p_term_name_length(class_name);
+    size_t mlen = p_term_name_length(member_name);
+    char *str = (char *)GC_MALLOC(clen + mlen + 2);
+    p_term *result;
+    if (!str)
+        return member_name;
+    memcpy(str, p_term_name(class_name), clen);
+    str[clen] = ':';
+    str[clen + 1] = ':';
+    memcpy(str + clen + 2, p_term_name(member_name), mlen);
+    result = p_term_create_atom_n(context, str, clen + mlen + 2);
+    GC_FREE(str);
+    return result;
+}
+
+/* Create the head part of a class member clause */
+static p_term *create_clause_head
+    (p_context *context, p_input_stream *stream,
+     p_term *member_name, p_term **args, size_t num_args,
+     int is_static)
+{
+    size_t index;
+    p_term *head = p_term_create_functor
+        (context, create_member_name
+            (context, stream->class_name, member_name),
+         (int)(num_args + (is_static ? 0 : 1)));
+    if (is_static) {
+        for (index = 0; index < num_args; ++index)
+            p_term_bind_functor_arg(head, index, args[index]);
+    } else {
+        p_term *self = p_term_lex_create_variable
+            (context, stream, "Self");
+        p_term_bind_functor_arg(head, 0, self);
+        for (index = 0; index < num_args; ++index)
+            p_term_bind_functor_arg(head, index + 1, args[index]);
+    }
+    if (args)
+        GC_FREE(args);
+    return head;
+}
+
 %}
 
 /* Bison options */
@@ -436,6 +474,7 @@ static void p_context_import
     struct {
         p_term *vars;
         p_term *clauses;
+        int has_constructor;
     } class_body;
     struct {
         struct {
@@ -446,6 +485,7 @@ static void p_context_import
             p_term *l_head;
             p_term *l_tail;
         } clauses;
+        int has_constructor;
     } member_list;
     struct {
         p_term *object;
@@ -521,6 +561,7 @@ static void p_context_import
 %token K_MOD            "`mod'"
 %token K_NEW            "`new'"
 %token K_REM            "`rem'"
+%token K_STATIC         "`static'"
 %token K_SWITCH         "`switch'"
 %token K_TRY            "`try'"
 %token K_WHILE          "`while'"
@@ -530,13 +571,14 @@ static void p_context_import
 %type <term>        K_ATOM K_INTEGER K_REAL K_STRING K_VARIABLE
 
 %type <term>        declaration directive goal clause callable_term
-%type <term>        class_declaration object_declaration atom
+%type <term>        class_declaration atom constructor opt_parent
+%type <term>        member_clause member_clause_head constructor_head
+%type <term>        static_clause static_clause_head
 
 %type <term>        term not_term compare_term additive_term
 %type <term>        multiplicative_term power_term unary_term
 %type <term>        primary_term condition if_term argument_term
-%type <term>        new_term property property_bindings
-%type <term>        opt_property_bindings member_var bracketed_term
+%type <term>        new_term member_var bracketed_term
 
 %type <term>        statement if_statement compound_statement
 %type <term>        loop_statement unbind_vars try_statement
@@ -546,7 +588,7 @@ static void p_context_import
 %type <switch_case> switch_cases switch_case
 %type <switch_body> switch_body
 
-%type <list>        list_members properties declaration_list
+%type <list>        list_members declaration_list
 %type <list>        member_vars unbind_var_list catch_clauses
 
 %type <arg_list>    arguments
@@ -589,7 +631,6 @@ declaration
     | directive                 { $$ = $1; }
     | goal                      { $$ = $1; }
     | class_declaration         { $$ = $1; }
-    | object_declaration        { $$ = $1; }
     | error K_DOT_TERMINATOR    {
             /* Replace the error term with "?- true." */
             $$ = unary_term("?-", context->true_atom);
@@ -675,6 +716,7 @@ atom
     | K_VAR         { $$ = p_term_create_atom(context, "var"); }
     | K_CATCH       { $$ = p_term_create_atom(context, "catch"); }
     | K_CLASS       { $$ = p_term_create_atom(context, "class"); }
+    | K_STATIC      { $$ = p_term_create_atom(context, "static"); }
     ;
 
 arguments
@@ -889,23 +931,37 @@ primary_term
                 (context, $1.object, $1.name, $1.auto_create);
         }
     | member_reference '(' arguments ')'    {
-            /* Turn "X.name(args)" into "$$call_member(X, name(args)) */
-            p_term *term = p_term_create_functor_with_args
-                (context, $1.name, $3.args, (int)($3.num_args));
+            /* Create '$$call_member'(X.name, '$$'(X, args)) */
+            p_term *term = p_term_create_functor
+                (context, p_term_create_atom(context, "$$"),
+                 (int)($3.num_args + 1));
+            size_t index;
+            p_term_bind_functor_arg(term, 0, $1.object);
+            for (index = 0; index < $3.num_args; ++index) {
+                p_term_bind_functor_arg
+                    (term, (int)(index + 1), $3.args[index]);
+            }
             GC_FREE($3.args);
             $$ = p_term_create_functor
                 (context, p_term_create_atom
                     (context, "$$call_member"), 2);
-            p_term_bind_functor_arg($$, 0, $1.object);
+            p_term_bind_functor_arg
+                ($$, 0, p_term_create_member_variable
+                    (context, $1.object, $1.name, $1.auto_create));
             p_term_bind_functor_arg($$, 1, term);
         }
     | member_reference '(' ')'  {
-            /* Turn "X.name()" into "$$call_member(X, name)" */
+            /* Create '$$call_member'(X.name, '$$'(X)) */
+            p_term *term = p_term_create_functor
+                (context, p_term_create_atom(context, "$$"), 1);
+            p_term_bind_functor_arg(term, 0, $1.object);
             $$ = p_term_create_functor
                 (context, p_term_create_atom
                     (context, "$$call_member"), 2);
-            p_term_bind_functor_arg($$, 0, $1.object);
-            p_term_bind_functor_arg($$, 1, $1.name);
+            p_term_bind_functor_arg
+                ($$, 0, p_term_create_member_variable
+                    (context, $1.object, $1.name, $1.auto_create));
+            p_term_bind_functor_arg($$, 1, term);
         }
     | new_term                  { $$ = $1; }
     ;
@@ -941,36 +997,22 @@ member_reference
     ;
 
 new_term
-    : K_NEW atom '(' K_VARIABLE ')' opt_property_bindings {
-            /* Convert the object construction into a predicate
-             * call on new/2 or new/3, passing the property
-             * bindings as a list to new/3 */
-            if ($6 == p_term_nil_atom(context))
-                $$ = binary_term("new", $2, $4);
-            else
-                $$ = ternary_term("new", $2, $6, $4);
+    : K_NEW atom '(' arguments ')' {
+            /* Convert the object construction into the term
+             * ($$new(class_name, Obj), class_name::$$new(Args))
+             * where Obj is the first argument of Args */
+            p_term *obj = $4.args[0];
+            p_term *call_new = p_term_create_functor
+                (context, p_term_create_atom(context, "$$new"), 2);
+            p_term *ctor_name = create_member_name
+                (context, $2, p_term_create_atom(context, "new"));
+            p_term *call_ctor = p_term_create_functor_with_args
+                (context, ctor_name, $4.args, (int)($4.num_args));
+            GC_FREE($4.args);
+            p_term_bind_functor_arg(call_new, 0, $2);
+            p_term_bind_functor_arg(call_new, 1, obj);
+            $$ = binary_term(",", call_new, call_ctor);
         }
-    ;
-
-opt_property_bindings
-    : property_bindings         { $$ = $1; }
-    | /* empty */               { $$ = p_term_nil_atom(context); }
-    ;
-
-property_bindings
-    : '{' properties '}'        { $$ = finalize_list($2); }
-    | '{' properties ',' '}'    { $$ = finalize_list($2); }
-    | '{' '}'                   { $$ = p_term_nil_atom(context); }
-    | '{' error '}'             { $$ = p_term_nil_atom(context); }
-    ;
-
-properties
-    : properties ',' property   { append_list($$, $1, $3); }
-    | property                  { create_list($$, $1); }
-    ;
-
-property
-    : atom ':' argument_term    { $$ = binary_term(":", $1, $3); }
     ;
 
 statements
@@ -1196,15 +1238,29 @@ case_label
     ;
 
 class_declaration
-    : K_CLASS atom class_body opt_semi    {
+    : K_CLASS atom      {
+            p_term_get_extra(yyscanner)->class_name = $2;
+        } opt_parent class_body opt_semi    {
+            p_term *clauses = $5.clauses;
+            if (!($5.has_constructor)) {
+                /* Create a default constructor for the class */
+                p_term *ctor = create_clause_head
+                    (context, p_term_get_extra(yyscanner),
+                     p_term_create_atom(context, "new"), 0, 0, 0);
+                ctor = binary_term(":-", ctor, context->true_atom);
+                ctor = add_debug(@2, ctor);
+                clauses = p_term_create_list(context, ctor, clauses);
+                clear_variables();
+            }
             $$ = make_class_declaration
-                (context, $2, p_term_nil_atom(context),
-                 $3.vars, $3.clauses);
+                (context, add_debug(@2, $2), $4, $5.vars, $5.clauses);
+            p_term_get_extra(yyscanner)->class_name = 0;
         }
-    | K_CLASS atom ':' atom class_body opt_semi {
-            $$ = make_class_declaration
-                (context, $2, $4, $5.vars, $5.clauses);
-        }
+    ;
+
+opt_parent
+    : /* empty */           { $$ = p_term_nil_atom(context); }
+    | ':' atom              { $$ = $2; }
     ;
 
 opt_semi
@@ -1216,14 +1272,17 @@ class_body
     : '{' class_members '}' {
             $$.vars = finalize_list($2.vars);
             $$.clauses = finalize_list($2.clauses);
+            $$.has_constructor = $2.has_constructor;
         }
     | '{' '}'   {
             $$.vars = p_term_nil_atom(context);
             $$.clauses = p_term_nil_atom(context);
+            $$.has_constructor = 0;
         }
     | '{' error '}' {
             $$.vars = p_term_nil_atom(context);
             $$.clauses = p_term_nil_atom(context);
+            $$.has_constructor = 0;
         }
     ;
 
@@ -1231,6 +1290,8 @@ class_members
     : class_members class_member    {
             append_lists($$.vars, $1.vars, $2.vars);
             append_lists($$.clauses, $1.clauses, $2.clauses);
+            $$.has_constructor =
+                ($1.has_constructor || $2.has_constructor);
         }
     | class_member                  { $$ = $1; }
     ;
@@ -1240,21 +1301,106 @@ class_member
             $$.vars.l_head = $2.l_head;
             $$.vars.l_tail = $2.l_tail;
             create_empty_list($$.clauses);
+            $$.has_constructor = 0;
         }
-    | clause    {
-            /* Convert the ":-/2" clause form into ":-/3" with
-             * the "Self" variable included in the arguments */
-            p_term *self = p_term_lex_create_variable
-                (context, p_term_get_extra(yyscanner), "Self");
-            p_term *clause = p_term_create_functor
-                (context, p_term_functor($1), 3);
-            p_term_bind_functor_arg(clause, 0, p_term_arg($1, 0));
-            p_term_bind_functor_arg(clause, 1, self);
-            p_term_bind_functor_arg(clause, 2, p_term_arg($1, 1));
+    | member_clause {
+            p_term *clause = add_debug(@1, $1);
             create_empty_list($$.vars);
-            clause = add_debug(@1, clause);
             create_list($$.clauses, clause);
+            $$.has_constructor = 0;
             clear_variables();
+        }
+    | static_clause {
+            p_term *clause = add_debug(@1, $1);
+            create_empty_list($$.vars);
+            create_list($$.clauses, clause);
+            $$.has_constructor = 0;
+            clear_variables();
+        }
+    | constructor {
+            p_term *clause = add_debug(@1, $1);
+            create_empty_list($$.vars);
+            create_list($$.clauses, clause);
+            $$.has_constructor = 1;
+            clear_variables();
+        }
+    ;
+
+member_clause
+    : member_clause_head K_DOT_TERMINATOR   {
+            $$ = binary_term(":-", $1, context->true_atom);
+        }
+    | member_clause_head compound_statement {
+            $$ = binary_term(":-", $1, $2);
+        }
+    ;
+
+member_clause_head
+    : atom                      {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1, 0, 0, 0);
+        }
+    | atom '(' ')'              {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1, 0, 0, 0);
+        }
+    | atom '(' arguments ')'    {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1,
+                 $3.args, $3.num_args, 0);
+        }
+    ;
+
+static_clause
+    : K_STATIC static_clause_head K_DOT_TERMINATOR   {
+            $$ = binary_term(":-", $2, context->true_atom);
+        }
+    | K_STATIC static_clause_head compound_statement {
+            $$ = binary_term(":-", $2, $3);
+        }
+    ;
+
+static_clause_head
+    : atom                      {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1, 0, 0, 1);
+        }
+    | atom '(' ')'              {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1, 0, 0, 1);
+        }
+    | atom '(' arguments ')'    {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner), $1,
+                 $3.args, $3.num_args, 1);
+        }
+    ;
+
+constructor
+    : constructor_head K_DOT_TERMINATOR    {
+            $$ = binary_term(":-", $1, context->true_atom);
+        }
+    | constructor_head compound_statement  {
+            $$ = binary_term(":-", $1, $2);
+        }
+    ;
+
+constructor_head
+    : K_NEW                         {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner),
+                 p_term_create_atom(context, "new"), 0, 0, 0);
+        }
+    | K_NEW '(' ')'                 {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner),
+                 p_term_create_atom(context, "new"), 0, 0, 0);
+        }
+    | K_NEW '(' arguments ')'       {
+            $$ = create_clause_head
+                (context, p_term_get_extra(yyscanner),
+                 p_term_create_atom(context, "new"),
+                 $3.args, $3.num_args, 0);
         }
     ;
 
@@ -1265,23 +1411,4 @@ member_vars
 
 member_var
     : atom                          { $$ = add_debug(@1, $1); }
-    ;
-
-object_declaration
-    : K_NEW atom property_bindings opt_semi     {
-            /* An object declaration is equivalent to:
-             * ?- new class_name (X) { properties }, assertz(X). */
-            p_term *var;
-            p_term *term;
-            p_term *term2;
-            var = p_term_create_variable(context);
-            if ($3 == p_term_nil_atom(context))
-                term = binary_term("new", $2, var);
-            else
-                term = ternary_term("new", $2, $3, var);
-            term2 = p_term_create_functor_with_args
-                (context, p_term_create_atom(context, "assertz"),
-                 &var, 1);
-            $$ = unary_term("?-", binary_term(",", term, term2));
-        }
     ;
