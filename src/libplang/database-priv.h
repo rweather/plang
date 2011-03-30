@@ -34,9 +34,8 @@ typedef struct p_class_info p_class_info;
 struct p_class_info
 {
     p_term *class_object;
-    p_term *parent;
+    p_class_info *parent;
     p_term *var_list;
-    p_term *clause_list;
 };
 
 /* Information that is attached to an atom to provide information
@@ -78,6 +77,8 @@ void _p_db_init_arith(p_context *context);
 
 p_database_info *_p_db_find_arity(const p_term *atom, unsigned int arity);
 p_database_info *_p_db_create_arity(p_term *atom, unsigned int arity);
+
+p_term *_p_db_clause_assert_last(p_context *context, p_term *clause);
 
 /** @endcond */
 

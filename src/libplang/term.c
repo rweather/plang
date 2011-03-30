@@ -1051,7 +1051,7 @@ p_term *p_term_property(p_context *context, const p_term *term, const p_term *na
  *
  * \ingroup term
  * \sa p_term_create_object(), p_term_add_property()
- * \sa p_term_property()
+ * \sa p_term_property(), p_term_set_own_property()
  */
 p_term *p_term_own_property(p_context *context, const p_term *term, const p_term *name)
 {
@@ -1076,6 +1076,55 @@ p_term *p_term_own_property(p_context *context, const p_term *term, const p_term
         term = term->object.next;
     } while (term != 0);
     return 0;
+}
+
+/**
+ * \brief Sets the \a value associated with the property \a name
+ * on \a term within \a context.
+ *
+ * This function does not search prototype objects for \a name.
+ * If \a name does not exist, then p_term_add_property() will be
+ * used to add a new property.
+ *
+ * Returns non-zero if the property was added, or zero if
+ * the parameters are invalid.  The \a term must be an object,
+ * and \a name must be an atom other than "prototype" or
+ * "className".
+ *
+ * This function should be used with care because the change
+ * to the property \a name is not back-trackable.
+ *
+ * \ingroup term
+ * \sa p_term_create_object(), p_term_add_property()
+ * \sa p_term_property(), p_term_own_property()
+ */
+int p_term_set_own_property(p_context *context, p_term *term, p_term *name, p_term *value)
+{
+    unsigned int index;
+
+    /* Validate the parameters */
+    if (!term || !name)
+        return 0;
+    term = p_term_deref_non_null(term);
+    if (term->header.type != P_TERM_OBJECT)
+        return 0;
+    name = p_term_deref_non_null(name);
+    if (name->header.type != P_TERM_ATOM)
+        return 0;
+
+    /* Locate the property in the object */
+    do {
+        for (index = 0; index < term->header.size; ++index) {
+            if (term->object.properties[index].name == name) {
+                term->object.properties[index].value = value;
+                return 1;
+            }
+        }
+        term = term->object.next;
+    } while (term != 0);
+
+    /* Property not found, so add a new one */
+    return p_term_add_property(context, term, name, value);
 }
 
 /**
@@ -1313,6 +1362,35 @@ p_term *p_term_next_clause(p_term **clauses)
         return head;
     }
     return 0;
+}
+
+/**
+ * \brief Returns an atom which is the concatenation of
+ * \a class_name, <tt>::</tt>, and \a name.  The atom is
+ * created within \a context.
+ *
+ * This function is typically used to create the name of a
+ * member predicate within a class.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), p_term_create_atom()
+ */
+p_term *p_term_create_member_name
+    (p_context *context, p_term *class_name, p_term *name)
+{
+    size_t clen = p_term_name_length(class_name);
+    size_t nlen = p_term_name_length(name);
+    char *str = (char *)GC_MALLOC(clen + nlen + 2);
+    p_term *result;
+    if (!str)
+        return name;
+    memcpy(str, p_term_name(class_name), clen);
+    str[clen] = ':';
+    str[clen + 1] = ':';
+    memcpy(str + clen + 2, p_term_name(name), nlen);
+    result = p_term_create_atom_n(context, str, clen + nlen + 2);
+    GC_FREE(str);
+    return result;
 }
 
 /* Perform an occurs check */

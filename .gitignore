@@ -21,6 +21,7 @@ depcomp
 ylwrap
 *.o
 *.lo
+*.loT
 *.a
 *.la
 INSTALL

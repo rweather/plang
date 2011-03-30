@@ -1,5 +1,6 @@
 PLANG_TESTS = \
 	test-arith.lp \
+	test-class.lp \
 	test-compare.lp \
 	test-compose.lp \
 	test-type.lp

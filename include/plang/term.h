@@ -90,6 +90,7 @@ p_term *p_term_create_class_object(p_context *context, p_term *class_name, p_ter
 int p_term_add_property(p_context *context, p_term *term, p_term *name, p_term *value);
 p_term *p_term_property(p_context *context, const p_term *term, const p_term *name);
 p_term *p_term_own_property(p_context *context, const p_term *term, const p_term *name);
+int p_term_set_own_property(p_context *context, p_term *term, p_term *name, p_term *value);
 int p_term_is_instance_object(p_context *context, const p_term *term);
 int p_term_is_class_object(p_context *context, const p_term *term);
 int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2);
@@ -100,6 +101,8 @@ void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clau
 void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause);
 p_term *p_term_clauses(const p_term *predicate);
 p_term *p_term_next_clause(p_term **clauses);
+
+p_term *p_term_create_member_name(p_context *context, p_term *class_name, p_term *name);
 
 int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int flags);
 int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags);

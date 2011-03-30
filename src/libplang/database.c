@@ -229,7 +229,7 @@ P_INLINE p_database_info *p_db_create_arity(p_term *atom, unsigned int arity)
 
 p_database_info *_p_db_create_arity(p_term *atom, unsigned int arity)
 {
-    return _p_db_create_arity(atom, arity);
+    return p_db_create_arity(atom, arity);
 }
 
 /**
@@ -558,20 +558,8 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
     return 1;
 }
 
-/**
- * \brief Asserts \a clause as the last clause in a database
- * predicate on \a context.
- *
- * Returns non-zero if the clause was added, or zero if the
- * predicate is compiled or builtin.  It is assumed that \a clause
- * is a freshly renamed term, is well-formed, and the top-level
- * functor is "(:-)/2".
- *
- * \ingroup database
- * \sa p_db_clause_assert_first(), p_db_clause_retract()
- * \sa p_db_clause_abolish()
- */
-int p_db_clause_assert_last(p_context *context, p_term *clause)
+/* Assert a clause and return the predicate it was asserted into */
+p_term *_p_db_clause_assert_last(p_context *context, p_term *clause)
 {
     p_database_info *info;
     p_term *name;
@@ -601,7 +589,25 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
         info->predicate = predicate;
     }
     p_term_add_clause_last(context, predicate, clause);
-    return 1;
+    return predicate;
+}
+
+/**
+ * \brief Asserts \a clause as the last clause in a database
+ * predicate on \a context.
+ *
+ * Returns non-zero if the clause was added, or zero if the
+ * predicate is compiled or builtin.  It is assumed that \a clause
+ * is a freshly renamed term, is well-formed, and the top-level
+ * functor is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_clause_assert_first(), p_db_clause_retract()
+ * \sa p_db_clause_abolish()
+ */
+int p_db_clause_assert_last(p_context *context, p_term *clause)
+{
+    return _p_db_clause_assert_last(context, clause) != 0;
 }
 
 /**

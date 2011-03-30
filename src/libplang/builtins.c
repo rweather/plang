@@ -39,6 +39,12 @@
  * \ref isnan_1 "isnan/1",
  * \ref isinf_1 "isinf/1"
  *
+ * \par Classes and objects
+ * \ref decl_class "class",
+ * \ref new_object_3 "new",
+ * \ref new_class_4 "new_class/4",
+ * \ref new_object_3 "new_object/3"
+ *
  * \par Clause handling
  * \ref abolish_1 "abolish/1",
  * \ref asserta_1 "asserta/1",
@@ -162,6 +168,570 @@ static p_goal_result p_builtin_unbind
  */
 /*\@{*/
 /* Predicates and functions for this group are defined in arith.c */
+/*\@}*/
+
+/**
+ * \defgroup classes_and_objects Builtin predicates - Classes and objects
+ *
+ * Predicates in this group are used to create classes and objects,
+ * and to manipulate them after creation.
+ *
+ * \ref decl_class "class",
+ * \ref new_object_3 "new",
+ * \ref new_class_4 "new_class/4",
+ * \ref new_object_3 "new_object/3"
+ */
+/*\@{*/
+
+static void p_builtin_add_member_predicate
+    (p_context *context, p_term *class_object,
+     p_term *member_name, p_term *predicate)
+{
+    p_term *list;
+    p_term *property = p_term_own_property
+        (context, class_object, member_name);
+    if (property && property != predicate) {
+        /* Search the existing predicate list and add this
+         * predicate if it does not currently exist.  We need
+         * a list of predicates to support arity overloading */
+        if (property->header.type == P_TERM_LIST) {
+            list = property;
+            while (list && list->header.type == P_TERM_LIST) {
+                if (list->list.head == predicate)
+                    return;     /* Predicate is already in the list */
+                list = list->list.tail;
+            }
+        } else {
+            /* Convert a single predicate reference into a list */
+            property = p_term_create_list
+                (context, property, context->nil_atom);
+        }
+        property = p_term_create_list(context, predicate, property);
+        p_term_set_own_property
+            (context, class_object, member_name, property);
+    } else if (!property) {
+        /* First time predicate was added to this property */
+        p_term_add_property
+            (context, class_object, member_name, predicate);
+    }
+}
+
+/**
+ * \addtogroup classes_and_objects
+ * <hr>
+ * \anchor decl_class
+ * \anchor new_class_4
+ * <b>class</b>, <b>new_class/4</b> - declares a new class.
+ *
+ * \par Usage
+ * \b class \em Name { \em Members }
+ * \par
+ * \b class \em Name : \em Parent { \em Members }
+ * \par
+ * \b new_class(\em Name, \em Parent, \em Vars, \em Clauses)
+ *
+ * \par Description
+ * The \em Name must be an atom to identify the new class that
+ * is different than all previous atoms used as class names.
+ * If \em Parent is present, then it must be an atom that identifies
+ * an existing class, or <tt>[]</tt> for no parent.
+ * \par
+ * Usually classes are created in the source file with the \b class
+ * keyword.  The <b>new_class/4</b> predicate can be used to create a
+ * class dynamically.
+ * \par
+ * \em Vars must be a list of atoms for the member field names.
+ * These members will be added as unbound variable properties
+ * to new objects of the class \em Name.  Duplicates in \em Vars
+ * will be ignored.
+ * \par
+ * \em Clauses must be a list of \b clause(\em MemberName, \em Kind,
+ * \em Clause) terms:
+ * \li \em MemberName is the name of the predicate member, without
+ *     the class \em Name as a qualifier.
+ * \li \em Kind is one of the atoms \c member, \c static, or
+ *     \c constructor, indicating an ordinary member predicate,
+ *     a static predicate, or an object constructor.
+ * \li \em Clause is a <b>(:-)/2</b> functor term for a single
+ *     clause within the predicate being defined.  The clause
+ *     should have the predicate name \em Name::\em MemberName.
+ *     If the \em Kind is \c member or \c constructor, then the
+ *     first argument of \em Clause will be passed the <tt>Self</tt>
+ *     object when the predicate is called.
+ * \par
+ * The atoms \c className and \c prototype are reserved and cannot
+ * be used as member names for declared variable or predicate members.
+ * \par
+ * Class \em Members may have one of the following forms,
+ * corresponding to member variables, regular member
+ * predicates, static predicates, and constructor predicates:
+ * \code
+ * var name1, ..., nameN
+ * name(Args) { ... }
+ * static name(Args) { ... }
+ * new(Args) { ... }
+ * \endcode
+ * \par
+ * When an object is constructed with the \ref new_object_3 "new"
+ * keyword, it is initially populated with \c name1, ..., \c nameN
+ * set to unbound variables, and \c prototype set to the class object.
+ * One of the constructor predicates is then called to initialize
+ * the object.
+ * \par
+ * Regular member predicates and constructor predicates are passed
+ * the \c Self object as a hidden first argument.  Static predicates
+ * do not have any hidden arguments.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Name, \em Parent, \em Vars,
+ *     or \em Clauses is a variable.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not an atom.
+ * \li <tt>type_error(atom, \em Parent)</tt> - \em Parent is not
+ *     an atom.
+ * \li <tt>type_error(atom, \em Var)</tt> - \em Var is a member of
+ *     \em Vars but it is not an atom.
+ * \li <tt>type_error(atom_list, \em Vars)</tt> - \em Vars is not a
+ *     valid list of atoms.
+ * \li <tt>type_error(clause_list, \em Clauses)</tt> - \em Clauses
+ *     is not a valid list of clauses.
+ * \li <tt>type_error(member_name, \em MemberName)</tt> -
+ *     \em MemberName is \c className or \c prototype.
+ * \li <tt>permission_error(create, class, \em Name)</tt> -
+ *     \em Name already exists as a class.
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     attempting to define a predicate \em Pred that is
+ *     already defined.
+ * \li <tt>existence_error(class, \em Parent)</tt> - \em Parent
+ *     does not exist as a class, and \em Parent is not <tt>[]</tt>.
+ *
+ * \par Examples
+ * \code
+ * class vehicle
+ * {
+ *     var owner, wheels
+ *     transferOwnership(NewOwner)
+ *     {
+ *         Self.owner := NewOwner;
+ *     }
+ * }
+ *
+ * class passenger_car : vehicle
+ * {
+ *     var make, model
+ *     new(Make, Model)
+ *     {
+ *         Self.wheels = 4;
+ *         Self.make = Make;
+ *         Self.model = Model;
+ *     }
+ * }
+ *
+ * class company
+ * {
+ *     var name
+ *     var fleet
+ *     new(Name)
+ *     {
+ *         Self.name = Name;
+ *         Self.fleet = [];
+ *     }
+ *     add_vehicle(Vehicle)
+ *     {
+ *         Self.fleet := [Vehicle|Self.fleet];
+ *     }
+ *     remove_vehicle(Vehicle)
+ *     {
+ *         remove(Vehicle, Self.fleet, List);
+ *         Self.fleet := List;
+ *     }
+ * }
+ *
+ * class truck : vehicle
+ * {
+ *     var company
+ *     new(Company, Wheels)
+ *     {
+ *         Self.company = Company;
+ *         Self.owner = Company.name;
+ *         Self.wheels = Wheels;
+ *         Company.add_vehicle(Self);
+ *     }
+ *     transferOwnership(Company)
+ *     {
+ *         Self.company.remove_vehicle(Self);
+ *         Self.company := Company;
+ *         vehicle::transferOwnership(Self, Company.name);
+ *         Company.add_vehicle(Self);
+ *     }
+ * }
+ *
+ * class semi_trailer : truck
+ * {
+ *     new(Company)
+ *     {
+ *         truck::new(Self, Company, 16);
+ *     }
+ * }
+ *
+ * new passenger_car(P, "MegaCarz", "FastKar 2000");
+ * P.owner = "Fred";
+ * P.transferOwnership("Mary");
+ *
+ * new company(C1, "Package Delivery, Inc.");
+ * new company(C2, "Deliver Packages, Inc.");
+ * new semi_trailer(S, C1);
+ * S.transferOwnership(C2);
+ * \endcode
+ *
+ * \par See Also
+ * \ref class_1 "class/1",
+ * \ref new_object_3 "new"
+ */
+static p_goal_result p_builtin_new_class
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *name = p_term_deref(args[0]);
+    p_term *parent = p_term_deref(args[1]);
+    p_term *vars = p_term_deref(args[2]);
+    p_term *clauses = p_term_deref(args[3]);
+    p_database_info *info;
+    p_database_info *info2;
+    p_class_info *class_info;
+    p_class_info *parent_info;
+    p_term *class_object;
+    p_term *prototype;
+    p_term *list;
+    p_term *var_name;
+    p_term *member_name;
+    p_term *kind;
+    p_term *clause_term;
+    p_term *clause_body;
+    p_term *clause_atom;
+    p_term *member_atom;
+    p_term *predicate;
+
+    /* Validate the class name - must be an atom and not yet a class */
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM) {
+        *error = p_create_type_error(context, "atom", name);
+        return P_RESULT_ERROR;
+    }
+    info = _p_db_create_arity(name, 0);
+    if (!info)
+        return P_RESULT_FAIL;
+    if (info->class_info) {
+        /* There already exists a class with this name */
+        *error = p_create_permission_error
+            (context, "create", "class", name);
+        return P_RESULT_ERROR;
+    }
+
+    /* Locate the prototype for the parent class */
+    if (!parent || (parent->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (parent && parent != context->nil_atom) {
+        if (parent->header.type != P_TERM_ATOM) {
+            *error = p_create_type_error(context, "atom", parent);
+            return P_RESULT_ERROR;
+        }
+        info2 = _p_db_find_arity(parent, 0);
+        if (!info2 || !info2->class_info) {
+            /* Parent class does not exist */
+            *error = p_create_existence_error(context, "class", parent);
+            return P_RESULT_ERROR;
+        }
+        parent_info = info2->class_info;
+        prototype = parent_info->class_object;
+    } else {
+        parent_info = 0;
+        prototype = 0;
+    }
+
+    /* Validate the member variable list */
+    list = vars;
+    if (!list || (list->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    for (;;) {
+        if (list == context->nil_atom)
+            break;
+        if (!list || list->header.type != P_TERM_LIST) {
+            *error = p_create_type_error(context, "atom_list", vars);
+            return P_RESULT_ERROR;
+        }
+        var_name = p_term_deref(list->list.head);
+        if (!var_name ||
+                (var_name->header.type & P_TERM_VARIABLE) != 0) {
+            *error = p_create_instantiation_error(context);
+            return P_RESULT_ERROR;
+        }
+        if (var_name->header.type != P_TERM_ATOM) {
+            *error = p_create_type_error(context, "atom_list", vars);
+            return P_RESULT_ERROR;
+        }
+        if(var_name == context->class_name_atom ||
+                var_name == context->prototype_atom) {
+            *error = p_create_type_error
+                (context, "member_name", var_name);
+            return P_RESULT_ERROR;
+        }
+        list = p_term_deref(list->list.tail);
+    }
+
+    /* Create the class information block and the object */
+    class_info = GC_NEW(p_class_info);
+    if (!class_info)
+        return P_RESULT_FAIL;
+    class_object = p_term_create_class_object(context, name, prototype);
+    if (!class_object)
+        return P_RESULT_FAIL;
+    class_info->class_object = class_object;
+    class_info->parent = parent_info;
+    class_info->var_list = vars;
+
+    /* Define the clauses into the database and attach
+     * them to the class object */
+    list = clauses;
+    clause_atom = p_term_create_atom(context, "clause");
+    member_atom = p_term_create_atom(context, "member");
+    while (list && list->header.type == P_TERM_LIST) {
+        /* Extract clause(MemberName, Kind, ClauseBody) from the list */
+        clause_term = p_term_deref(list->list.head);
+        if (!clause_term ||
+                (clause_term->header.type & P_TERM_VARIABLE) != 0) {
+            *error = p_create_instantiation_error(context);
+            return P_RESULT_ERROR;
+        }
+        if (clause_term->header.type == P_TERM_FUNCTOR &&
+                clause_term->header.size == 3 &&
+                clause_term->functor.functor_name == context->line_atom)
+            clause_term = p_term_deref(clause_term->functor.arg[2]);
+        if (clause_term->header.type != P_TERM_FUNCTOR ||
+                clause_term->header.size != 3 ||
+                clause_term->functor.functor_name != clause_atom) {
+            break;
+        }
+        member_name = p_term_deref(clause_term->functor.arg[0]);
+        kind = p_term_deref(clause_term->functor.arg[1]);
+        clause_body = p_term_deref(clause_term->functor.arg[2]);
+        if (!member_name || member_name->header.type != P_TERM_ATOM)
+            break;
+        if (!kind || kind->header.type != P_TERM_ATOM)
+            break;
+        if (!clause_body ||
+                clause_body->header.type != P_TERM_FUNCTOR ||
+                clause_body->header.size != 2 ||
+                clause_body->functor.functor_name
+                        != context->clause_atom)
+            break;
+
+        /* Validate the member name */
+        if(member_name == context->class_name_atom ||
+                member_name == context->prototype_atom) {
+            *error = p_create_type_error
+                (context, "member_name", member_name);
+            return P_RESULT_ERROR;
+        }
+
+        /* Define the clause into the database */
+        predicate = _p_db_clause_assert_last(context, clause_body);
+        if (!predicate) {
+            /* Predicate is compiled or builtin */
+            p_term *pred, *head;
+            pred = p_term_create_functor
+                (context, context->slash_atom, 2);
+            head = p_term_deref(clause_body->functor.arg[0]);
+            if (head->header.type == P_TERM_FUNCTOR) {
+                p_term_bind_functor_arg
+                    (pred, 0, head->functor.functor_name);
+                p_term_bind_functor_arg
+                    (pred, 1,
+                     p_term_create_integer(context, head->header.size));
+            } else {
+                p_term_bind_functor_arg(pred, 0, head);
+                p_term_bind_functor_arg(pred, 1, 0);
+            }
+            *error = p_create_permission_error
+                (context, "modify", "static_procedure", pred);
+            return P_RESULT_ERROR;
+        }
+        if (kind == member_atom) {
+            /* Add this predicate to the member_name class property */
+            p_builtin_add_member_predicate
+                (context, class_object, member_name, predicate);
+        }
+
+        /* Move on to the next clause in the list */
+        list = p_term_deref(list->list.tail);
+    }
+    if (!list || (list->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (list != context->nil_atom) {
+        *error = p_create_type_error(context, "clause_list", clauses);
+        return P_RESULT_ERROR;
+    }
+
+    /* Class object is ready to go */
+    info->class_info = class_info;
+    return P_RESULT_TRUE;
+}
+
+static p_goal_result p_builtin_univ
+    (p_context *context, p_term **args, p_term **error);
+
+/**
+ * \addtogroup classes_and_objects
+ * <hr>
+ * \anchor new_object_3
+ * <b>new</b>, <b>new_object/3</b> - create a new object
+ * instance of a class.
+ *
+ * \par Usage
+ * \b new \em Name(\em Var, \em Args)
+ * \par
+ * \b new_object(\em Name, \em Var, \em ArgList)
+ *
+ * \par Description
+ * The <b>new</b> keyword constructs a new instance of the class
+ * \em Name and unifies it with \em Var.  The comma-separated
+ * list of \em Args is passed to the constructor for \em Name.
+ * \par
+ * The <b>new_object/3</b> predicate performs the same operation
+ * for constructing objects dynamically.  The \em ArgList is
+ * a regular Plang list rather than a comma-separated list.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Name or \em ArgList
+ *     is a variable, or the tail of \em ArgList is not <tt>[]</tt>.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not an atom.
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is not a
+ *     variable.
+ * \li <tt>type_error(list, \em ArgList)</tt> - \em ArgList is not a
+ *     list.
+ * \li <tt>existence_error(class, \em Name)</tt> - \em Name
+ *     does not exist as a class.
+ * \li <tt>existence_error(procedure, \em Pred)</tt> - \em Pred
+ *     is the name of the constructor predicate that <b>new</b>
+ *     attempted to call but the constructor does not exist.
+ *
+ * \par Examples
+ * \code
+ * class foo
+ * {
+ *     new(X, Y) { ... }
+ * }
+ * class bar
+ * {
+ * }
+ *
+ * new foo(F, 1.5, f(X))
+ * new bar(B)
+ * new_object(foo, F, [1.5, f(X)])
+ * new_object(bar, B, [])
+ * \endcode
+ *
+ * \par See Also
+ * \ref decl_class "class",
+ * \ref object_1 "object/1"
+ */
+static p_goal_result p_builtin_new
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *name = p_term_deref(args[0]);
+    p_term *var = p_term_deref(args[1]);
+    p_term *obj;
+    p_database_info *info;
+    p_class_info *class_info;
+    p_term *vars;
+    p_term *var_name;
+
+    /* Validate the parameters */
+    if (!name || !var || (name->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM) {
+        *error = p_create_type_error(context, "atom", name);
+        return P_RESULT_ERROR;
+    }
+    if ((var->header.type & P_TERM_VARIABLE) == 0) {
+        *error = p_create_type_error(context, "variable", var);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find the class information for creating the object */
+    info = _p_db_find_arity(name, 0);
+    if (!info || !(info->class_info)) {
+        *error = p_create_existence_error(context, "class", name);
+        return P_RESULT_ERROR;
+    }
+
+    /* Create the bare object term */
+    class_info = info->class_info;
+    obj = p_term_create_object(context, class_info->class_object);
+    if (!obj)
+        return P_RESULT_FAIL;
+
+    /* Create unbound variable property slots for all declared fields */
+    do {
+        vars = p_term_deref(class_info->var_list);
+        while (vars && vars->header.type == P_TERM_LIST) {
+            var_name = p_term_deref(vars->list.head);
+            if (!p_term_own_property(context, obj, var_name)) {
+                p_term_add_property
+                    (context, obj, var_name,
+                     p_term_create_variable(context));
+            }
+            vars = p_term_deref(vars->list.tail);
+        }
+        class_info = class_info->parent;
+    } while (class_info);
+
+    /* Unify the object with the variable */
+    if (p_term_unify(context, var, obj, P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+static p_goal_result p_builtin_new_object
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_goal_result result;
+    p_term *name;
+    p_term *list;
+    p_term *univ_args[2];
+
+    /* Create the basic object instance */
+    result = p_builtin_new(context, args, error);
+    if (result != P_RESULT_TRUE)
+        return result;
+
+    /* Use the "=.." operator to build a call to the constructor */
+    name = p_term_create_member_name
+        (context, args[0], p_term_create_atom(context, "new"));
+    list = p_term_create_list(context, args[1], args[2]);
+    list = p_term_create_list(context, name, list);
+    univ_args[0] = p_term_create_variable(context);
+    univ_args[1] = list;
+    result = p_builtin_univ(context, args, error);
+    if (result != P_RESULT_TRUE)
+        return result;
+
+    /* Replace the current goal with the constructor call */
+    context->current_node->goal = univ_args[0];
+    return P_RESULT_TREE_CHANGE;
+}
+
 /*\@}*/
 
 /**
@@ -3578,6 +4148,9 @@ void _p_db_init_builtins(p_context *context)
         {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},
         {"$$line", 3, p_builtin_line},
+        {"$$new", 2, p_builtin_new},
+        {"new_class", 4, p_builtin_new_class},
+        {"new_object", 3, p_builtin_new_object},
         {"nonvar", 1, p_builtin_nonvar},
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
