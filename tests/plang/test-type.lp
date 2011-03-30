@@ -180,6 +180,15 @@ predicate()
     verify_error(predicate(_, foo/bar), type_error(integer, bar));
     verify_error(predicate(_, foo/-1), domain_error(not_less_than_zero, -1));
     verify_error(predicate(_, "foo"/0), type_error(atom, "foo"));
+
+    verify(predicate(T1));
+    verify(!predicate(a));
+    verify(!predicate(X));
+    verify(!predicate(foo(X, Y)));
+    verify(!predicate(foo/2));
+    verify(!predicate(1.5));
+    verify(!predicate([a]));
+    verify(!predicate("foo"));
 }
 
 main(_)

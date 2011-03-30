@@ -110,6 +110,7 @@
  * \ref number_1 "number/1",
  * \ref object_1 "object/1",
  * \ref object_2 "object/2",
+ * \ref predicate_1 "predicate/1",
  * \ref predicate_2 "predicate/2",
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
@@ -2773,6 +2774,7 @@ static p_goal_result p_builtin_unifiable
  * \ref number_1 "number/1",
  * \ref object_1 "object/1",
  * \ref object_2 "object/2",
+ * \ref predicate_1 "predicate/1",
  * \ref predicate_2 "predicate/2",
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
@@ -2897,7 +2899,7 @@ static p_goal_result p_builtin_atomic
  * \par See Also
  * \ref class_2 "class/2",
  * \ref object_1 "object/1",
- * \ref predicate_2 "predicate/2"
+ * \ref predicate_1 "predicate/1"
  */
 static p_goal_result p_builtin_class_1
     (p_context *context, p_term **args, p_term **error)
@@ -2952,7 +2954,7 @@ static p_goal_result p_builtin_class_1
  * \par See Also
  * \ref class_1 "class/1",
  * \ref object_1 "object/1",
- * \ref predicate_2 "predicate/2"
+ * \ref predicate_1 "predicate/1"
  */
 static p_goal_result p_builtin_class_2
     (p_context *context, p_term **args, p_term **error)
@@ -3208,7 +3210,7 @@ static p_goal_result p_builtin_number
  * \par See Also
  * \ref class_1 "class/1",
  * \ref object_2 "object/2",
- * \ref predicate_2 "predicate/2"
+ * \ref predicate_1 "predicate/1"
  */
 static p_goal_result p_builtin_object_1
     (p_context *context, p_term **args, p_term **error)
@@ -3253,7 +3255,7 @@ static p_goal_result p_builtin_object_1
  * \par See Also
  * \ref class_1 "class/1",
  * \ref object_1 "object/1",
- * \ref predicate_2 "predicate/2"
+ * \ref predicate_1 "predicate/1"
  */
 static p_goal_result p_builtin_object_2
     (p_context *context, p_term **args, p_term **error)
@@ -3266,6 +3268,45 @@ static p_goal_result p_builtin_object_2
         class_object = db_info->class_info->class_object;
     }
     if (p_term_is_instance_of(context, args[0], class_object))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup type_testing
+ * <hr>
+ * \anchor predicate_1
+ * \b predicate/1 - tests if a term is a predicate.
+ *
+ * \par Usage
+ * \b predicate(\em Term)
+ *
+ * \par Description
+ * If \em Term is a predicate, then succeeds.  Fails otherwise.
+ *
+ * \par Examples
+ * \code
+ * foo(X, Y) { ... }
+ * predicate(P, foo/2);
+ *
+ * predicate(P)             succeeds
+ * predicate(a)             fails
+ * predicate(X)             fails
+ * predicate(foo(X, Y))     fails
+ * predicate(foo/2)         fails
+ * predicate(1.5)           fails
+ * \endcode
+ *
+ * \par See Also
+ * \ref class_1 "class/1",
+ * \ref object_1 "object/1",
+ * \ref predicate_2 "predicate/2"
+ */
+static p_goal_result p_builtin_predicate_1
+    (p_context *context, p_term **args, p_term **error)
+{
+    if (p_term_type(args[0]) == P_TERM_PREDICATE)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -3320,9 +3361,10 @@ static p_goal_result p_builtin_object_2
  *
  * \par See Also
  * \ref class_1 "class/1",
- * \ref object_1 "object/1"
+ * \ref object_1 "object/1",
+ * \ref predicate_1 "predicate/1"
  */
-static p_goal_result p_builtin_predicate
+static p_goal_result p_builtin_predicate_2
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *term = p_term_deref(args[0]);
@@ -3540,7 +3582,8 @@ void _p_db_init_builtins(p_context *context)
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
-        {"predicate", 2, p_builtin_predicate},
+        {"predicate", 1, p_builtin_predicate_1},
+        {"predicate", 2, p_builtin_predicate_2},
         {"$$print", 1, p_builtin_print},
         {"$$println", 0, p_builtin_println},
         {"$$printq", 1, p_builtin_printq},
