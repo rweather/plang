@@ -1787,7 +1787,8 @@ static char const p_builtin_while[] =
  *
  * \li Variables precede all floating-point numbers, which precede
  * all integers, which precede all strings, which precede all
- * atoms, which precede all compound terms, which precede all objects.
+ * atoms, which precede all compound terms, which precede all objects,
+ * which precede all predicates.
  * \li Variables and objects are ordered on pointer.
  * \li Integers and floating-point numbers are ordered according
  * to their numeric value.
@@ -2895,7 +2896,8 @@ static p_goal_result p_builtin_atomic
  *
  * \par See Also
  * \ref class_2 "class/2",
- * \ref object_1 "object/1"
+ * \ref object_1 "object/1",
+ * \ref predicate_2 "predicate/2"
  */
 static p_goal_result p_builtin_class_1
     (p_context *context, p_term **args, p_term **error)
@@ -2949,7 +2951,8 @@ static p_goal_result p_builtin_class_1
  *
  * \par See Also
  * \ref class_1 "class/1",
- * \ref object_1 "object/1"
+ * \ref object_1 "object/1",
+ * \ref predicate_2 "predicate/2"
  */
 static p_goal_result p_builtin_class_2
     (p_context *context, p_term **args, p_term **error)
@@ -3204,7 +3207,8 @@ static p_goal_result p_builtin_number
  *
  * \par See Also
  * \ref class_1 "class/1",
- * \ref object_2 "object/2"
+ * \ref object_2 "object/2",
+ * \ref predicate_2 "predicate/2"
  */
 static p_goal_result p_builtin_object_1
     (p_context *context, p_term **args, p_term **error)
@@ -3248,7 +3252,8 @@ static p_goal_result p_builtin_object_1
  *
  * \par See Also
  * \ref class_1 "class/1",
- * \ref object_1 "object/1"
+ * \ref object_1 "object/1",
+ * \ref predicate_2 "predicate/2"
  */
 static p_goal_result p_builtin_object_2
     (p_context *context, p_term **args, p_term **error)
@@ -3314,7 +3319,8 @@ static p_goal_result p_builtin_object_2
  * \endcode
  *
  * \par See Also
- * \ref predicate_2 "predicate/2"
+ * \ref class_1 "class/1",
+ * \ref object_1 "object/1"
  */
 static p_goal_result p_builtin_predicate
     (p_context *context, p_term **args, p_term **error)

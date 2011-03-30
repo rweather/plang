@@ -23,6 +23,137 @@
 foo(X, Y) {}
 bar(X, Y) {}
 
+atom()
+{
+    verify(atom(a));
+    verify(!atom(X));
+    verify((X = a, atom(X)));
+    verify(!atom(f(a)));
+    verify(!atom([a]));
+    verify(!atom(1));
+    verify(!atom(1.5));
+    verify(!atom("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!atom(Foo));
+}
+
+atomic()
+{
+    verify(atomic(a));
+    verify(!atomic(X));
+    verify((X = a, atomic(X)));
+    verify(!atomic(f(a)));
+    verify(!atomic([a]));
+    verify(atomic(1));
+    verify(atomic(1.5));
+    verify(atomic("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!atomic(Foo));
+}
+
+compound()
+{
+    verify(!compound(a));
+    verify(!compound([]));
+    verify(!compound(X));
+    verify(compound(f(X)));
+    verify((X = f(Y), compound(X)));
+    verify(compound([a]));
+    verify(!compound(1));
+    verify(!compound(1.5));
+    verify(!compound("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!compound(Foo));
+}
+
+float()
+{
+    verify(!float(a));
+    verify(!float(X));
+    verify(!float(f(X)));
+    verify(float(1.5));
+    verify((X = 1.5, float(X)));
+    verify(!float(1));
+    verify(!float("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!float(Foo));
+}
+
+integer()
+{
+    verify(!integer(a));
+    verify(!integer(X));
+    verify(!integer(f(X)));
+    verify(integer(1));
+    verify((X = 1, integer(X)));
+    verify(!integer(1.5));
+    verify(!integer("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!integer(Foo));
+}
+
+nonvar()
+{
+    verify(nonvar(a));
+    verify(!nonvar(X));
+    verify(nonvar(f(X)));
+    verify(nonvar(1));
+    verify((X = a, nonvar(X)));
+    verify(nonvar(1.5));
+    verify(nonvar("foo"));
+
+    predicate(Foo, foo/2);
+    verify(nonvar(Foo));
+}
+
+number()
+{
+    verify(!number(a));
+    verify(!number(X));
+    verify(!number(f(X)));
+    verify(number(1));
+    verify((X = 1, number(X)));
+    verify(number(1.5));
+    verify(!number("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!number(Foo));
+}
+
+string()
+{
+    verify(!string(a));
+    verify(!string(X));
+    verify(!string(f(X)));
+    verify(!string(1));
+    verify(!string(1.5));
+    verify(string("foo"));
+    verify((X = "foo", string(X)));
+
+    predicate(Foo, foo/2);
+    verify(!string(Foo));
+}
+
+var()
+{
+    verify(!var(a));
+    verify(var(X));
+    verify(!var(f(X)));
+    verify(!var(1));
+    verify(!(X = a, var(X)));
+    verify((X = Y, var(X)));
+    verify(!var(1.5));
+    verify(!var("foo"));
+
+    predicate(Foo, foo/2);
+    verify(!var(Foo));
+}
+
 predicate()
 {
     verify(predicate(T1, foo/2));
@@ -54,6 +185,15 @@ predicate()
 main(_)
 {
     init("test-type");
+    run(atom);
+    run(atomic);
+    run(compound);
+    run(float);
+    run(integer);
+    run(nonvar);
+    run(number);
+    run(string);
+    run(var);
     run(predicate);
     report();
 }
