@@ -71,9 +71,6 @@ int p_db_clause_assert_last(p_context *context, p_term *clause);
 int p_db_clause_retract(p_context *context, p_term *clause);
 int p_db_clause_abolish(p_context *context, const p_term *name, int arity);
 
-p_term *p_db_global_object(p_context *context, p_term *name);
-void p_db_set_global_object(p_context *context, p_term *name, p_term *value);
-
 p_predicate_flags p_db_predicate_flags(p_context *context, const p_term *name, int arity);
 void p_db_set_predicate_flag(p_context *context, p_term *name, int arity, p_predicate_flags flag, int value);
 

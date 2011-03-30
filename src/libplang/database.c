@@ -700,53 +700,6 @@ int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
 }
 
 /**
- * \brief Returns the global object associated with \a name
- * within \a context, or null if \a name is not a global object.
- *
- * \ingroup database
- * \sa p_db_set_global_object()
- */
-p_term *p_db_global_object(p_context *context, p_term *name)
-{
-    p_database_info *info;
-
-    /* Check that the name is actually an atom */
-    name = p_term_deref(name);
-    if (!name || name->header.type != P_TERM_ATOM)
-        return 0;
-
-    /* Find the information block for arity 0 */
-    info = p_db_find_arity(name, 0);
-    if (info)
-        return info->global_object;
-    else
-        return 0;
-}
-
-/**
- * \brief Sets the global object associated with \a name
- * within \a context to \a value.  If \a value is null,
- * then \a name is removed as a global object.
- *
- * \ingroup database
- * \sa p_db_global_object()
- */
-void p_db_set_global_object(p_context *context, p_term *name, p_term *value)
-{
-    p_database_info *info;
-
-    /* Check that the name is actually an atom */
-    name = p_term_deref(name);
-    if (!name || name->header.type != P_TERM_ATOM)
-        return;
-
-    /* Find or create the information block for arity 0 */
-    info = p_db_create_arity(name, 0);
-    if (info)
-        info->global_object = value;
-}
-
-/**
  * \brief Returns the flags associated with the predicate
  * \a name / \a arity in \a context.
  *

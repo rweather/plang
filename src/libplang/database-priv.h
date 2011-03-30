@@ -52,7 +52,6 @@ struct p_database_info
     p_db_arith arith_func;
     p_class_info *class_info;
     p_term *predicate;
-    p_term *global_object;
 };
 
 struct p_builtin

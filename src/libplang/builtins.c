@@ -557,16 +557,14 @@ static p_goal_result p_builtin_retract
  *
  * ?- {
  *     new fridge(F);
- *     set_global_object(my_fridge, F);
- *     my_fridge.open();
+ *     F.open();
  * }
  * \endcode
  *
  * After the directive is executed, the Plang engine will execute a
  * cut, \ref cut_0 "(!)/0", and \ref fail_0 "fail/0" to backtrack
  * to the original system state.  The only permanent modifications
- * to the system state will be in the form of side-effects
- * (e.g. the call to <b>set_global_object/2</b> above).
+ * to the system state will be in the form of side-effects.
  *
  * Directives may also be called as regular builtin predicates
  * during normal program execution.  The exception is
