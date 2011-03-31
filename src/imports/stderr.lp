@@ -17,29 +17,32 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-stderr::write(Term)
+class stderr
 {
-    '$$print_error'(Term);
-}
+    static write(Term)
+    {
+        '$$print_error'(Term);
+    }
 
-stderr::writeln(Term)
-{
-    '$$print_error'(Term);
-    '$$println_error'();
-}
+    static writeln(Term)
+    {
+        '$$print_error'(Term);
+        '$$println_error'();
+    }
 
-stderr::writeln()
-{
-    '$$println_error'();
-}
+    static writeln()
+    {
+        '$$println_error'();
+    }
 
-stderr::writeq(Term)
-{
-    '$$printq_error'(Term);
-}
+    static writeq(Term)
+    {
+        '$$printq_error'(Term);
+    }
 
-stderr::writeqln(Term)
-{
-    '$$printq_error'(Term);
-    '$$println_error'();
+    static writeqln(Term)
+    {
+        '$$printq_error'(Term);
+        '$$println_error'();
+    }
 }

@@ -17,29 +17,32 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-stdout::write(Term)
+class stdout
 {
-    '$$print'(Term);
-}
+    static write(Term)
+    {
+        '$$print'(Term);
+    }
 
-stdout::writeln(Term)
-{
-    '$$print'(Term);
-    '$$println'();
-}
+    static writeln(Term)
+    {
+        '$$print'(Term);
+        '$$println'();
+    }
 
-stdout::writeln()
-{
-    '$$println'();
-}
+    static writeln()
+    {
+        '$$println'();
+    }
 
-stdout::writeq(Term)
-{
-    '$$printq'(Term);
-}
+    static writeq(Term)
+    {
+        '$$printq'(Term);
+    }
 
-stdout::writeqln(Term)
-{
-    '$$printq'(Term);
-    '$$println'();
+    static writeqln(Term)
+    {
+        '$$printq'(Term);
+        '$$println'();
+    }
 }
