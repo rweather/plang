@@ -185,10 +185,11 @@ void _p_db_init(p_context *context)
 
         /* New operators specific to this implementation */
         {":=",      P_OP_XFX,  700},    /* Variable assignment */ 
+        {":==",     P_OP_XFX,  700},    /* Backtrackable assignment */ 
         {"::=",     P_OP_XFX,  700},    /* Numeric assignment */ 
+        {"::==",    P_OP_XFX,  700},    /* Backtrackable num assign */ 
         {"in",      P_OP_XFX,  700},    /* List membership test */
         {">>>",     P_OP_YFX,  400},    /* Unsigned shift right */
-        {":",       P_OP_XFX,  100},    /* Type constraint */
 
         {0,         0,           0}
     };

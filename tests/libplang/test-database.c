@@ -66,7 +66,9 @@ static void test_operators()
         { 700, P_OP_XFX, 2, ">"},
         { 700, P_OP_XFX, 2, ">="},
         { 700, P_OP_XFX, 2, ":="},
+        { 700, P_OP_XFX, 2, ":=="},
         { 700, P_OP_XFX, 2, "::="},
+        { 700, P_OP_XFX, 2, "::=="},
         { 500, P_OP_YFX, 2, "+"},
         { 500, P_OP_YFX, 2, "-"},
         { 500, P_OP_YFX, 2, "/\\"},
@@ -84,7 +86,6 @@ static void test_operators()
         { 200, P_OP_FY,  1, "-"},
         { 200, P_OP_FY,  1, "\\"},
         { 200, P_OP_FY,  1, "~"},
-        { 100, P_OP_XFX, 2, ":"},
         {   0, P_OP_NONE,0, 0},
     };
     int index, priority;

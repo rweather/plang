@@ -170,6 +170,7 @@ NEG             (-?)
 ">"             { RETURNTOK(K_NUM_GT); }
 ">="            { RETURNTOK(K_NUM_GE); }
 "::="           { RETURNTOK(K_NUM_GETS); }
+"::=="          { RETURNTOK(K_NUM_BT_GETS); }
 "/\\"           { RETURNTOK(K_BITWISE_AND); }
 "\\/"           { RETURNTOK(K_BITWISE_OR); }
 "\\"            { RETURNTOK(K_BITWISE_NOT); }
@@ -179,6 +180,7 @@ NEG             (-?)
 "**"            { RETURNTOK(K_EXP); }
 ".."            { RETURNTOK(K_DOT_DOT); }
 ":="            { RETURNTOK(K_GETS); }
+":=="           { RETURNTOK(K_BT_GETS); }
 "case"          { RETURNTOK(K_CASE); }
 "catch"         { RETURNTOK(K_CATCH); }
 "class"         { RETURNTOK(K_CLASS); }

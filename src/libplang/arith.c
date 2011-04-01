@@ -110,7 +110,7 @@
  */
 
 /* Internal expression evaluator */
-static p_goal_result p_arith_eval
+p_goal_result p_arith_eval
     (p_context *context, p_arith_value *result,
      p_term *expr, p_term **error)
 {
@@ -246,6 +246,7 @@ static p_goal_result p_arith_eval
  *
  * \par See Also
  * \ref num_eq_2 "(=:=)/2",
+ * \ref num_assign_2 "(::=)/2",
  * \ref fperror_1 "fperror/1"
  */
 static p_goal_result p_builtin_is

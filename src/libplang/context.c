@@ -163,10 +163,10 @@ int _p_context_record_in_trail(p_context *context, p_term *var)
     return p_context_push_trail(context, (void **)&(var->var.value));
 }
 
-int _p_context_record_contents_in_trail(p_context *context, void **location)
+int _p_context_record_contents_in_trail(p_context *context, void **location, void *prev_value)
 {
     long loc = ((long)location) | 1L;
-    if (!p_context_push_trail(context, (void **)(*location)))
+    if (!p_context_push_trail(context, (void **)prev_value))
         return 0;
     if (p_context_push_trail(context, (void **)loc))
         return 1;

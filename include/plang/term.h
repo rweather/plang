@@ -73,6 +73,7 @@ p_term *p_term_class_name_atom(p_context *context);
 
 p_term *p_term_deref(const p_term *term);
 p_term *p_term_deref_member(p_context *context, p_term *term);
+p_term *p_term_deref_own_member(p_context *context, p_term *term);
 
 int p_term_type(const p_term *term);
 int p_term_arg_count(const p_term *term);

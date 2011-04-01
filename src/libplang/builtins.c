@@ -121,6 +121,12 @@
  * \ref string_1 "string/1",
  * \ref var_1 "var/1"
  *
+ * \par Variable assignment
+ * \ref assign_2 "(:=)/2",
+ * \ref num_assign_2 "(::=)/2",
+ * \ref bt_assign_2 "(:==)/2",
+ * \ref bt_num_assign_2 "(::==)/2"
+ *
  * \par Compatibility
  * \anchor standard
  * Many of the builtin predicates share names and behavior with
@@ -3244,7 +3250,8 @@ static p_goal_result p_builtin_functor
  *
  * \par See Also
  * \ref not_unifiable_2 "(!=)/2",
- * \ref unifiable_2 "unifiable/2"
+ * \ref unifiable_2 "unifiable/2",
+ * \ref assign_2 "(:=)/2"
  */
 static p_goal_result p_builtin_unify
     (p_context *context, p_term **args, p_term **error)
@@ -4064,6 +4071,326 @@ static p_goal_result p_builtin_var
 
 /*\@}*/
 
+/**
+ * \defgroup assignment Builtin predicates - Variable assignment
+ *
+ * Predicates in this group are used to assign values to variables
+ * without unification, replacing their previous values.
+ * Variable assignment may be destructive [\ref assign_2 "(:=)/2",
+ * \ref num_assign_2 "(::=)/2"] or back-trackable
+ * [\ref bt_assign_2 "(:==)/2", \ref bt_num_assign_2 "(::==)/2"].
+ *
+ * Destructive assignment is useful for setting object properties
+ * and temporary loop variables.  Back-trackable assignment is
+ * recommended for use in code that is searching for a solution
+ * amongst alternatives so as to preserve logical consistency.
+ *
+ * \ref assign_2 "(:=)/2",
+ * \ref num_assign_2 "(::=)/2",
+ * \ref bt_assign_2 "(:==)/2",
+ * \ref bt_num_assign_2 "(::==)/2"
+ */
+/*\@{*/
+
+int p_term_occurs_in(const p_term *var, const p_term *value);
+p_goal_result p_arith_eval
+    (p_context *context, p_arith_value *result,
+     p_term *expr, p_term **error);
+
+/* Resolve a variable reference down to its basic form.
+ * Returns null if not a variable */
+P_INLINE p_term *p_term_resolve_variable(p_context *context, p_term *var)
+{
+    p_term *value;
+    if (!var || var->header.type == P_TERM_VARIABLE)
+        return var;
+    if (var->header.type != P_TERM_MEMBER_VARIABLE)
+        return 0;
+    p_term_deref_own_member(context, var);
+    value = var->var.value;
+    if (value && value->header.type == P_TERM_VARIABLE)
+        return value;
+    return 0;
+}
+
+/**
+ * \addtogroup assignment
+ * <hr>
+ * \anchor assign_2
+ * <b>(:=)/2</b> - destructive variable assignment.
+ *
+ * \par Usage
+ * \em Var <b>:=</b> \em Term
+ *
+ * \par Description
+ * Assigns \em Term to \em Var, replacing its previous value,
+ * and succeed.  If \em Var occurs in \em Term, then the assignment
+ * will fail.
+ * \par
+ * The assignment will be permanent; back-tracking will not
+ * revert \em Var to its previous value.  However, bound variables
+ * within \em Term may be reverted upon back-tracking.  Use
+ * \ref copy_term_2 "copy_term/2" to make a copy of \em Term
+ * that is protected from back-tracking of its bound variables.
+ * \par
+ * Use \ref bt_assign_2 "(:==)/2" for back-trackable assignment.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is not
+ *     a variable.
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is a member
+ *     variable reference but the member does not exist.
+ *
+ * \par Examples
+ * \code
+ * X := f(a, b)             succeeds
+ * X := f(b, a)             succeeds again, replacing the value
+ * X := f(X, a)             fails due to occurs check
+ * X := Y + Z               sets X to (Y + Z), does not evaluate
+ * X := pi                  sets X to the atom pi, does not evaluate
+ * X.name := 42             sets the name property of object X to 42
+ * a := X                   type_error(variable, a)
+ * \endcode
+ *
+ * \par See Also
+ * \ref num_assign_2 "(::=)/2",
+ * \ref bt_assign_2 "(:==)/2",
+ * \ref bt_num_assign_2 "(::==)/2",
+ * \ref unify_2 "(=)/2"
+ */
+static p_goal_result p_builtin_assign
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *var;
+    p_term *prev;
+    var = p_term_resolve_variable(context, args[0]);
+    if (!var) {
+        *error = p_create_type_error(context, "variable", args[0]);
+        return P_RESULT_ERROR;
+    }
+    prev = var->var.value;
+    var->var.value = 0;
+    if (!p_term_occurs_in(var, args[1])) {
+        var->var.value = args[1];
+        return P_RESULT_TRUE;
+    }
+    var->var.value = prev;
+    return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup assignment
+ * <hr>
+ * \anchor num_assign_2
+ * <b>(::=)/2</b> - destructive variable assignment of an
+ * arithmetic term.
+ *
+ * \par Usage
+ * \em Var <b>::=</b> \em Term
+ *
+ * \par Description
+ * Evaluates \em Term according to the rules of \ref is_2 "is/2",
+ * and assigns it to \em Var, replacing its previous value.
+ * \par
+ * The assignment will be permanent; back-tracking will not
+ * revert \em Var to its previous value.
+ * Use \ref bt_num_assign_2 "(::==)/2" for back-trackable assignment.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is not
+ *     a variable.
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is a member
+ *     variable reference but the member does not exist.
+ *
+ * The errors for \ref is_2 "is/2" may also be thrown during
+ * the evaluation of \em Term.
+ *
+ * \par Examples
+ * \code
+ * X ::= X + 1              increments X
+ * X ::= pi                 sets X to 3.14159265358979323846
+ * X.name ::= 48 - 6        sets the name property of object X to 42
+ * a ::= X                  type_error(variable, a)
+ * \endcode
+ *
+ * \par See Also
+ * \ref assign_2 "(:=)/2",
+ * \ref bt_assign_2 "(:==)/2",
+ * \ref bt_num_assign_2 "(::==)/2",
+ * \ref is_2 "is/2"
+ */
+static p_goal_result p_builtin_num_assign
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *var;
+    p_arith_value value;
+    p_goal_result result;
+    var = p_term_resolve_variable(context, args[0]);
+    if (!var) {
+        *error = p_create_type_error(context, "variable", args[0]);
+        return P_RESULT_ERROR;
+    }
+    result = p_arith_eval(context, &value, args[1], error);
+    if (result != P_RESULT_TRUE)
+        return result;
+    switch (value.type) {
+    case P_TERM_INTEGER:
+        var->var.value =
+            p_term_create_integer(context, value.integer_value);
+        break;
+    case P_TERM_REAL:
+        var->var.value =
+            p_term_create_real(context, value.real_value);
+        break;
+    case P_TERM_STRING:
+        var->var.value = value.string_value;
+        break;
+    default: return P_RESULT_FAIL;
+    }
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup assignment
+ * <hr>
+ * \anchor bt_assign_2
+ * <b>(:==)/2</b> - back-trackable variable assignment.
+ *
+ * \par Usage
+ * \em Var <b>:==</b> \em Term
+ *
+ * \par Description
+ * Assigns \em Term to \em Var, replacing its previous value,
+ * and succeed.  If \em Var occurs in \em Term, then the assignment
+ * will fail.
+ * \par
+ * Upon back-tracking, \em Var will revert to its previous value.
+ * Use \ref assign_2 "(:=)/2" for destructive assignment.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is not
+ *     a variable.
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is a member
+ *     variable reference but the member does not exist.
+ *
+ * \par Examples
+ * \code
+ * X :== f(a, b)            succeeds
+ * X :== f(b, a)            succeeds again, replacing the value
+ * X :== f(X, a)            fails due to occurs check
+ * X :== Y + Z              sets X to (Y + Z), does not evaluate
+ * X :== pi                 sets X to the atom pi, does not evaluate
+ * X.name :== 42            sets the name property of object X to 42
+ * a :== X                  type_error(variable, a)
+ * \endcode
+ *
+ * \par See Also
+ * \ref assign_2 "(:=)/2",
+ * \ref num_assign_2 "(::=)/2",
+ * \ref bt_num_assign_2 "(::==)/2",
+ * \ref unify_2 "(=)/2"
+ */
+static p_goal_result p_builtin_bt_assign
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *var;
+    p_term *prev;
+    var = p_term_resolve_variable(context, args[0]);
+    if (!var) {
+        *error = p_create_type_error(context, "variable", args[0]);
+        return P_RESULT_ERROR;
+    }
+    prev = var->var.value;
+    var->var.value = 0;
+    if (!p_term_occurs_in(var, args[1])) {
+        _p_context_record_contents_in_trail
+            (context, (void **)&(var->var.value), prev);
+        var->var.value = args[1];
+        return P_RESULT_TRUE;
+    }
+    var->var.value = prev;
+    return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup assignment
+ * <hr>
+ * \anchor bt_num_assign_2
+ * <b>(::==)/2</b> - back-trackable variable assignment of an
+ * arithmetic term.
+ *
+ * \par Usage
+ * \em Var <b>::==</b> \em Term
+ *
+ * \par Description
+ * Evaluates \em Term according to the rules of \ref is_2 "is/2",
+ * and assigns it to \em Var, replacing its previous value.
+ * \par
+ * Upon back-tracking, \em Var will revert to its previous value.
+ * Use \ref num_assign_2 "(::=)/2" for destructive assignment.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is not
+ *     a variable.
+ * \li <tt>type_error(variable, \em Var)</tt> - \em Var is a member
+ *     variable reference but the member does not exist.
+ *
+ * The errors for \ref is_2 "is/2" may also be thrown during
+ * the evaluation of \em Term.
+ *
+ * \par Examples
+ * \code
+ * X ::== X + 1
+ * X ::== pi
+ * X.name ::== 48 - 6       sets the name property of object X to 42
+ * a ::== X                 type_error(variable, a)
+ * \endcode
+ *
+ * \par See Also
+ * \ref assign_2 "(:=)/2",
+ * \ref bt_assign_2 "(:==)/2",
+ * \ref num_assign_2 "(::=)/2",
+ * \ref is_2 "is/2"
+ */
+static p_goal_result p_builtin_bt_num_assign
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *var;
+    p_arith_value value;
+    p_goal_result result;
+    var = p_term_resolve_variable(context, args[0]);
+    if (!var) {
+        *error = p_create_type_error(context, "variable", args[0]);
+        return P_RESULT_ERROR;
+    }
+    result = p_arith_eval(context, &value, args[1], error);
+    if (result != P_RESULT_TRUE)
+        return result;
+    _p_context_record_contents_in_trail
+        (context, (void **)&(var->var.value), var->var.value);
+    switch (value.type) {
+    case P_TERM_INTEGER:
+        var->var.value =
+            p_term_create_integer(context, value.integer_value);
+        break;
+    case P_TERM_REAL:
+        var->var.value =
+            p_term_create_real(context, value.real_value);
+        break;
+    case P_TERM_STRING:
+        var->var.value = value.string_value;
+        break;
+    default: return P_RESULT_FAIL;
+    }
+    return P_RESULT_TRUE;
+}
+
+/*\@}*/
+
 /* Dummy implementations for stdout/stderr printing until
  * we get a better I/O system up and running */
 static p_goal_result p_builtin_print
@@ -4134,6 +4461,10 @@ void _p_db_init_builtins(p_context *context)
         {"?-", 1, p_builtin_call},
         {":-", 1, p_builtin_call},
         {"=..", 2, p_builtin_univ},
+        {":=", 2, p_builtin_assign},
+        {"::=", 2, p_builtin_num_assign},
+        {":==", 2, p_builtin_bt_assign},
+        {"::==", 2, p_builtin_bt_num_assign},
         {"abolish", 1, p_builtin_abolish},
         {"arg", 3, p_builtin_arg},
         {"asserta", 1, p_builtin_asserta},

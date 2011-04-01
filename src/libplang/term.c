@@ -601,7 +601,7 @@ p_term *p_term_deref(const p_term *term)
  * for back-tracking.
  *
  * \ingroup term
- * \sa p_term_type(), p_term_deref()
+ * \sa p_term_type(), p_term_deref(), p_term_deref_own_member()
  */
 p_term *p_term_deref_member(p_context *context, p_term *term)
 {
@@ -616,6 +616,50 @@ p_term *p_term_deref_member(p_context *context, p_term *term)
     if (!object || object->header.type != P_TERM_OBJECT)
         return term;
     value = p_term_property(context, object, term->member_var.name);
+    if (value) {
+        /* Propery has a value - bind the term to it */
+        p_term_bind_variable(context, term, value, P_BIND_DEFAULT);
+    } else if (term->header.size) {
+        /* Auto-create the property with an unbound variable slot,
+         * and then bind this term to the new variable */
+        value = p_term_create_variable(context);
+        p_term_add_property
+            (context, object, term->member_var.name, value);
+        p_term_bind_variable(context, term, value, P_BIND_DEFAULT);
+    }
+    return term;
+}
+
+/**
+ * \brief Dereferences \a term to resolve bound variables
+ * within \a context.
+ *
+ * Returns the dereferenced version of \a term, or null if
+ * \a term is null.  The result may be a variable if it is unbound.
+ *
+ * This function differs from p_term_deref_member() in that it will
+ * only resolve member references on the object itself, not on
+ * class prototypes.  This is typically used in the implementation
+ * of variable assignment predicates such as \ref assign_2 "(:=)/2"
+ * where the class prototype should be read-only with respect
+ * to an assignment to an object property.
+ *
+ * \ingroup term
+ * \sa p_term_deref_member()
+ */
+p_term *p_term_deref_own_member(p_context *context, p_term *term)
+{
+    p_term *object;
+    p_term *value;
+    if (!term)
+        return 0;
+    term = p_term_deref_non_null(term);
+    if (term->header.type != P_TERM_MEMBER_VARIABLE)
+        return term;
+    object = p_term_deref_member(context, term->member_var.object);
+    if (!object || object->header.type != P_TERM_OBJECT)
+        return term;
+    value = p_term_own_property(context, object, term->member_var.name);
     if (value) {
         /* Propery has a value - bind the term to it */
         p_term_bind_variable(context, term, value, P_BIND_DEFAULT);
@@ -1436,7 +1480,7 @@ p_term *p_term_create_member_name
 }
 
 /* Perform an occurs check */
-static int p_term_occurs_in(const p_term *var, const p_term *value)
+int p_term_occurs_in(const p_term *var, const p_term *value)
 {
     unsigned int index;
     if (!value)

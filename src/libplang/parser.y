@@ -526,6 +526,7 @@ static p_term *create_clause_head
 %token K_NUM_GT         "`>'"
 %token K_NUM_GE         "`>='"
 %token K_NUM_GETS       "`::='"
+%token K_NUM_BT_GETS    "`::=='"
 %token K_BITWISE_AND    "`/\\'"
 %token K_BITWISE_OR     "`\\/'"
 %token K_BITWISE_NOT    "`\\'"
@@ -535,6 +536,7 @@ static p_term *create_clause_head
 %token K_EXP            "`**'"
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
+%token K_BT_GETS        "`:=='"
 %token K_CASE           "`case'"
 %token K_CATCH          "`catch'"
 %token K_CLASS          "`class'"
@@ -821,8 +823,14 @@ compare_term
     | additive_term K_GETS additive_term {
             $$ = binary_term(":=", $1, $3);
         }
+    | additive_term K_BT_GETS additive_term {
+            $$ = binary_term(":==", $1, $3);
+        }
     | additive_term K_NUM_GETS additive_term {
             $$ = binary_term("::=", $1, $3);
+        }
+    | additive_term K_NUM_BT_GETS additive_term {
+            $$ = binary_term("::==", $1, $3);
         }
     | additive_term     { $$ = $1; }
     ;
