@@ -30,8 +30,8 @@ typedef union p_term p_term;
 p_context *p_context_create(void);
 void p_context_free(p_context *context);
 
-void *p_context_mark_trace(p_context *context);
-void p_context_backtrack_trace(p_context *context, void *marker);
+void *p_context_mark_trail(p_context *context);
+void p_context_backtrack_trail(p_context *context, void *marker);
 
 int p_context_consult_file(p_context *context, const char *filename);
 int p_context_consult_string(p_context *context, const char *str);

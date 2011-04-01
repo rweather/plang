@@ -36,7 +36,7 @@ extern "C" {
  * has modified the search tree */
 #define P_RESULT_TREE_CHANGE    ((p_goal_result)(P_RESULT_HALT + 5))
 
-typedef struct p_trace p_trace;
+typedef struct p_trail p_trail;
 
 struct p_path_list
 {
@@ -73,8 +73,8 @@ struct p_context
     p_term *call_member_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
-    p_trace *trace;
-    int trace_top;
+    p_trail *trail;
+    int trail_top;
 
     int fail_on_unknown : 1;
     int debug : 1;
@@ -94,14 +94,14 @@ struct p_context
 
 #define P_TRACE_SIZE 1020
 
-struct p_trace
+struct p_trail
 {
     void **bindings[P_TRACE_SIZE];
-    p_trace *next;
+    p_trail *next;
 };
 
-int _p_context_record_in_trace(p_context *context, p_term *var);
-int _p_context_record_contents_in_trace(p_context *context, void **location);
+int _p_context_record_in_trail(p_context *context, p_term *var);
+int _p_context_record_contents_in_trail(p_context *context, void **location);
 
 void p_goal_call_from_parser(p_context *context, p_term *goal);
 

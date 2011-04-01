@@ -1627,7 +1627,7 @@ int p_builtin_handle_catch(p_context *context, p_term *error)
     p_term *catch_clause_atom = p_term_create_atom(context, "$$catch");
     p_term *goal;
     while (catcher != 0) {
-        p_context_backtrack_trace(context, catcher->fail_marker);
+        p_context_backtrack_trail(context, catcher->fail_marker);
         goal = p_term_deref_member(context, catcher->goal);
         if (goal->functor.functor_name == catch_atom) {
             /* "catch" block */
@@ -3288,9 +3288,9 @@ static p_goal_result p_builtin_unify
 static p_goal_result p_builtin_not_unifiable
     (p_context *context, p_term **args, p_term **error)
 {
-    void *marker = p_context_mark_trace(context);
+    void *marker = p_context_mark_trail(context);
     if (p_term_unify(context, args[0], args[1], P_BIND_DEFAULT)) {
-        p_context_backtrack_trace(context, marker);
+        p_context_backtrack_trail(context, marker);
         return P_RESULT_FAIL;
     } else {
         return P_RESULT_TRUE;
@@ -3324,9 +3324,9 @@ static p_goal_result p_builtin_not_unifiable
 static p_goal_result p_builtin_unifiable
     (p_context *context, p_term **args, p_term **error)
 {
-    void *marker = p_context_mark_trace(context);
+    void *marker = p_context_mark_trail(context);
     if (p_term_unify(context, args[0], args[1], P_BIND_DEFAULT)) {
-        p_context_backtrack_trace(context, marker);
+        p_context_backtrack_trail(context, marker);
         return P_RESULT_TRUE;
     } else {
         return P_RESULT_FAIL;

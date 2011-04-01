@@ -56,7 +56,7 @@ p_context *p_context_create(void)
     context->fail_atom = p_term_create_atom(context, "fail");
     context->cut_atom = p_term_create_atom(context, "!");
     context->call_member_atom = p_term_create_atom(context, "$$call_member");
-    context->trace_top = P_TRACE_SIZE;
+    context->trail_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
     _p_db_init_arith(context);
@@ -76,101 +76,101 @@ void p_context_free(p_context *context)
     GC_FREE(context);
 }
 
-/* Push a word onto the trace */
-P_INLINE int p_context_push_trace(p_context *context, void **word)
+/* Push a word onto the trail */
+P_INLINE int p_context_push_trail(p_context *context, void **word)
 {
-    if (context->trace_top >= P_TRACE_SIZE) {
-        struct p_trace *trace = GC_NEW(struct p_trace);
-        if (!trace)
+    if (context->trail_top >= P_TRACE_SIZE) {
+        struct p_trail *trail = GC_NEW(struct p_trail);
+        if (!trail)
             return 0;
-        trace->next = context->trace;
-        context->trace = trace;
-        context->trace_top = 0;
+        trail->next = context->trail;
+        context->trail = trail;
+        context->trail_top = 0;
     }
-    context->trace->bindings[(context->trace_top)++] = word;
+    context->trail->bindings[(context->trail_top)++] = word;
     return 1;
 }
 
-/* Pop a word from the trace */
-P_INLINE void **p_context_pop_trace(p_context *context, void *marker)
+/* Pop a word from the trail */
+P_INLINE void **p_context_pop_trail(p_context *context, void *marker)
 {
     void **word;
     void ***wordp;
 
     /* Have we reached the marker? */
-    if (!context->trace)
+    if (!context->trail)
         return 0;
-    wordp = &(context->trace->bindings[context->trace_top]);
+    wordp = &(context->trail->bindings[context->trail_top]);
     if (wordp == (void ***)marker)
         return 0;
 
     /* Pop the word and zero it out so that the garbage collector
      * will forget the reference to the popped word */
-    --(context->trace_top);
+    --(context->trail_top);
     word = *(--wordp);
     *wordp = 0;
 
-    /* Free the trace block if it is now empty */
-    if (context->trace_top <= 0) {
-        struct p_trace *trace = context->trace;
-        context->trace = trace->next;
-        context->trace_top = P_TRACE_SIZE;
-        GC_FREE(trace);
+    /* Free the trail block if it is now empty */
+    if (context->trail_top <= 0) {
+        struct p_trail *trail = context->trail;
+        context->trail = trail->next;
+        context->trail_top = P_TRACE_SIZE;
+        GC_FREE(trail);
     }
     return word;
 }
 
 /**
- * \brief Marks the current position in the backtrack trace
+ * \brief Marks the current position in the backtrack trail
  * in \a context and returns a marker pointer.
  *
  * \ingroup context
- * \sa p_context_backtrace_trace()
+ * \sa p_context_backtrack_trail()
  */
-void *p_context_mark_trace(p_context *context)
+void *p_context_mark_trail(p_context *context)
 {
-    if (context->trace)
-        return (void *)&(context->trace->bindings[context->trace_top]);
+    if (context->trail)
+        return (void *)&(context->trail->bindings[context->trail_top]);
     else
         return 0;
 }
 
 /**
- * \brief Backtracks the trace in \a context, undoing variable
+ * \brief Backtracks the trail in \a context, undoing variable
  * bindings until \a marker is reached.
  *
  * \ingroup context
- * \sa p_context_mark_trace()
+ * \sa p_context_mark_trail()
  */
-void p_context_backtrack_trace(p_context *context, void *marker)
+void p_context_backtrack_trail(p_context *context, void *marker)
 {
     void **word;
-    while ((word = p_context_pop_trace(context, marker)) != 0) {
+    while ((word = p_context_pop_trail(context, marker)) != 0) {
         if (!(((long)word) & 1L)) {
             /* Reset a regular variable to unbound */
             *word = 0;
         } else {
             /* Restore a previous value from before an assignment */
-            void *value = (void *)p_context_pop_trace(context, marker);
+            void *value = (void *)p_context_pop_trail(context, marker);
             word = (void **)(((long)word) & ~1L);
             *word = value;
         }
     }
 }
 
-int _p_context_record_in_trace(p_context *context, p_term *var)
+int _p_context_record_in_trail(p_context *context, p_term *var)
 {
-    return p_context_push_trace(context, (void **)&(var->var.value));
+    return p_context_push_trail(context, (void **)&(var->var.value));
 }
 
-int _p_context_record_contents_in_trace(p_context *context, void **location)
+int _p_context_record_contents_in_trail(p_context *context, void **location)
 {
     long loc = ((long)location) | 1L;
-    if (!p_context_push_trace(context, (void **)(*location)))
+    if (!p_context_push_trail(context, (void **)(*location)))
         return 0;
-    if (p_context_push_trace(context, (void **)loc))
+    if (p_context_push_trail(context, (void **)loc))
         return 1;
-    p_context_pop_trace(context, 0);
+    p_context_pop_trail(context, 0);
     return 0;
 }
 
@@ -547,7 +547,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
 
         /* Determine what needs to be done next for this goal */
         *error = 0;
-        current->fail_marker = p_context_mark_trace(context);
+        current->fail_marker = p_context_mark_trail(context);
         result = p_goal_execute_inner(context, goal, error);
         if (result == P_RESULT_TRUE) {
             /* Success of deterministic leaf goal */
@@ -572,7 +572,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             if (!(context->current_node))
                 break;      /* Final top-level goal failure */
             context->fail_node = context->current_node->cut_node;
-            p_context_backtrack_trace
+            p_context_backtrack_trail
                 (context, context->current_node->fail_marker);
         } else if (result == P_RESULT_ERROR) {
             /* Find an enclosing "catch" block to handle the error */
@@ -638,7 +638,7 @@ p_goal_result p_context_execute_goal
     context->current_node->goal = goal;
     context->fail_node = 0;
     context->goal_active = 1;
-    context->goal_marker = p_context_mark_trace(context);
+    context->goal_marker = p_context_mark_trail(context);
     result = p_goal_execute(context, &error_term);
     if (error)
         *error = error_term;
@@ -674,7 +674,7 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
     p_goal_result result;
     if (!context->current_node)
         return P_RESULT_FAIL;
-    p_context_backtrack_trace
+    p_context_backtrack_trail
         (context, context->current_node->fail_marker);
     result = p_goal_execute(context, &error_term);
     if (error)
@@ -700,7 +700,7 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
 void p_context_abandon_goal(p_context *context)
 {
     if (context->goal_active) {
-        p_context_backtrack_trace(context, context->goal_marker);
+        p_context_backtrack_trail(context, context->goal_marker);
         context->goal_active = 0;
         context->goal_marker = 0;
         context->current_node = 0;
@@ -713,7 +713,7 @@ void p_context_abandon_goal(p_context *context)
 void p_goal_call_from_parser(p_context *context, p_term *goal)
 {
     p_term *error = 0;
-    void *marker = p_context_mark_trace(context);
+    void *marker = p_context_mark_trail(context);
     p_goal_result result;
     p_exec_node *current = context->current_node;
     p_exec_node *fail = context->fail_node;
@@ -728,7 +728,7 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
     } else {
         result = P_RESULT_FAIL;
     }
-    p_context_backtrack_trace(context, marker);
+    p_context_backtrack_trail(context, marker);
     if (result == P_RESULT_TRUE)
         return;
     goal = p_term_deref_member(context, goal);

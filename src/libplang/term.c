@@ -597,7 +597,7 @@ p_term *p_term_deref(const p_term *term)
  *
  * This function differs from p_term_deref() in that it will
  * attempt to resolve P_TERM_MEMBER_VARIABLE references,
- * recording their bindings in the trace of \a context
+ * recording their bindings in the trail of \a context
  * for back-tracking.
  *
  * \ingroup term
@@ -1516,7 +1516,7 @@ static int p_term_occurs_in(const p_term *var, const p_term *value)
  *
  * This is typically used when the first term is a newly formed
  * predicate instance whose free variables will be discarded
- * upon back-tracking without assistance from the trace.
+ * upon back-tracking without assistance from the trail.
  */
 
 /**
@@ -1555,7 +1555,7 @@ int p_term_bind_variable(p_context *context, p_term *var, p_term *value, int fla
             return 0;
     }
     if ((flags & P_BIND_NO_RECORD) == 0) {
-        if (!_p_context_record_in_trace(context, var))
+        if (!_p_context_record_in_trail(context, var))
             return 0;
     }
     var->var.value = value;
@@ -1570,7 +1570,7 @@ P_INLINE int p_term_bind_var(p_context *context, p_term *var, p_term *value, int
             return 0;
     }
     if ((flags & P_BIND_NO_RECORD) == 0) {
-        if (!_p_context_record_in_trace(context, var))
+        if (!_p_context_record_in_trail(context, var))
             return 0;
     }
     var->var.value = value;
@@ -1733,10 +1733,10 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
  */
 int p_term_unify(p_context *context, p_term *term1, p_term *term2, int flags)
 {
-    void *marker = p_context_mark_trace(context);
+    void *marker = p_context_mark_trail(context);
     int result = p_term_unify_inner(context, term1, term2, flags);
     if (!result && (flags & P_BIND_NO_RECORD) == 0)
-        p_context_backtrack_trace(context, marker);
+        p_context_backtrack_trail(context, marker);
     return result;
 }
 
@@ -2355,7 +2355,7 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
             clone = p_term_create_variable(context);
         if (!clone)
             return 0;
-        _p_context_record_in_trace(context, term);
+        _p_context_record_in_trail(context, term);
         rename = p_term_malloc
             (context, p_term, sizeof(struct p_term_rename));
         if (!rename)
@@ -2374,7 +2374,7 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
              (int)(term->header.size));
         if (!clone)
             return 0;
-        _p_context_record_in_trace(context, term);
+        _p_context_record_in_trail(context, term);
         rename = p_term_malloc
             (context, p_term, sizeof(struct p_term_rename));
         if (!rename)
@@ -2401,13 +2401,13 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
  */
 p_term *p_term_clone(p_context *context, p_term *term)
 {
-    /* We use the trace to record temporary bindings of variables
+    /* We use the trail to record temporary bindings of variables
      * to P_TERM_RENAME terms, and then back them out at the end.
      * This won't be safe in concurrent environments, so we will
      * need to come up with a better solution later */
-    void *marker = p_context_mark_trace(context);
+    void *marker = p_context_mark_trail(context);
     p_term *clone = p_term_clone_inner(context, term);
-    p_context_backtrack_trace(context, marker);
+    p_context_backtrack_trail(context, marker);
     return clone;
 }
 
@@ -2484,17 +2484,17 @@ p_term *p_term_unify_member_clause(p_context *context, p_term *term, p_term *cla
     head = clone->functor.arg[0];
     if (!head)
         return 0;
-    marker = p_context_mark_trace(context);
+    marker = p_context_mark_trail(context);
     for (index = 0; index < term->header.size; ++index) {
         if (!p_term_unify(context, term->functor.arg[index],
                           head->functor.arg[index], P_BIND_DEFAULT)) {
-            p_context_backtrack_trace(context, marker);
+            p_context_backtrack_trail(context, marker);
             return 0;
         }
     }
     if (!p_term_unify(context, self, clone->functor.arg[1],
                       P_BIND_DEFAULT)) {
-        p_context_backtrack_trace(context, marker);
+        p_context_backtrack_trail(context, marker);
         return 0;
     }
 

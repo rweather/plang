@@ -894,7 +894,7 @@ static void test_unify()
     char *result2;
     int flags, unify_result;
     for (index = 0; index < unify_data_len; ++index) {
-        void *marker = p_context_mark_trace(context);
+        void *marker = p_context_mark_trail(context);
         clear_parse_state();
         P_TEST_SET_ROW(unify_data[index].row);
         term1 = unify_data[index].term1
@@ -911,7 +911,7 @@ static void test_unify()
             result2 = term_to_string(term2);
             P_VERIFY(!strcmp(result1, unify_data[index].result));
             P_VERIFY(!strcmp(result2, unify_data[index].result));
-            p_context_backtrack_trace(context, marker);
+            p_context_backtrack_trail(context, marker);
         }
         /* Did the backtrack return to the original state? */
         if (flags & P_BIND_NO_REVERSE)
