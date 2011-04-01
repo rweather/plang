@@ -114,7 +114,7 @@ static p_goal_result p_arith_eval
     (p_context *context, p_arith_value *result,
      p_term *expr, p_term **error)
 {
-    expr = p_term_deref(expr);
+    expr = p_term_deref_member(context, expr);
     if (!expr || (expr->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
@@ -743,7 +743,7 @@ static p_goal_result p_builtin_num_ge
 static p_goal_result p_builtin_fperror
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *type = p_term_deref(args[0]);
+    p_term *type = p_term_deref_member(context, args[0]);
     if (!type || (type->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;

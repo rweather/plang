@@ -355,8 +355,8 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     p_exec_node *current;
     p_exec_node *next;
 
-    /* Bail out if the goal is a variable */
-    goal = p_term_deref(goal);
+    /* Bail out if the goal is a variable.  It is assumed that
+     * the goal has already been dereferenced by the caller */
     if (!goal || (goal->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
@@ -500,7 +500,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
                 current->goal = context->fail_atom;
             }
         }
-        goal = p_term_deref(current->goal);
+        goal = p_term_deref_member(context, current->goal);
 
         /* Debugging: output the goal details, including next goals */
 #ifdef P_GOAL_DEBUG
@@ -731,7 +731,7 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
     p_context_backtrack_trace(context, marker);
     if (result == P_RESULT_TRUE)
         return;
-    goal = p_term_deref(goal);
+    goal = p_term_deref_member(context, goal);
     if (goal && goal->header.type == P_TERM_FUNCTOR &&
             goal->header.size == 3 &&
             goal->functor.functor_name == context->line_atom) {

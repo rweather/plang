@@ -391,10 +391,10 @@ static void p_builtin_add_member_predicate
 static p_goal_result p_builtin_new_class
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *name = p_term_deref(args[0]);
-    p_term *parent = p_term_deref(args[1]);
-    p_term *vars = p_term_deref(args[2]);
-    p_term *clauses = p_term_deref(args[3]);
+    p_term *name = p_term_deref_member(context, args[0]);
+    p_term *parent = p_term_deref_member(context, args[1]);
+    p_term *vars = p_term_deref_member(context, args[2]);
+    p_term *clauses = p_term_deref_member(context, args[3]);
     p_database_info *info;
     p_database_info *info2;
     p_class_info *class_info;
@@ -466,7 +466,7 @@ static p_goal_result p_builtin_new_class
             *error = p_create_type_error(context, "atom_list", vars);
             return P_RESULT_ERROR;
         }
-        var_name = p_term_deref(list->list.head);
+        var_name = p_term_deref_member(context, list->list.head);
         if (!var_name ||
                 (var_name->header.type & P_TERM_VARIABLE) != 0) {
             *error = p_create_instantiation_error(context);
@@ -482,7 +482,7 @@ static p_goal_result p_builtin_new_class
                 (context, "member_name", var_name);
             return P_RESULT_ERROR;
         }
-        list = p_term_deref(list->list.tail);
+        list = p_term_deref_member(context, list->list.tail);
     }
 
     /* Create the class information block and the object */
@@ -503,7 +503,7 @@ static p_goal_result p_builtin_new_class
     member_atom = p_term_create_atom(context, "member");
     while (list && list->header.type == P_TERM_LIST) {
         /* Extract clause(MemberName, Kind, ClauseBody) from the list */
-        clause_term = p_term_deref(list->list.head);
+        clause_term = p_term_deref_member(context, list->list.head);
         if (!clause_term ||
                 (clause_term->header.type & P_TERM_VARIABLE) != 0) {
             *error = p_create_instantiation_error(context);
@@ -512,15 +512,19 @@ static p_goal_result p_builtin_new_class
         if (clause_term->header.type == P_TERM_FUNCTOR &&
                 clause_term->header.size == 3 &&
                 clause_term->functor.functor_name == context->line_atom)
-            clause_term = p_term_deref(clause_term->functor.arg[2]);
+            clause_term = p_term_deref_member
+                (context, clause_term->functor.arg[2]);
         if (clause_term->header.type != P_TERM_FUNCTOR ||
                 clause_term->header.size != 3 ||
                 clause_term->functor.functor_name != clause_atom) {
             break;
         }
-        member_name = p_term_deref(clause_term->functor.arg[0]);
-        kind = p_term_deref(clause_term->functor.arg[1]);
-        clause_body = p_term_deref(clause_term->functor.arg[2]);
+        member_name = p_term_deref_member
+            (context, clause_term->functor.arg[0]);
+        kind = p_term_deref_member
+            (context, clause_term->functor.arg[1]);
+        clause_body = p_term_deref_member
+            (context, clause_term->functor.arg[2]);
         if (!member_name || member_name->header.type != P_TERM_ATOM)
             break;
         if (!kind || kind->header.type != P_TERM_ATOM)
@@ -547,7 +551,8 @@ static p_goal_result p_builtin_new_class
             p_term *pred, *head;
             pred = p_term_create_functor
                 (context, context->slash_atom, 2);
-            head = p_term_deref(clause_body->functor.arg[0]);
+            head = p_term_deref_member
+                (context, clause_body->functor.arg[0]);
             if (head->header.type == P_TERM_FUNCTOR) {
                 p_term_bind_functor_arg
                     (pred, 0, head->functor.functor_name);
@@ -569,7 +574,8 @@ static p_goal_result p_builtin_new_class
         }
 
         /* Move on to the next clause in the list */
-        list = p_term_deref(list->list.tail);
+        list = p_term_deref_member
+            (context, list->list.tail);
     }
     if (!list || (list->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
@@ -647,8 +653,8 @@ static p_goal_result p_builtin_univ
 static p_goal_result p_builtin_new
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *name = p_term_deref(args[0]);
-    p_term *var = p_term_deref(args[1]);
+    p_term *name = p_term_deref_member(context, args[0]);
+    p_term *var = p_term_deref_member(context, args[1]);
     p_term *obj;
     p_database_info *info;
     p_class_info *class_info;
@@ -684,15 +690,15 @@ static p_goal_result p_builtin_new
 
     /* Create unbound variable property slots for all declared fields */
     do {
-        vars = p_term_deref(class_info->var_list);
+        vars = p_term_deref_member(context, class_info->var_list);
         while (vars && vars->header.type == P_TERM_LIST) {
-            var_name = p_term_deref(vars->list.head);
+            var_name = p_term_deref_member(context, vars->list.head);
             if (!p_term_own_property(context, obj, var_name)) {
                 p_term_add_property
                     (context, obj, var_name,
                      p_term_create_variable(context));
             }
-            vars = p_term_deref(vars->list.tail);
+            vars = p_term_deref_member(context, vars->list.tail);
         }
         class_info = class_info->parent;
     } while (class_info);
@@ -752,7 +758,7 @@ static p_term *p_builtin_parse_indicator
 {
     p_term *name_term;
     p_term *arity_term;
-    pred = p_term_deref(pred);
+    pred = p_term_deref_member(context, pred);
     if (!pred || (pred->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return 0;
@@ -763,8 +769,8 @@ static p_term *p_builtin_parse_indicator
             (context, "predicate_indicator", pred);
         return 0;
     }
-    name_term = p_term_deref(pred->functor.arg[0]);
-    arity_term = p_term_deref(pred->functor.arg[1]);
+    name_term = p_term_deref_member(context, pred->functor.arg[0]);
+    arity_term = p_term_deref_member(context, pred->functor.arg[1]);
     if (!name_term || (name_term->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return 0;
@@ -922,7 +928,7 @@ static p_goal_result p_builtin_abolish
 static p_goal_result p_builtin_assert
     (p_context *context, p_term **args, p_term **error, int at_start)
 {
-    p_term *clause = p_term_deref(args[0]);
+    p_term *clause = p_term_deref_member(context, args[0]);
     p_term *head;
     p_term *pred;
     if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
@@ -932,7 +938,7 @@ static p_goal_result p_builtin_assert
     if (clause->header.type == P_TERM_FUNCTOR &&
             clause->header.size == 2 &&
             clause->functor.functor_name == context->clause_atom) {
-        head = p_term_deref(clause->functor.arg[0]);
+        head = p_term_deref_member(context, clause->functor.arg[0]);
     } else {
         head = clause;
         clause = p_term_create_functor
@@ -1047,7 +1053,7 @@ static p_goal_result p_builtin_assertz
 static p_goal_result p_builtin_retract
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *clause = p_term_deref(args[0]);
+    p_term *clause = p_term_deref_member(context, args[0]);
     p_term *head;
     p_term *pred;
     int result;
@@ -1058,7 +1064,7 @@ static p_goal_result p_builtin_retract
     if (clause->header.type == P_TERM_FUNCTOR &&
             clause->header.size == 2 &&
             clause->functor.functor_name == context->clause_atom) {
-        head = p_term_deref(clause->functor.arg[0]);
+        head = p_term_deref_member(context, clause->functor.arg[0]);
     } else {
         head = clause;
         clause = p_term_create_functor
@@ -1469,7 +1475,7 @@ static p_goal_result p_builtin_import
 static p_goal_result p_builtin_logical_or
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *term = p_term_deref(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
     p_exec_node *current;
     p_exec_node *retry;
     p_exec_node *cut;
@@ -1622,7 +1628,7 @@ int p_builtin_handle_catch(p_context *context, p_term *error)
     p_term *goal;
     while (catcher != 0) {
         p_context_backtrack_trace(context, catcher->fail_marker);
-        goal = p_term_deref(catcher->goal);
+        goal = p_term_deref_member(context, catcher->goal);
         if (goal->functor.functor_name == catch_atom) {
             /* "catch" block */
             if (p_term_unify(context, error,
@@ -1634,9 +1640,10 @@ int p_builtin_handle_catch(p_context *context, p_term *error)
             }
         } else {
             /* "try" block */
-            p_term *list = p_term_deref(goal->functor.arg[1]);
+            p_term *list = p_term_deref_member(context, goal->functor.arg[1]);
             while (list && list->header.type == P_TERM_LIST) {
-                p_term *head = p_term_deref(p_term_head(list));
+                p_term *head = p_term_deref_member
+                    (context, p_term_head(list));
                 if (head->header.type == P_TERM_FUNCTOR &&
                         head->header.size == 2 &&
                         head->functor.functor_name
@@ -1649,7 +1656,7 @@ int p_builtin_handle_catch(p_context *context, p_term *error)
                         return 1;
                     }
                 }
-                list = p_term_deref(p_term_tail(list));
+                list = p_term_deref_member(context, p_term_tail(list));
             }
         }
         catcher = catcher->catch_node;
@@ -1990,7 +1997,7 @@ static p_goal_result p_builtin_halt_0
 static p_goal_result p_builtin_halt_1
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *exitval = p_term_deref(args[0]);
+    p_term *exitval = p_term_deref_member(context, args[0]);
     if (!exitval || (exitval->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
@@ -2770,8 +2777,8 @@ static p_goal_result p_builtin_term_ge
 static p_goal_result p_builtin_univ
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *term = p_term_deref(args[0]);
-    p_term *list = p_term_deref(args[1]);
+    p_term *term = p_term_deref_member(context, args[0]);
+    p_term *list = p_term_deref_member(context, args[1]);
     p_term *new_term;
     p_term *functor;
     p_term *member;
@@ -2828,21 +2835,21 @@ static p_goal_result p_builtin_univ
             return P_RESULT_ERROR;
         }
         length = 1;
-        member = p_term_deref(list->list.tail);
+        member = p_term_deref_member(context, list->list.tail);
         while (member != context->nil_atom) {
             if (!member || member->header.type != P_TERM_LIST) {
                 *error = p_create_instantiation_error(context);
                 return P_RESULT_ERROR;
             }
             ++length;
-            member = p_term_deref(member->list.tail);
+            member = p_term_deref_member(context, member->list.tail);
         }
-        functor = p_term_deref(list->list.head);
+        functor = p_term_deref_member(context, list->list.head);
         if ((functor->header.type & P_TERM_VARIABLE) != 0) {
             *error = p_create_instantiation_error(context);
             return P_RESULT_ERROR;
         }
-        list_args = p_term_deref(list->list.tail);
+        list_args = p_term_deref_member(context, list->list.tail);
         if (length == 1) {
             switch (functor->header.type) {
             case P_TERM_ATOM:
@@ -2861,7 +2868,8 @@ static p_goal_result p_builtin_univ
         } else if (functor == context->dot_atom && length == 3) {
             new_term = p_term_create_list
                 (context, list_args->list.head,
-                 p_term_deref(list_args->list.tail)->list.head);
+                 p_term_deref_member
+                    (context, list_args->list.tail)->list.head);
         } else if (functor->header.type != P_TERM_ATOM) {
             *error = p_create_type_error(context, "atom", functor);
             return P_RESULT_ERROR;
@@ -2871,7 +2879,8 @@ static p_goal_result p_builtin_univ
             for (index = 0; index < (length - 1); ++index) {
                 p_term_bind_functor_arg
                     (new_term, index, list_args->list.head);
-                list_args = p_term_deref(list_args->list.tail);
+                list_args = p_term_deref_member
+                    (context, list_args->list.tail);
             }
         }
         if (p_term_unify(context, term, new_term, P_BIND_DEFAULT))
@@ -2934,8 +2943,8 @@ static p_goal_result p_builtin_univ
 static p_goal_result p_builtin_arg
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *number = p_term_deref(args[0]);
-    p_term *term = p_term_deref(args[1]);
+    p_term *number = p_term_deref_member(context, args[0]);
+    p_term *term = p_term_deref_member(context, args[1]);
     p_term *arg;
     int num;
     if (!number || (number->header.type & P_TERM_VARIABLE) != 0) {
@@ -3088,9 +3097,9 @@ static p_goal_result p_builtin_copy_term
 static p_goal_result p_builtin_functor
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *term = p_term_deref(args[0]);
-    p_term *name = p_term_deref(args[1]);
-    p_term *arity = p_term_deref(args[2]);
+    p_term *term = p_term_deref_member(context, args[0]);
+    p_term *name = p_term_deref_member(context, args[1]);
+    p_term *arity = p_term_deref_member(context, args[2]);
     p_term *new_term;
     int arity_value, index;
     if (!term || !name || !arity) {
@@ -3474,7 +3483,7 @@ static p_goal_result p_builtin_atomic
 static p_goal_result p_builtin_class_1
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *term = p_term_deref(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
     if (p_term_is_class_object(context, term)) {
         return P_RESULT_TRUE;
     } else if (p_term_type(term) == P_TERM_ATOM) {
@@ -3529,7 +3538,7 @@ static p_goal_result p_builtin_class_1
 static p_goal_result p_builtin_class_2
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *name = p_term_deref(args[0]);
+    p_term *name = p_term_deref_member(context, args[0]);
     int type = p_term_type(name);
     if (type == P_TERM_ATOM) {
         p_database_info *db_info = name->atom.db_info;
@@ -3830,7 +3839,7 @@ static p_goal_result p_builtin_object_1
 static p_goal_result p_builtin_object_2
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *class_object = p_term_deref(args[1]);
+    p_term *class_object = p_term_deref_member(context, args[1]);
     if (p_term_type(class_object) == P_TERM_ATOM) {
         p_database_info *db_info = class_object->atom.db_info;
         if (!db_info || !(db_info->class_info))
@@ -3937,7 +3946,7 @@ static p_goal_result p_builtin_predicate_1
 static p_goal_result p_builtin_predicate_2
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term *term = p_term_deref(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
     if (!term) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
