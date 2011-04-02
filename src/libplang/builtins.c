@@ -744,6 +744,115 @@ static p_goal_result p_builtin_new_object
     return P_RESULT_TREE_CHANGE;
 }
 
+static p_term *p_create_member_existence_error
+    (p_context *context, p_term *object, p_term *name, p_term *arg_head)
+{
+    p_term *class_name = p_term_property
+        (context, object, context->class_name_atom);
+    p_term *full_name = p_term_create_member_name
+        (context, class_name, name);
+    p_term *pred = p_term_create_functor
+        (context, context->slash_atom, 2);
+    p_term_bind_functor_arg(pred, 0, full_name);
+    p_term_bind_functor_arg
+        (pred, 1, p_term_create_integer
+            (context, (int)(arg_head->header.size)));
+    return p_create_existence_error(context, "member_predicate", pred);
+}
+
+/* Implementation of '$$call_member'(X.name, '$$'(X, args)) */
+static p_goal_result p_builtin_call_member
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *member = p_term_deref(args[0]);
+    p_term *arg_head = p_term_deref(args[1]);
+    p_term *object;
+    p_term *predicate;
+    p_term *list;
+    p_term *clause_list;
+    p_term *body;
+    p_exec_node *current;
+    p_exec_node *next;
+    int arity;
+
+    /* Validate the parameters */
+    if (!member || member->header.type != P_TERM_MEMBER_VARIABLE)
+        return P_RESULT_FAIL;
+    if (!arg_head || arg_head->header.type != P_TERM_FUNCTOR)
+        return P_RESULT_FAIL;
+    object = p_term_deref_member(context, member->member_var.object);
+    if (!object || object->header.type != P_TERM_OBJECT) {
+        *error = p_create_type_error(context, "object", object);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find the predicate to be executed via this member */
+    predicate = p_term_property
+        (context, object, member->member_var.name);
+    if (!predicate) {
+        *error = p_create_member_existence_error
+            (context, object, member->member_var.name, arg_head);
+        return P_RESULT_ERROR;
+    }
+    if (predicate->header.type == P_TERM_LIST) {
+        /* Overloaded predicate member: search for the correct arity */
+        list = predicate;
+        arity = -1;
+        do {
+            predicate = p_term_deref(list->list.head);
+            if (predicate &&
+                    predicate->header.type == P_TERM_PREDICATE &&
+                    predicate->header.size == arg_head->header.size) {
+                arity = (int)(arg_head->header.size);
+                break;
+            }
+            list = p_term_deref(list->list.tail);
+        } while (list && list->header.type == P_TERM_LIST);
+    } else if (predicate->header.type == P_TERM_PREDICATE) {
+        /* Single predicate associated with the member name */
+        arity = (int)(predicate->header.size);
+    } else {
+        *error = p_create_type_error(context, "predicate", predicate);
+        return P_RESULT_ERROR;
+    }
+    if (arity != (int)(arg_head->header.size)) {
+        *error = p_create_member_existence_error
+            (context, object, member->member_var.name, arg_head);
+        return P_RESULT_ERROR;
+    }
+
+    /* Search for the first predicate clause that matches */
+    clause_list = predicate->predicate.clauses_head;
+    while (clause_list != 0) {
+        body = p_term_unify_clause
+            (context, arg_head, clause_list->list.head);
+        if (body) {
+            current = context->current_node;
+            clause_list = clause_list->list.tail;
+            if (clause_list) {
+                next = GC_NEW(p_exec_node);
+                if (!next)
+                    return P_RESULT_FAIL;
+                next->goal = arg_head;
+                next->next_clause = clause_list;
+                next->success_node = current->success_node;
+                next->cut_node = context->fail_node;
+                next->catch_node = current->catch_node;
+                next->fail_marker = current->fail_marker;
+                current->goal = body;
+                current->cut_node = context->fail_node;
+                context->fail_node = next;
+            } else {
+                current->goal = body;
+                current->cut_node = context->fail_node;
+            }
+            return P_RESULT_TREE_CHANGE;
+        }
+        clause_list = clause_list->list.tail;
+    }
+    return P_RESULT_FAIL;
+}
+
 /*\@}*/
 
 /**
@@ -4472,6 +4581,7 @@ void _p_db_init_builtins(p_context *context)
         {"atom", 1, p_builtin_atom},
         {"atomic", 1, p_builtin_atomic},
         {"call", 1, p_builtin_call},
+        {"$$call_member", 2, p_builtin_call_member},
         {"catch", 3, p_builtin_catch},
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},

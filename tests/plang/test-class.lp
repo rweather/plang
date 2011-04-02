@@ -21,6 +21,12 @@
 
 class foo
 {
+    var bar;
+
+    bar0() { Self.bar = a; }
+    bar1(X) { X = b; }
+    bar2(X, Y) { Self.bar ::= X + Y; }
+    bar2(X, Y) { Self.bar ::= X - Y; }
 };
 
 new_object()
@@ -38,10 +44,40 @@ decl_errors()
     verify_error(new_class(baz, bay, [], []), existence_error(class, bay));
 }
 
+solutions(Object)
+{
+    Object.bar2(4, 3);
+    retract(sols(Current));
+    X = Object.bar;
+    assertz(sols([X|Current]));
+    fail;
+}
+
+call_method()
+{
+    new foo(F);
+
+    verify(var(F.bar));
+    F.bar0();
+    verify(F.bar == a);
+
+    F.bar1(X);
+    verify(X == b);
+
+    F.bar2(42, 8);
+    verify(F.bar == 50);
+
+    assertz(sols([]));
+    (solutions(F) || true);
+    retract(sols(List));
+    verify(List == [1, 7]);
+}
+
 main(_)
 {
     init("test-class");
     run(new_object);
     run(decl_errors);
+    run(call_method);
     report();
 }

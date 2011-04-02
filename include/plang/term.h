@@ -120,7 +120,6 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
 int p_term_is_ground(const p_term *term);
 p_term *p_term_clone(p_context *context, p_term *term);
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause);
-p_term *p_term_unify_member_clause(p_context *context, p_term *term, p_term *clause);
 
 int p_term_strcmp(const p_term *str1, const p_term *str2);
 p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2);

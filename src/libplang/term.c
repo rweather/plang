@@ -2455,6 +2455,36 @@ p_term *p_term_clone(p_context *context, p_term *term)
     return clone;
 }
 
+/* Unifies only the arguments of a functor term, ignoring the name */
+static int p_term_unify_args_only
+    (p_context *context, p_term *term1, p_term *term2, int flags)
+{
+    void *marker;
+    unsigned int index;
+    if (!term1 || !term2)
+        return 0;
+    term1 = p_term_deref_non_null(term1);
+    term2 = p_term_deref_non_null(term2);
+    if (term1->header.type == P_TERM_FUNCTOR) {
+        if (term2->header.type == P_TERM_FUNCTOR &&
+                term1->header.size == term2->header.size) {
+            marker = p_context_mark_trail(context);
+            for (index = 0; index < term1->header.size; ++index) {
+                if (!p_term_unify(context, term1->functor.arg[index],
+                                  term2->functor.arg[index], flags)) {
+                    p_context_backtrack_trail(context, marker);
+                    return 0;
+                }
+            }
+            return 1;
+        }
+    } else if (term1->header.type == P_TERM_ATOM) {
+        if (term2->header.type == P_TERM_ATOM)
+            return term1 == term2;
+    }
+    return 0;
+}
+
 /**
  * \brief Unifies \a term with the renamed head of \a clause.
  *
@@ -2464,8 +2494,12 @@ p_term *p_term_clone(p_context *context, p_term *term)
  * The return value will be the atom \c true if \a clause
  * does not have a body and \a clause unifies with \a term.
  *
+ * The name of the functor in the head of \a clause is ignored
+ * when unifying against \a term, which makes this function suitable
+ * for matching against member predicates that have qualified names.
+ *
  * \ingroup term
- * \sa p_term_unify(), p_term_clone(), p_term_unify_member_clause()
+ * \sa p_term_unify(), p_term_clone()
  */
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
 {
@@ -2478,72 +2512,15 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
     if (clone->header.type == P_TERM_FUNCTOR &&
             clone->header.size == 2 &&
             clone->functor.functor_name == context->clause_atom) {
-        if (p_term_unify(context, term, clone->functor.arg[0],
-                         P_BIND_DEFAULT))
+        if (p_term_unify_args_only
+                (context, term, clone->functor.arg[0], P_BIND_DEFAULT))
             return clone->functor.arg[1];
     } else {
-        if (p_term_unify(context, term, clone, P_BIND_DEFAULT))
+        if (p_term_unify_args_only
+                (context, term, clone, P_BIND_DEFAULT))
             return context->true_atom;
     }
     return 0;
-}
-
-/**
- * \brief Unifies \a term with the renamed head of a member
- * \a clause.
- *
- * If the unification succeeds, then this function returns the
- * renamed body of \a clause.  Returns null if the unification fails.
- *
- * The \a term must have the form
- * <tt>$$call_member(\em X, \em name(\em Args))</tt> where \em X
- * will be passed to the member clause as the \em Self argument.
- *
- * The \a clause must have the functor <b>(:-)/3</b> with
- * the arguments \em Head, \em Self, and \em Body.  The \em Head
- * does not need to have the same functor as \em name, but it must
- * have the same number of arguments as in \em Args.
- *
- * \ingroup term
- * \sa p_term_unify(), p_term_clone(), p_term_unify_member_clause()
- */
-p_term *p_term_unify_member_clause(p_context *context, p_term *term, p_term *clause)
-{
-    p_term *clone;
-    p_term *self;
-    p_term *head;
-    void *marker;
-    unsigned int index;
-
-    /* Check that the argument count matches in the term and clause */
-    self = term->functor.arg[0];
-    term = p_term_deref(term->functor.arg[1]);
-    if (!term || term->header.type != P_TERM_FUNCTOR)
-        return 0;
-    if (term->header.size != clause->functor.arg[0]->header.size)
-        return 0;
-
-    /* Clone the clause and unify against the head and Self */
-    clone = p_term_clone(context, clause);
-    head = clone->functor.arg[0];
-    if (!head)
-        return 0;
-    marker = p_context_mark_trail(context);
-    for (index = 0; index < term->header.size; ++index) {
-        if (!p_term_unify(context, term->functor.arg[index],
-                          head->functor.arg[index], P_BIND_DEFAULT)) {
-            p_context_backtrack_trail(context, marker);
-            return 0;
-        }
-    }
-    if (!p_term_unify(context, self, clone->functor.arg[1],
-                      P_BIND_DEFAULT)) {
-        p_context_backtrack_trail(context, marker);
-        return 0;
-    }
-
-    /* Return the body of the cloned clause to the caller */
-    return clone->functor.arg[2];
 }
 
 /**
