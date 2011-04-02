@@ -4,6 +4,7 @@ PLANG_TESTS = \
 	test-class.lp \
 	test-compare.lp \
 	test-compose.lp \
+	test-dcg.lp \
 	test-type.lp
 
 TESTS = $(PLANG_TESTS)
