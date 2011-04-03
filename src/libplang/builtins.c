@@ -56,7 +56,8 @@
  * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
  * \ref initialization_1 "(?-)/1",
- * \ref initialization_1 "initialization/1"
+ * \ref initialization_1 "initialization/1",
+ * \ref load_library_1 "load_library/1"
  *
  * \par Logic and control
  * \ref logical_and_2 "(&amp;&amp;)/2",
@@ -1278,7 +1279,8 @@ static p_goal_result p_builtin_retract
  * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
  * \ref initialization_1 "(?-)/1",
- * \ref initialization_1 "initialization/1"
+ * \ref initialization_1 "initialization/1",
+ * \ref load_library_1 "load_library/1"
  */
 /*\@{*/
 
@@ -1444,7 +1446,8 @@ static p_goal_result p_builtin_dynamic
  * directives are not supported by Plang.
  *
  * \par See Also
- * \ref directive_1 "(:-)/1"
+ * \ref directive_1 "(:-)/1",
+ * \ref load_library_1 "load_library/1"
  */
 static p_goal_result p_builtin_import
     (p_context *context, p_term **args, p_term **error)
@@ -1496,6 +1499,54 @@ static p_goal_result p_builtin_import
  * \ref directive_1 "(:-)/1",
  * \ref call_1 "call/1"
  */
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor load_library_1
+ * <b>load_library/1</b> - loads a native C library that implements
+ * Plang predicates.
+ *
+ * \par Usage
+ * <b>:-</b> \b load_library(\em Name).
+ *
+ * \par Description
+ * The \em Name must be an atom or string.  The \em Name is used
+ * as a base name to search for a .so or .dll library.  If found,
+ * the library is loaded and any native predicates implemented
+ * in C are registered with the Plang execution engine.
+ * \par
+ * If the library associated with \em Name can be loaded,
+ * then \b load_library(\em Name) succeeds, fails otherwise.
+ * \par
+ * The <b>load_library/1</b> directive can only be used within a
+ * \ref directive_1 "(:-)/1" directive.  It is typically used to
+ * load native predicates for a module imported with the
+ * \ref import_1 "import/1" directive.
+ *
+ * \par Errors
+ *
+ * \li <tt>system_error</tt> - <b>load_library/1</b> was not used
+ *     within a \ref directive_1 "(:-)/1" directive.
+ *
+ * \par Examples
+ * \code
+ * :- load_library(plang_wordnet).
+ * \endcode
+ *
+ * \par See Also
+ * \ref directive_1 "(:-)/1",
+ * \ref import_1 "import/1"
+ */
+static p_goal_result p_builtin_load_library
+    (p_context *context, p_term **args, p_term **error)
+{
+    /* Library loading is only allowed when parsing a source file
+     * because it isn't possible to know the filename of the
+     * parent when executed from within a normal predicate */
+    *error = p_create_system_error(context);
+    return P_RESULT_ERROR;
+}
 
 /*\@}*/
 
@@ -4654,6 +4705,7 @@ void _p_db_init_builtins(p_context *context)
         {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},
         {"$$line", 3, p_builtin_line},
+        {"load_library", 1, p_builtin_load_library},
         {"$$new", 2, p_builtin_new},
         {"new_class", 4, p_builtin_new_class},
         {"new_object", 3, p_builtin_new_object},

@@ -33,7 +33,7 @@ AC_OBJEXT
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_CHECK_HEADERS(unistd.h sys/types.h sys/stat.h fcntl.h)
-AC_CHECK_HEADERS(sys/mman.h limits.h wchar.h unistd.h)
+AC_CHECK_HEADERS(sys/mman.h limits.h wchar.h unistd.h dlfcn.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
@@ -58,13 +58,26 @@ AC_SUBST(libdir)
 
 dnl Checks for library functions.
 AC_CHECK_LIB(m, sin)
+AC_CHECK_LIB(dl, dlopen)
 AC_FUNC_MEMCMP
 AC_CHECK_FUNCS(vsnprintf _vsnprintf strerror strerror_r fstat mmap munmap)
 AC_CHECK_FUNCS(fork execvp fmod remainder drem feclearexcept fetestexcept)
+AC_CHECK_FUNCS(dlopen)
 AC_FUNC_ALLOCA
 
 AC_CHECK_LIB(gc, GC_gcollect)
 AC_CHECK_HEADERS(gc.h gc/gc.h fenv.h)
+
+dnl Checks for the presence of the WordNet library.
+AC_SUBST(WORDS_LIBS)
+AC_SUBST(WORDS_MODULE)
+AC_SUBST(WORDS_TESTCASE)
+AC_CHECK_LIB(WN, in_wn, [WORDS_LIBS=-lWN
+                         WORDS_MODULE=words
+                         WORDS_TESTCASE=test-words.lp],
+    [AC_CHECK_LIB(wordnet, in_wn, [WORDS_LIBS=-lwordnet
+                                   WORDS_MODULE=words
+                                   WORDS_TESTCASE=test-words.lp])])
 
 AC_CONFIG_FILES([
   Makefile
@@ -73,6 +86,7 @@ AC_CONFIG_FILES([
   src/Makefile
   src/libplang/Makefile
   src/frontend/Makefile
+  src/words/Makefile
   tests/Makefile
   tests/libplang/Makefile
   tests/plang/Makefile])

@@ -25,6 +25,13 @@
 #include "parser-priv.h"
 #include <errno.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#if defined(HAVE_LIBDL) && defined(HAVE_DLFCN_H) && defined(HAVE_DLOPEN)
+#include <unistd.h>
+#include <dlfcn.h>
+#define P_HAVE_DLOPEN 1
+#endif
 
 /**
  * \defgroup context Execution Contexts
@@ -63,6 +70,8 @@ p_context *p_context_create(void)
     return context;
 }
 
+static void p_context_free_libraries(p_context *context);
+
 /**
  * \brief Frees an execution \a context.
  *
@@ -73,6 +82,7 @@ void p_context_free(p_context *context)
 {
     if (!context)
         return;
+    p_context_free_libraries(context);
     GC_FREE(context);
 }
 
@@ -826,6 +836,125 @@ void p_context_set_debug(p_context *context, int debug)
 void p_context_add_import_path(p_context *context, const char *path)
 {
     p_context_add_path(context->user_imports, path);
+}
+
+#if defined(HAVE_DLOPEN)
+
+static char *p_context_library_path
+    (const char *path, size_t path_len, const char *prefix,
+     const char *base_name, const char *suffix)
+{
+    char *lib_path = (char *)malloc
+        (path_len + strlen(prefix) + strlen(base_name) + strlen(suffix));
+    if (!lib_path)
+        return 0;
+    strncpy(lib_path, path, path_len);
+    strcpy(lib_path + path_len, prefix);
+    strcat(lib_path, base_name);
+    strcat(lib_path, suffix);
+    if (access(lib_path, 0) >= 0)
+        return lib_path;
+    free(lib_path);
+    return 0;
+}
+
+#endif
+
+int _p_context_load_library(p_context *context, const char *source_file, int source_line, const char *base_name)
+{
+#if defined(HAVE_DLOPEN)
+    const char *path;
+    size_t len;
+    char *lib_path;
+    void *handle;
+    p_library_entry_func setup_func;
+    p_library_entry_func shutdown_func;
+    p_library *library;
+
+    /* Validate the name: must not contain directory separators */
+    if (*base_name == '\0' || strchr(base_name, '/') != 0 ||
+            strchr(base_name, '\\') != 0) {
+        fprintf(stderr, "%s:%d: invalid library name `%s'\n",
+                source_file, source_line, base_name);
+        return 0;
+    }
+
+    /* Strip the final component from the source filename */
+    len = strlen(source_file);
+    while (len > 0 && source_file[len - 1] != '/' &&
+           source_file[len - 1] != '\\')
+        --len;
+    if (len) {
+        path = source_file;
+    } else {
+        path = "./";
+        len = 2;
+    }
+
+    /* Search for the library */
+    lib_path = p_context_library_path
+        (path, len, "lib", base_name, ".so");
+    if (!lib_path) {
+        lib_path = p_context_library_path
+            (source_file, len, ".libs/lib", base_name, ".so");
+        if (!lib_path) {
+            fprintf(stderr, "%s:%d: cannot locate library `%s'\n",
+                    source_file, source_line, base_name);
+            return 0;
+        }
+    }
+
+    /* Open the library and fetch the Plang entry points */
+    dlerror();
+    handle = dlopen(lib_path, RTLD_LAZY | RTLD_LOCAL);
+    if (!handle) {
+        fprintf(stderr, "%s:%d: cannot load library `%s': %s\n",
+                source_file, source_line, base_name, dlerror());
+        free(lib_path);
+        return 0;
+    }
+    setup_func = (p_library_entry_func)dlsym(handle, "plang_module_setup");
+    shutdown_func = (p_library_entry_func)dlsym(handle, "plang_module_shutdown");
+    if (!setup_func) {
+        fprintf(stderr, "%s:%d: invalid library `%s': "
+                "plang_module_setup() entry point not found\n",
+                source_file, source_line, base_name);
+        free(lib_path);
+        return 0;
+    }
+    free(lib_path);
+
+    /* Initialize the library for this context */
+    (*setup_func)(context);
+
+    /* Create a library information block for the context */
+    library = GC_NEW(p_library);
+    library->handle = handle;
+    library->shutdown_func = shutdown_func;
+    library->next = context->libraries;
+    context->libraries = library;
+
+    /* Library is ready to go */
+    return 1;
+#else
+    /* Don't know how to load dynamic libraries */
+    fprintf(stderr, "%s:%d: cannot load library `%s'\n",
+            source_file, source_line, base_name);
+    return 0;
+#endif
+}
+
+static void p_context_free_libraries(p_context *context)
+{
+#if defined(HAVE_DLOPEN)
+    p_library *library = context->libraries;
+    while (library != 0) {
+        if (library->shutdown_func)
+            (*(library->shutdown_func))(context);
+        dlclose(library->handle);
+        library = library->next;
+    }
+#endif
 }
 
 /*\@}*/

@@ -1,0 +1,22 @@
+
+
+WordNet
+-------
+
+Plang can make use of the WordNet lexical database to provide access
+to huge amounts of information about English words.  Natural language
+processing systems in particular can benefit from being able to
+ask "Is this a noun/verb/adverb/etc?".  More information on WordNet
+can be found here:
+
+    http://wordnet.princeton.edu/
+
+Many GNU/Linux distributions have WordNet packages already.  You can
+try installing "wordnet" and "wordnet-devel" (or "wordnet-dev")
+to see if your distribution already has WordNet.  If not, download
+and build it from the sources at the above URL.
+
+Note: WordNet support is optional in Plang, but highly recommended.
+If the "configure" script does not detect WordNet, then it will
+not build the "words" module.  You will need the "devel" package
+installed to build Plang with WordNet.

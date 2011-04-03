@@ -6,9 +6,10 @@ PLANG_TESTS = \
 	test-compose.lp \
 	test-dcg.lp \
 	test-findall.lp \
-	test-type.lp
+	test-type.lp \
+	@WORDS_TESTCASE@
 
 TESTS = $(PLANG_TESTS)
-TESTS_ENVIRONMENT = $(top_builddir)/src/frontend/plang -I$(top_srcdir)/src/imports
+TESTS_ENVIRONMENT = $(top_builddir)/src/frontend/plang -I$(top_srcdir)/src/imports -I$(top_builddir)/src/words -I$(top_srcdir)/src/words
 
 EXTRA_DIST = $(PLANG_TESTS) testcase.lp

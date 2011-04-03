@@ -678,6 +678,23 @@ directive
                         (&(@2), context, yyscanner, p_term_name(name));
                 }
                 $$ = unary_term(":-", $2);
+            } else if (p_term_type($2) == P_TERM_FUNCTOR &&
+                       p_term_arg_count($2) == 1 &&
+                       p_term_functor($2) ==
+                       p_term_create_atom(context, "load_library")) {
+                /* Load a library that implements native predicates */
+                p_term *name = p_term_deref(p_term_arg($2, 0));
+                if (!name || (name->header.type != P_TERM_ATOM &&
+                              name->header.type != P_TERM_STRING)) {
+                    yyerror_printf
+                        (&(@2), context, yyscanner,
+                         "library name is not an atom or string");
+                } else {
+                    _p_context_load_library
+                        (context, input_stream->filename,
+                         @2.first_line, p_term_name(name));
+                }
+                $$ = unary_term(":-", $2);
             } else {
                 /* Execute the directive immediately */
                 p_goal_call_from_parser(context, add_debug(@2, $2));

@@ -56,6 +56,15 @@ struct p_exec_node
     void *fail_marker;
 };
 
+typedef void (*p_library_entry_func)(p_context *context);
+typedef struct p_library p_library;
+struct p_library
+{
+    void *handle;
+    p_library_entry_func shutdown_func;
+    p_library *next;
+};
+
 struct p_context
 {
     p_term *nil_atom;
@@ -92,6 +101,8 @@ struct p_context
     struct p_path_list loaded_files;
 
     int unique_num;
+
+    p_library *libraries;
 };
 
 #define P_TRACE_SIZE 1020
@@ -106,6 +117,8 @@ int _p_context_record_in_trail(p_context *context, p_term *var);
 int _p_context_record_contents_in_trail(p_context *context, void **location, void *prev_value);
 
 void p_goal_call_from_parser(p_context *context, p_term *goal);
+
+int _p_context_load_library(p_context *context, const char *source_file, int source_line, const char *base_name);
 
 #define p_context_add_path(list,name)   \
     do { \

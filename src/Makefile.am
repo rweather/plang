@@ -1,1 +1,1 @@
-SUBDIRS = libplang frontend
+SUBDIRS = libplang frontend @WORDS_MODULE@
