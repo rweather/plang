@@ -359,6 +359,24 @@ static void test_reexecute()
                   "btt(X) { X = 1; }\n");
     P_COMPARE(run_goal("btt(X), integer(X)"), P_RESULT_TRUE);
     P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    p_context_consult_string
+        (context, "ca(X, Y) { cb(X); cc(Y); }\n"
+                  "cb(X) { X = a; }\n"
+                  "cb(X) { X = b; }\n"
+                  "cc(X) { X = 1; }\n"
+                  "cc(X) { X = 2; }\n");
+    P_COMPARE(run_goal("ca(X, Y)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("(X = a || X = b), (Y = 1 || Y = 2)"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
 }
 
 int main(int argc, char *argv[])

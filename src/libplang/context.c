@@ -354,6 +354,7 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     p_database_info *info;
     p_exec_node *current;
     p_exec_node *next;
+    p_exec_node *new_current;
 
     /* Bail out if the goal is a variable.  It is assumed that
      * the goal has already been dereferenced by the caller */
@@ -370,19 +371,22 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
         if (goal->header.size == 2 &&
                 goal->functor.functor_name == context->comma_atom) {
             /* Handle comma terms, which are assumed to be
-             * right-recursive.  Replace the current goal with
-             * the left-hand part of the comma term, and create a
-             * new continuation node for the right-hand part */
+             * right-recursive.  Create two new nodes for the
+             * left and right parts of the comma term */
             current = context->current_node;
             next = GC_NEW(p_exec_node);
-            if (!next)
+            new_current = GC_NEW(p_exec_node);
+            if (!next || !new_current)
                 return P_RESULT_FAIL;
+            new_current->goal = goal->functor.arg[0];
+            new_current->success_node = next;
+            new_current->cut_node = current->cut_node;
+            new_current->catch_node = current->catch_node;
             next->goal = goal->functor.arg[1];
             next->success_node = current->success_node;
             next->cut_node = current->cut_node;
             next->catch_node = current->catch_node;
-            current->goal = goal->functor.arg[0];
-            current->success_node = next;
+            context->current_node = new_current;
             return P_RESULT_TREE_CHANGE;
         }
         name = goal->functor.functor_name;
@@ -417,7 +421,8 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                 clause_list = clause_list->list.tail;
                 if (clause_list) {
                     next = GC_NEW(p_exec_node);
-                    if (!next)
+                    new_current = GC_NEW(p_exec_node);
+                    if (!next || !new_current)
                         return P_RESULT_FAIL;
                     next->goal = current->goal;
                     next->next_clause = clause_list;
@@ -425,12 +430,21 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                     next->cut_node = context->fail_node;
                     next->catch_node = current->catch_node;
                     next->fail_marker = current->fail_marker;
-                    current->goal = body;
-                    current->cut_node = context->fail_node;
+                    new_current->goal = body;
+                    new_current->success_node = current->success_node;
+                    new_current->cut_node = context->fail_node;
+                    new_current->catch_node = current->catch_node;
+                    context->current_node = new_current;
                     context->fail_node = next;
                 } else {
-                    current->goal = body;
-                    current->cut_node = context->fail_node;
+                    new_current = GC_NEW(p_exec_node);
+                    if (!new_current)
+                        return P_RESULT_FAIL;
+                    new_current->goal = body;
+                    new_current->success_node = current->success_node;
+                    new_current->cut_node = context->fail_node;
+                    new_current->catch_node = current->catch_node;
+                    context->current_node = new_current;
                 }
                 return P_RESULT_TREE_CHANGE;
             }
@@ -459,6 +473,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
     p_term *goal;
     p_goal_result result = P_RESULT_FAIL;
     p_exec_node *current;
+    p_exec_node *new_current;
 
     for (;;) {
         /* Fetch the current goal */
@@ -469,7 +484,6 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
              * matches the current goal.  If no match, then fail */
             p_term *clause_list = current->next_clause;
             p_term *body = 0;
-            current->next_clause = 0;
             while (clause_list != 0) {
                 body = p_term_unify_clause
                     (context, current->goal, clause_list->list.head);
@@ -488,14 +502,21 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
                         next->cut_node = current->cut_node;
                         next->catch_node = current->catch_node;
                         next->fail_marker = current->fail_marker;
-                        current->goal = body;
                         context->fail_node = next;
                     } else {
-                        current->goal = context->fail_atom;
+                        body = context->fail_atom;
                     }
-                } else {
-                    current->goal = body;
                 }
+            } else {
+                body = context->fail_atom;
+            }
+            new_current = GC_NEW(p_exec_node);
+            if (new_current) {
+                new_current->goal = body;
+                new_current->success_node = current->success_node;
+                new_current->cut_node = current->cut_node;
+                new_current->catch_node = current->catch_node;
+                current = context->current_node = new_current;
             } else {
                 current->goal = context->fail_atom;
             }
@@ -560,7 +581,10 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
                 /* Top-level success.  Set the current node to
                  * the fail node for re-executing the goal */
                 context->current_node = context->fail_node;
-                context->fail_node = 0;
+                if (context->current_node)
+                    context->fail_node = context->current_node->cut_node;
+                else
+                    context->fail_node = 0;
                 break;
             }
         } else if (result == P_RESULT_FAIL) {

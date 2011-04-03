@@ -23,7 +23,7 @@
 
 Plang uses a continuation-based model for implementing
 p_context_execute_goal().  The mathematical foundations we
-adopted can be found in the following paper:
+adopted can be found in section 2 of the following paper:
 
 \par
 E. Jahier, M. Ducasse, O. Ridoux,
@@ -51,19 +51,22 @@ does not backtrack internally):
     - If the goal succeeds, then the current node is set to "success",
       and the "fail point" is left unchanged.
     - If the goal fails, then a back-track occurs (see below).
-- If the goal is (A , B), then a new node is created for B that
-has the same "success" and "cut fail point" links as (A, B).
-The current node is replaced with A, with its "success" link pointing
-at B.  The current node and "fail point" are left unchanged, and the
-goal is re-executed as A.
+- If the goal is (A , B), then new nodes are created for A and B.
+  The "cut fail point" for the new nodes are set to the "cut fail
+  point" of (A, B).  The "success" link on the A node is set to
+  point at the B node, and the "success" link on the B node is
+  set to the "success" link of (A, B).  The current node is
+  replaced with the A node and the "fail point" is left unchanged.
 - If the goal is !, then the "fail point" is set to the
-"cut fail point" of the node, and then the current node is set
-to "success".
-- If the goal is (A || B), then a new node is created for B that
-has the same "success" link as (A || B).  The current node is
-replaced with A.  Both A and B's "cut fail point" links are set
-to the current "fail point".  The "fail point" is set to B,
-and then the current node is re-executed as A.
+  "cut fail point" of the node, and then the current node is set
+  to "success".
+- If the goal is (A || B), then two new nodes are created for A and
+  B that have the same "success" link as (A || B).  The current node is
+  replaced with the A node.  Both A and B's "cut fail point" links
+  are set to the current "fail point".  The "fail point" is set to B.
+- Alternative clauses for a predicate are handled in a similar
+  fashion to (A || B), with the B node searching for a new clause
+  amongst the remaining clauses.
 
 Upon back-tracking, the current node is set to the "fail point",
 and the "fail point" is set to the "cut fail point" of the new
@@ -78,8 +81,9 @@ also set to NULL.
 A top-level goal succeeds once the current node becomes NULL
 (because a "success" link was encountered that was NULL).
 The top-level goal is re-executed by setting the current node
-to "fail point", and "fail point" to NULL and then continuing
-execution.
+to "fail point", and "fail point" to the "cut fail point" of the
+new current node.  All solutions are exhausted once "fail point"
+becomes NULL on a top-level goal.
 
 The paper above does not describe the handling of
 \ref catch_3 "catch/3" and \ref throw_1 "throw/1" in a Prolog

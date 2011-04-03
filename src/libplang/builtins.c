@@ -772,6 +772,7 @@ static p_goal_result p_builtin_call_member
     p_term *clause_list;
     p_term *body;
     p_exec_node *current;
+    p_exec_node *new_current;
     p_exec_node *next;
     int arity;
 
@@ -831,7 +832,8 @@ static p_goal_result p_builtin_call_member
             clause_list = clause_list->list.tail;
             if (clause_list) {
                 next = GC_NEW(p_exec_node);
-                if (!next)
+                new_current = GC_NEW(p_exec_node);
+                if (!next || !new_current)
                     return P_RESULT_FAIL;
                 next->goal = arg_head;
                 next->next_clause = clause_list;
@@ -839,12 +841,21 @@ static p_goal_result p_builtin_call_member
                 next->cut_node = context->fail_node;
                 next->catch_node = current->catch_node;
                 next->fail_marker = current->fail_marker;
-                current->goal = body;
-                current->cut_node = context->fail_node;
+                new_current->goal = body;
+                new_current->success_node = current->success_node;
+                new_current->cut_node = context->fail_node;
+                new_current->catch_node = current->catch_node;
+                context->current_node = new_current;
                 context->fail_node = next;
             } else {
-                current->goal = body;
-                current->cut_node = context->fail_node;
+                new_current = GC_NEW(p_exec_node);
+                if (!new_current)
+                    return P_RESULT_FAIL;
+                new_current->goal = body;
+                new_current->success_node = current->success_node;
+                new_current->cut_node = context->fail_node;
+                new_current->catch_node = current->catch_node;
+                context->current_node = new_current;
             }
             return P_RESULT_TREE_CHANGE;
         }
@@ -1595,15 +1606,17 @@ static p_goal_result p_builtin_logical_or
     p_exec_node *retry;
     p_exec_node *cut;
     p_exec_node *then;
+    p_exec_node *if_node;
     if (term->header.type == P_TERM_FUNCTOR &&
             term->header.size == 2 &&
             term->functor.functor_name == context->if_atom) {
         /* The term has the form (A -> B || C) */
         current = context->current_node;
+        if_node = GC_NEW(p_exec_node);
         retry = GC_NEW(p_exec_node);
         cut = GC_NEW(p_exec_node);
         then = GC_NEW(p_exec_node);
-        if (!retry || !cut || !then)
+        if (!if_node || !retry || !cut || !then)
             return P_RESULT_FAIL;
         retry->goal = args[1];
         retry->success_node = current->success_node;
@@ -1617,24 +1630,30 @@ static p_goal_result p_builtin_logical_or
         then->success_node = current->success_node;
         then->cut_node = context->fail_node;
         then->catch_node = current->catch_node;
-        current->goal = p_term_arg(term, 0);
-        current->success_node = cut;
-        current->cut_node = context->fail_node;
+        if_node->goal = p_term_arg(term, 0);
+        if_node->success_node = cut;
+        if_node->cut_node = context->fail_node;
+        if_node->catch_node = current->catch_node;
+        context->current_node = if_node;
         context->fail_node = retry;
         return P_RESULT_TREE_CHANGE;
     } else {
         /* Regular disjunction */
         current = context->current_node;
+        if_node = GC_NEW(p_exec_node);
         retry = GC_NEW(p_exec_node);
-        if (!retry)
+        if (!if_node || !retry)
             return P_RESULT_FAIL;
         retry->goal = args[1];
         retry->success_node = current->success_node;
         retry->cut_node = context->fail_node;
         retry->catch_node = current->catch_node;
         retry->fail_marker = current->fail_marker;
-        current->goal = term;
-        current->cut_node = context->fail_node;
+        if_node->goal = term;
+        if_node->success_node = current->success_node;
+        if_node->cut_node = context->fail_node;
+        if_node->catch_node = current->catch_node;
+        context->current_node = if_node;
         context->fail_node = retry;
         return P_RESULT_TREE_CHANGE;
     }
@@ -1693,8 +1712,14 @@ static p_goal_result p_builtin_call
     (p_context *context, p_term **args, p_term **error)
 {
     p_exec_node *current = context->current_node;
-    current->goal = args[0];
-    current->cut_node = context->fail_node;
+    p_exec_node *new_current = GC_NEW(p_exec_node);
+    if (!new_current)
+        return P_RESULT_FAIL;
+    new_current->goal = args[0];
+    new_current->success_node = current->success_node;
+    new_current->cut_node = context->fail_node;
+    new_current->catch_node = current->catch_node;
+    context->current_node = new_current;
     return P_RESULT_TREE_CHANGE;
 }
 
@@ -1785,17 +1810,19 @@ static p_goal_result p_builtin_catch
 {
     p_exec_node *current = context->current_node;
     p_exec_node *catcher = GC_NEW(p_exec_node);
-    if (!catcher)
+    p_exec_node *new_current = GC_NEW(p_exec_node);
+    if (!catcher || !new_current)
         return P_RESULT_FAIL;
     catcher->goal = current->goal;
     catcher->success_node = current->success_node;
     catcher->cut_node = context->fail_node;
     catcher->catch_node = current->catch_node;
     catcher->fail_marker = current->fail_marker;
-    current->goal = args[0];
-    current->success_node = current->success_node;
-    current->cut_node = context->fail_node;
-    current->catch_node = catcher;
+    new_current->goal = args[0];
+    new_current->success_node = current->success_node;
+    new_current->cut_node = context->fail_node;
+    new_current->catch_node = catcher;
+    context->current_node = new_current;
     return P_RESULT_TREE_CHANGE;
 }
 
@@ -2177,7 +2204,8 @@ static p_goal_result p_builtin_if
     p_exec_node *current = context->current_node;
     p_exec_node *cut = GC_NEW(p_exec_node);
     p_exec_node *then = GC_NEW(p_exec_node);
-    if (!cut || !then)
+    p_exec_node *if_node = GC_NEW(p_exec_node);
+    if (!cut || !then || !if_node)
         return P_RESULT_FAIL;
     cut->goal = context->cut_atom;
     cut->success_node = then;
@@ -2186,9 +2214,11 @@ static p_goal_result p_builtin_if
     then->success_node = current->success_node;
     then->cut_node = context->fail_node;
     then->catch_node = current->catch_node;
-    current->goal = args[0];
-    current->success_node = then;
-    current->cut_node = context->fail_node;
+    if_node->goal = args[0];
+    if_node->success_node = cut;
+    if_node->cut_node = context->fail_node;
+    if_node->catch_node = current->catch_node;
+    context->current_node = if_node;
     return P_RESULT_TREE_CHANGE;
 }
 
