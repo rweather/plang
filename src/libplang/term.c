@@ -2621,4 +2621,84 @@ p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2)
     return (p_term *)term;
 }
 
+/* Inner implementation of p_term_witness */
+static p_term *p_term_witness_inner
+    (p_context *context, p_term *term, p_term *list)
+{
+    unsigned int index;
+    if (!term)
+        return list;
+    term = p_term_deref_non_null(term);
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR:
+        /* Fetch the witness of the arguments */
+        for (index = 0; index < term->header.size; ++index) {
+            list = p_term_witness_inner
+                (context, term->functor.arg[index], list);
+        }
+        break;
+    case P_TERM_LIST:
+        /* Fetch the witness of the list members */
+        do {
+            list = p_term_witness_inner(context, term->list.head, list);
+            term = term->list.tail;
+            if (!term)
+                break;
+            term = p_term_deref_non_null(term);
+        } while (term->header.type == P_TERM_LIST);
+        return p_term_witness_inner(context, term, list);
+    case P_TERM_VARIABLE:
+        /* Add the variable to the list, and then bind it to an
+         * atom to prevent it being added to the list again if
+         * we see it during subsequent traversal.  We don't update
+         * the list if it is null, because that happens when
+         * traversing the left-hand side of a ^ term */
+        if (list)
+            list = p_term_create_list(context, term, list);
+        if (_p_context_record_in_trail(context, term))
+            term->var.value = context->true_atom;
+        break;
+    case P_TERM_MEMBER_VARIABLE:
+        /* Fetch the witness for the object term */
+        return p_term_witness_inner
+            (context, term->member_var.object, list);
+    default: break;
+    }
+    return list;
+}
+
+/**
+ * \brief Returns a list of the free variables in \a term,
+ * where each free variable occurs only once in the list.
+ *
+ * The argument \a subgoal will be set to the bagof-subgoal
+ * of \a term.
+ *
+ * This function is used to help implement the \ref bagof_3 "bagof/3"
+ * and \ref setof_3 "setof/3" predicates.
+ *
+ * \ingroup term
+ */
+p_term *p_term_witness(p_context *context, p_term *term, p_term **subgoal)
+{
+    p_term *caret = p_term_create_atom(context, "^");
+    p_term *list;
+    void *marker = p_context_mark_trail(context);
+    while (term) {
+        term = p_term_deref_non_null(term);
+        if (term->header.type == P_TERM_FUNCTOR &&
+                term->header.size == 2 &&
+                term->functor.functor_name == caret) {
+            p_term_witness_inner(context, term->functor.arg[0], 0);
+            term = term->functor.arg[1];
+        } else {
+            break;
+        }
+    }
+    *subgoal = term;
+    list = p_term_witness_inner(context, term, context->nil_atom);
+    p_context_backtrack_trail(context, marker);
+    return list;
+}
+
 /*\@}*/

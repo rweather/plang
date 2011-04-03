@@ -17,34 +17,33 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-/** @cond */
-class stderr
+:- import(testcase).
+:- import(findall).
+
+ca(X, Y) { cb(X); cc(Y); }
+cb(X) { X = b; }
+cb(X) { X = a; }
+cb(X) { X = b; }
+cc(X) { X = 1; }
+cc(X) { X = 2; }
+
+findall()
 {
-    static write(Term)
-    {
-        '$$print_error'(Term);
-    }
+    verify(findall((X, Y), ca(X, Y), L1));
+    verify(L1 == [(b, 1), (b, 2), (a, 1), (a, 2), (b, 1), (b, 2)]);
+    verify(findall((X, Y), ca(X, Y), L1));
+    verify((findall((X, Y), ca(X, Y), [A, B|C]), A == (b, 1), B == (b, 2), C == [(a, 1), (a, 2), (b, 1), (b, 2)]));
+    verify((findall(X, fail, L2), L2 == []));
+    verify((findall(foo, true, L3), L3 == [foo]));
 
-    static writeln(Term)
-    {
-        '$$print_error'(Term);
-        '$$println_error'();
-    }
-
-    static writeln()
-    {
-        '$$println_error'();
-    }
-
-    static writeq(Term)
-    {
-        '$$printq_error'(Term);
-    }
-
-    static writeqln(Term)
-    {
-        '$$printq_error'(Term);
-        '$$println_error'();
-    }
+    verify_error(findall(X, Goal, L9), instantiation_error);
+    verify_error(findall(X, true, a), type_error(list, a));
+    verify_error(findall(X, true, [a, b|h]), type_error(list, [a, b|h]));
 }
-/** @endcond */
+
+main(_)
+{
+    init("test-findall");
+    run(findall);
+    report();
+}

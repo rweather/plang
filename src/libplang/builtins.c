@@ -4580,6 +4580,32 @@ static p_goal_result p_builtin_line
     return P_RESULT_TREE_CHANGE;
 }
 
+/* $$unique(Value) to generate a (fairly) unique integer value */
+static p_goal_result p_builtin_unique
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *value = p_term_create_integer
+        (context, (context->unique_num)++);
+    if (p_term_unify(context, args[0], value, P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/* $$witness(Term, List, Subgoal) helper predicate */
+static p_goal_result p_builtin_witness
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *term = p_term_deref_member(context, args[0]);
+    p_term *subgoal = 0;
+    p_term *list = p_term_witness(context, term, &subgoal);
+    if (!p_term_unify(context, args[1], list, P_BIND_DEFAULT))
+        return P_RESULT_FAIL;
+    if (!p_term_unify(context, args[2], subgoal, P_BIND_DEFAULT))
+        return P_RESULT_FAIL;
+    return P_RESULT_TRUE;
+}
+
 void _p_db_init_builtins(p_context *context)
 {
     static struct p_builtin const builtins[] = {
@@ -4652,7 +4678,9 @@ void _p_db_init_builtins(p_context *context)
         {"$$unbind", 1, p_builtin_unbind},
         {"unifiable", 2, p_builtin_unifiable},
         {"unify_with_occurs_check", 2, p_builtin_unify},
+        {"$$unique", 1, p_builtin_unique},
         {"var", 1, p_builtin_var},
+        {"$$witness", 3, p_builtin_witness},
         {0, 0, 0}
     };
     static const char * const builtin_sources[] = {

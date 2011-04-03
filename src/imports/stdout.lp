@@ -17,6 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
+/** @cond */
 class stdout
 {
     static write(Term)
@@ -46,3 +47,4 @@ class stdout
         '$$println'();
     }
 }
+/** @endcond */

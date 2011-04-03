@@ -90,6 +90,8 @@ struct p_context
     struct p_path_list user_imports;
     struct p_path_list system_imports;
     struct p_path_list loaded_files;
+
+    int unique_num;
 };
 
 #define P_TRACE_SIZE 1020

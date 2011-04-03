@@ -17,34 +17,22 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-/** @cond */
-class stderr
-{
-    static write(Term)
-    {
-        '$$print_error'(Term);
-    }
+/**
+ * \defgroup modules Modules - Overview
+ *
+ * \par findall
+ * \ref bagof_3 "bagof/3",
+ * \ref findall_3 "findall/3",
+ * \ref setof_3 "setof/3"
+ */
 
-    static writeln(Term)
-    {
-        '$$print_error'(Term);
-        '$$println_error'();
-    }
-
-    static writeln()
-    {
-        '$$println_error'();
-    }
-
-    static writeq(Term)
-    {
-        '$$printq_error'(Term);
-    }
-
-    static writeqln(Term)
-    {
-        '$$printq_error'(Term);
-        '$$println_error'();
-    }
-}
-/** @endcond */
+/**
+ * \defgroup module_findall Modules - findall
+ *
+ * \ref bagof_3 "bagof/3",
+ * \ref findall_3 "findall/3",
+ * \ref setof_3 "setof/3"
+ */
+/*\@{*/
+/* Defined in findall.lp */
+/*\@}*/

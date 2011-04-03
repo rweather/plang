@@ -1032,6 +1032,46 @@ static void test_precedes()
     clear_parse_state();
 }
 
+static void test_witness()
+{
+    struct witness_type
+    {
+        const char *row;
+        const char *term;
+        const char *result;
+    };
+    static struct witness_type const witness_data[] = {
+        {"null", 0, "[]"},
+        {"atom_1", "a", "[]"},
+        {"atom_2", "[]", "[]"},
+        {"functor_1", "f(X)", "[X]"},
+        {"functor_2", "f(X, X)", "[X]"},
+        {"functor_3", "f(X, Y)", "[Y, X]"},
+        {"list_1", "[X, Y, a, Z]", "[Z, Y, X]"},
+        {"list_2", "[X, Y, a, Z|W]", "[W, Z, Y, X]"},
+        {"string_1", "\"a\"", "[]"},
+        {"integer_1", "1", "[]"},
+        {"real_1", "1.5", "[]"},
+    };
+    #define witness_data_len (sizeof(witness_data) / sizeof(struct witness_type))
+
+    size_t index;
+    p_term *term;
+    p_term *witness;
+    p_term *subgoal;
+    char *result;
+    for (index = 0; index < witness_data_len; ++index) {
+        clear_parse_state();
+        P_TEST_SET_ROW(witness_data[index].row);
+        term = witness_data[index].term
+                    ? parse_term(witness_data[index].term) : 0;
+        witness = p_term_witness(context, term, &subgoal);
+        result = term_to_string(witness);
+        P_VERIFY(!strcmp(result, witness_data[index].result));
+    }
+    clear_parse_state();
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -1050,6 +1090,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(predicate);
     P_TEST_RUN(unify);
     P_TEST_RUN(precedes);
+    P_TEST_RUN(witness);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

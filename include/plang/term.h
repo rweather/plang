@@ -124,6 +124,8 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause);
 int p_term_strcmp(const p_term *str1, const p_term *str2);
 p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2);
 
+p_term *p_term_witness(p_context *context, p_term *term, p_term **subgoal);
+
 #ifdef __cplusplus
 };
 #endif
