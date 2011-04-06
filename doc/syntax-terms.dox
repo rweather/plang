@@ -1,0 +1,776 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\defgroup syntax_terms Plang syntax - Terms
+
+Terms are the fundamental knowledge representation tool in Plang.
+Everything, including programs, are ultimately represented as
+tagged term structures.  Terms have one of the following forms:
+
+\li \ref syntax_atoms "Atoms"
+\li \ref syntax_numbers "Numbers"
+\li \ref syntax_strings "Strings"
+\li \ref syntax_variables "Variables"
+\li \ref syntax_functors "Functors"
+\li \ref syntax_lists "Lists"
+\li \ref syntax_operators "Operators"
+\li \ref syntax_objects "Objects"
+\li \ref syntax_predicates "Predicates"
+
+\code
+term --> atom.
+term --> integer.
+term --> float.
+term --> string.
+term --> variable.
+term --> functor.
+term --> list.
+term --> operator.
+term --> member_variable.
+term --> member_call.
+term --> "(", term, ")".
+\endcode
+
+\section syntax_atoms Atoms
+
+Atoms are alphanumeric identifiers in the program that represent
+unique constant values.  Examples include:
+
+\li \c true, \c fail, \c foobar, \c fooBar, <tt>'Foo Bar'</tt>,
+    <tt>'hi\\nthere'</tt>, <tt>person::age</tt>, <tt>''</tt>
+
+Atoms have two forms syntactic forms: unquoted and quoted.  Unquoted
+atoms start with a lower case letter, followed by any combination of
+lower or upper case letters, digits, underscores, and "::" scope
+markers.  Quoted atoms start and end with a single quote and can
+contain any characters in between.
+
+\code
+atom --> lower_letter.
+atom --> lower_letter, identifier_tail.
+atom --> "'", squote_string, "'".
+
+identifier_tail --> identifier_char.
+identifier_tail --> identifier_tail, identifier_char.
+
+identifier_char --> lower_letter || upper_letter || dec_digit.
+identifier_char --> "_" || "::".
+
+lower_letter --> "a" || "b" || ... || "z".
+upper_letter --> "A" || "B" || ... || "Z".
+dec_digit --> "0" || "1" || ... || "9".
+\endcode
+
+The scope marker "::" is a convention only - it does not indicate
+namespacing in the same sense as C++.  Plang uses it in its system
+library to prefix similar predicates with the module or class name.
+For example, "person::age" may be the name of a method called "age"
+within the "person" class, or the name of a global predicate
+within the "person" module.  It is up to the user which interpretation
+(class or module) makes most sense in their application.
+
+Atoms with the same name are considered identical when compared with
+\ref term_eq_2 "(==)/2" or unified with \ref unify_2 "(=)/2.
+Atoms are not comparable with \ref syntax_strings "Strings" without
+first converting them with \ref atom_name_2 "atom_name/2".
+
+\section syntax_numbers Numbers
+
+Integers may be represented in decimal, hexadecimal, or octal
+as in C, with or without a "-" prefix:
+
+\li \c 42, \c 0x2A, \c 052, <tt>-42</tt>, <tt>-0x2A</tt>,
+    <tt>-052</tt>.
+
+Note: if a "-" prefix is present, then it must not be followed
+by whitespace before the digits.  The sequence <tt>- 42</tt> is a
+unary functor application, equivalent to <tt>'-'(42)</tt>.
+See the description of \ref func_neg_1 "(-)/1" for more information.
+
+\code
+integer --> dec_integer.
+integer --> hex_integer.
+integer --> oct_integer.
+integer --> "-", dec_integer.
+integer --> "-", hex_integer.
+integer --> "-", oct_integer.
+
+dec_integer --> dec_digit.
+dec_integer --> dec_integer, dec_digit.
+
+hex_integer --> "0x", hex_digit.
+hex_integer --> "0X", hex_digit.
+hex_integer --> hex_integer, hex_digit.
+
+hex_digit --> "0" || "1" || ... || "9".
+hex_digit --> "A" || "B" || ... || "F".
+hex_digit --> "a" || "b" || ... || "f".
+
+oct_integer --> "0", oct_digit.
+oct_integer --> oct_integer, oct_digit.
+
+oct_digit --> "0" || "1" || ... || "7".
+\endcode
+
+Integers can also be expressed as character constants.  The constant
+<tt>0'A'</tt> is equal to the integer 65.
+
+\code
+integer --> "0", "'", squote_string, "'". // string must be 1 character
+\endcode
+
+Note: \ref standard "Standard Prolog" expresses character constants
+as <tt>0'A</tt> without a trailing quote.  This looks unbalanced and
+is less obvious as to where a multi-byte character ends.
+
+Floating-point numbers are represented in the usual way:
+
+\li 23.0, -42.5, 2e13
+
+\code
+float --> float_value.
+float --> "-" float_value.
+
+float_value --> dec_integer, ".", dec_integer.
+float_value --> dec_integer, ".", dec_integer, exponent.
+float_value --> dec_integer, exponent.
+
+exponent --> exponent_char, dec_integer.
+exponent --> exponent_char, "-", dec_integer.
+exponent --> exponent_char, "+", dec_integer.
+
+exponent_char --> "e" || "E".
+\endcode
+
+Plang only supports double-precision floating-point values as
+represented by the C \c double type on the underlying system.
+
+Numbers with the same value are considered identical when compared
+with \ref term_eq_2 "(==)/2" or unified with \ref unify_2 "(=)/2.
+However, integers and floating-point values are not directly
+comparable this way; the comparison <tt>3 == 3.0</tt> will fail.
+Use \ref num_eq_2 "(=:=)/2" for numeric comparison instead.
+
+\section syntax_strings Strings
+
+Strings typically represent human-readable text for program
+input and ouput.  They start and end with a double-quote
+character and can contain any other character in-between.
+
+\li <tt>"Hello World!"</tt>, <tt>"foobar"</tt>, <tt>"\n"</tt>,
+    <tt>""</tt>
+
+\code
+string --> "\"", dquote_string, "\"".
+
+dquote_string --> dquote_char.
+dquote_string --> dquote_string, dquote_char.
+
+squote_string --> squote_char.
+squote_string --> squote_string, squote_char.
+
+dquote_char --> ordinary_char || escape_char || "'".
+squote_char --> ordinary_char || escape_char || "\"".
+
+ordinary_char --> any character except "\"", "'", "\\", or a newline.
+
+escape_char --> "\\", control_char.
+escape_char --> "\\", other_char.       // same as other_char
+
+control_char --> "n" | "r" | "t" | "f" | "v" | "0".
+other_char --> any character except a control_char.
+\endcode
+
+Strings and atoms are similar in that they both represent
+textual values.  However, their storage is managed differently.
+When an atom is created, a unique storage area is assigned to the
+atom that will persist until the program stops executing.
+This allows atoms to be very quickly compared for equality
+by simply comparing their pointers.  Strings on the other hand
+are temporary.  When there are no further references to the string,
+the Plang garbage collector will discard the string's storage.
+The general rule is that program identifiers and constants
+should be represented as atoms, but program data and human-readable
+text should be represented as strings.
+
+The \ref atom_name_2 "atom_name/2" predicate can be used to
+convert back and forth between atoms and strings.
+
+\section syntax_variables Variables
+
+Variables are alphanumeric identifiers in the program that represent
+parameters and temporary values during the program's execution.
+Variable names must start with an upper-case letter or an underscore.
+Examples include:
+
+\li \c A, \c FooBar, \c _foo_bar, \c _
+
+\code
+variable --> upper_letter.
+variable --> upper_letter, identifier_tail.
+variable --> "_".
+variable --> "_", identifier_tail.
+\endcode
+
+Variables with the same name that occur in a larger term refer
+to the same storage.  For example, <tt>f(X, g(X, Y))</tt>
+contains two variables \c X and \c Y.  If the variable X was
+to be bound to the atom \c a, then the term would transform into
+<tt>f(a, g(a, Y))</tt>.
+
+The variable named "_" is special in that every occurrence in a
+term will create a new anonymous variable whose name is unknown.
+The term <tt>f(_, g(_, _))</tt> contains three variables, whereas
+<tt>f(_A, g(_A, _A))</tt> contains only one.  The "_" variable
+is typically used to mark an unused parameter whose value is
+unimportant to a predicate.
+
+Variable binding is a primary feature of Plang, as in Prolog.
+Variables are bound during unification to make terms equal.
+Consider the following code that is using the \ref unify_2 "(=)/2"
+unification operator:
+
+\code
+f(X, g(X, Y)) = f(a, g(Z, W))
+\endcode
+
+When executed, unification attempts to make the two sides of
+the "=" operator identical.  In this case, the following
+variable bindings will be performed:
+
+\code
+X = a
+Z = a
+Y = W
+\endcode
+
+If the two sides cannot be made identical then unification fails,
+the variables bindings are undone, and the program will backtrack
+to an alternative execution path to find a different solution.
+The following is an example of a unification that will fail
+because X cannot be bound to both \c a and \c b:
+
+\code
+f(X, g(X, Y)) = f(a, g(b, W))
+\endcode
+
+A variable will keep its bound value until a fail and backtrack
+occurs.  Thus, \ref unify_2 "(=)/2" is not the exactly the same
+as variable assignment in other programming languages.  Subsequent
+attempts to change the variable to a different value with
+\ref unify_2 "(=)/2" will fail.
+
+Plang provides separate \ref assign_2 "(:=)/2" and
+\ref bt_assign_2 "(:==)/2" operators to perform destructive and
+back-trackable variable assignment in the traditional sense.
+However, these assignment operators should be used with care as
+they can break the logical consistency of a solution search.
+
+\section syntax_functors Functors
+
+Functors collect up one or more argument terms and tag them with a
+functor name.  The functor name itself must be an atom.
+In the following examples, \c f and \c g are functor names:
+
+\li <tt>f(a)</tt>
+\li <tt>f(X, g(X, Y))</tt>
+\li <tt>f(X, f(Y, f(Z, end)))</tt>
+
+As can be seen, a functor term is written as an atom, followed by
+a left-parenthesis, a comma-separated list of argument terms,
+and a right-parenthesis.
+
+\code
+functor --> atom, "(", arguments, ")".
+arguments --> term.
+arguments --> arguments, ",", term.
+\endcode
+
+It is typical to refer to a functor by both its atom name and its
+\em arity, or number of arguments.  The functor <b>f/2</b> names
+functor terms whose atom name is \c f and which have 2 arguments.
+The same functor name can have multiple arities, and each arity
+creates a distinct functor name.
+
+Atoms can be referred to as having "arity 0", especially when they
+are used to name predicates that do not have any parameters.
+In Prolog, it is invalid to write a term as <tt>name()</tt>,
+but we allow it in Plang:
+
+\code
+functor --> atom, "(", ")".     // same as the atom on its own
+\endcode
+
+By convention, the parentheses should only appear after the atom
+if the atom is being used as the name of a called predicate,
+such as in the call to \c print_prompt below:
+
+\code
+mainloop()
+{
+    do {
+        print_prompt();
+        read_command(Cmd);
+        ...
+    } while (Cmd != quit);
+}
+\endcode
+
+Note that the atom \c quit was not followed by parentheses, even though
+it would technically be allowed.  That is because the atom is being
+used as a constant, not a predicate call.  Adding parentheses would
+make the code confusing - it would look like a function call.
+
+\section syntax_lists Lists
+
+Lists are a special kind of functor term for representing
+organized collections of terms.  The following are some
+examples of lists:
+
+\li <tt>[f(a, X), b, g(Y)]</tt>, <tt>[H|T]</tt>, <tt>[]</tt>
+
+<tt>[]</tt> is an atom that represents an empty list.
+
+\code
+list --> "[", list_members, "]".
+list --> "[", list_members, "|", term, "]".
+
+list_members --> term.
+list_members --> list_members "," term.
+
+atom --> "[", "]".
+\endcode
+
+Lists can also be represented with the \ref list_cons_2 "(.)/2"
+functor, although doing so is rare:
+
+\li <tt>'.'(f(a, X), '.'(b, '.'(g(Y), [])))</tt>
+
+The \ref for_stmt "for" statement can be used to iterate over
+all members of a list:
+
+\code
+for (X in List) {
+    ...
+}
+\endcode
+
+\section syntax_operators Operators
+
+The prefix form of functors can be awkward when referring to
+mathematical operations.  The form <tt>A + B</tt> is preferable
+to the prefixed equivalent of <tt>'+'(A, B)</tt>.  Plang
+includes a large selection of operators.  Unlike Prolog however,
+the list of operators is fixed by the Plang language.  This
+choice was deliberate, to make it possible to write an efficient
+parser.
+
+Operators have an associated priority and associativity.
+The higher the priority, the less tightly the operator binds
+to its arguments (+ has a higher priority than * for example).
+Associativity may be one of the following:
+
+\li <tt>xfx</tt> - binary infix operator, non-associative.
+\li <tt>yfx</tt> - binary infix operator, left-associative.
+\li <tt>xfy</tt> - binary infix operator, right-associative.
+\li <tt>fx</tt> - unary prefix operator, non-associative.
+\li <tt>fy</tt> - unary prefix operator, right-associative.
+
+There are presently no unary postfix operators (<tt>xf</tt> and
+<tt>yf</tt> associativity) in Plang.
+
+<table cellspacing="0" cellpadding="3">
+<tr>
+    <td>Operator</td>
+    <td>Priority</td>
+    <td>Associativity</td>
+    <td>Example</td>
+</tr>
+<tr>
+    <td>\ref clause_op_2 "(:-)/2", <b>(--&gt;)/2</b></td>
+    <td>1200</td>
+    <td><tt>xfx</tt></td>
+    <td><tt>noun_phrase --> det, words::noun.</tt></td>
+</tr>
+<tr>
+    <td>\ref directive_1 "(:-)/1", \ref initialization_1 "(?-)/1"</td>
+    <td>1200</td>
+    <td><tt>fx</tt></td>
+    <td><tt>:- import(stdout).</tt></td>
+</tr>
+<tr>
+    <td>\ref logical_or_2 "(||)/2"</td>
+    <td>1100</td>
+    <td><tt>xfy</tt></td>
+    <td><tt>if (f(X) || g(X)) { ... }</tt></td>
+</tr>
+<tr>
+    <td>\ref if_stmt "(-&gt;)/2"</td>
+    <td>1050</td>
+    <td><tt>xfy</tt></td>
+    <td><tt>(A -&gt; B || C)</tt></td>
+</tr>
+<tr>
+    <td>\ref logical_and_2 "(,)/2", \ref logical_and_2 "(&amp;&amp;)/2"</td>
+    <td>1000</td>
+    <td><tt>xfy</tt></td>
+    <td><tt>if (f(X) &amp;&amp; g(X)) { ... }</tt></td>
+</tr>
+<tr>
+    <td>\ref not_provable_1 "(!)/1"</td>
+    <td>900</td>
+    <td><tt>fy</tt></td>
+    <td><tt>if (!f(X)) { ... }</tt></td>
+</tr>
+<tr>
+    <td>\ref unify_2 "(=)/2", \ref not_unifiable_2 "(!=)/2",
+        \ref univ_2 "(=..)/2", <b>in/2</b></td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>f(X, b) = f(a, Y)</tt></td>
+</tr>
+<tr>
+    <td>\ref term_eq_2 "(==)/2", \ref term_ne_2 "(!==)/2",
+        \ref term_lt_2 "(\@&lt;)/2", \ref term_le_2 "(\@&lt;=)/2",
+        \ref term_gt_2 "(\@&gt;)/2", \ref term_ge_2 "(\@&gt;=)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X !== Y</tt></td>
+</tr>
+<tr>
+    <td>\ref num_eq_2 "(=:=)/2", \ref num_ne_2 "(=!=)/2",
+        \ref num_lt_2 "(&lt;)/2", \ref num_le_2 "(&lt;=)/2",
+        \ref num_gt_2 "(&gt;)/2", \ref num_ge_2 "(&gt;=)/2",
+        \ref is_2 "is/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X is Y + Z * W</tt></td>
+</tr>
+<tr>
+    <td>\ref assign_2 "(:=)/2", \ref num_assign_2 "(::=)/2",
+        \ref bt_assign_2 "(:==)/2", \ref bt_num_assign_2 "(::==)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X ::= Y + Z * W</tt></td>
+</tr>
+<tr>
+    <td>\ref func_add_2 "(+)/2", \ref func_sub_2 "(-)/2",
+        \ref func_and_2 "(/\\)/2", \ref func_or_2 "(\\/)/2"</td>
+    <td>500</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X is Y + Z</tt></td>
+</tr>
+<tr>
+    <td>\ref func_mul_2 "(*)/2", \ref func_div_2 "(/)/2",
+        \ref func_mod_2 "(%)/2", \ref func_rem_2 "rem/2",
+        \ref func_mod_2 "mod/2"</td>
+    <td>400</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X is Y * Z</tt></td>
+</tr>
+<tr>
+    <td>\ref func_lshift_2 "(&lt;&lt;)/2",
+        \ref func_rshift_2 "(&gt;&gt;)/2",
+        \ref func_rushift_2 "(&gt;&gt;&gt;)/2"</td>
+    <td>400</td>
+    <td><tt>yfx</tt></td>
+    <td><tt>X is Y &gt;&gt; Z</tt></td>
+</tr>
+<tr>
+    <td>\ref func_pow_2 "(**)/2"</td>
+    <td>200</td>
+    <td><tt>xfx</tt></td>
+    <td><tt>X is Y ** Z</tt></td>
+</tr>
+<tr>
+    <td>\ref func_xor_2 "(^)/2"</td>
+    <td>200</td>
+    <td><tt>xfy</tt></td>
+    <td><tt>X is Y ^ Z</tt></td>
+</tr>
+<tr>
+    <td>\ref func_neg_1 "(-)/1", \ref func_not_1 "(~)/1"</td>
+    <td>200</td>
+    <td><tt>fy</tt></td>
+    <td><tt>X is - Z</tt></td>
+</tr>
+</table>
+
+Plang also includes some legacy operator names for compatibility
+with \ref standard "Standard Prolog".  The new operator names
+are the recommended spelling:
+
+<table cellspacing="0" cellpadding="3">
+<tr>
+    <td>Legacy Operator</td>
+    <td>Priority</td>
+    <td>Associativity</td>
+    <td>New Operator</td>
+<tr>
+    <td>\ref not_provable_1 "(\\+)/1"</td>
+    <td>900</td>
+    <td><tt>fy</tt></td>
+    <td>\ref not_provable_1 "(!)/1"</td>
+</tr>
+<tr>
+    <td>\ref not_unifiable_2 "(\\=)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td>\ref not_unifiable_2 "(!=)/2"</td>
+</tr>
+<tr>
+    <td>\ref term_ne_2 "(\\==)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td>\ref term_ne_2 "(!==)/2"</td>
+</tr>
+<tr>
+    <td>\ref term_le_2 "(\@=&lt;)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td>\ref term_le_2 "(\@&lt;=)/2"</td>
+</tr>
+<tr>
+    <td>\ref num_ne_2 "(=\\=)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td>\ref num_ne_2 "(=!=)/2"</td>
+</tr>
+<tr>
+    <td>\ref num_le_2 "(=&lt;)/2"</td>
+    <td>700</td>
+    <td><tt>yfx</tt></td>
+    <td>\ref num_le_2 "(&lt;=)/2"</td>
+</tr>
+<tr>
+    <td>\ref func_not_1 "(\\)/1"</td>
+    <td>200</td>
+    <td><tt>fy</tt></td>
+    <td>\ref func_not_1 "(~)/1"</td>
+</tr>
+</table>
+
+The <b>(;)/2</b> and <b>(//)/2</b> operators from Prolog are
+not supported in Plang because they clash with <tt>;</tt> used as a
+statement separator and <tt>//</tt> used to start comment blocks.
+Use \ref logical_or_2 "(||)/2" and \ref func_div_2 "(/)/2" instead.
+
+The term syntax is augmented as follows:
+
+\code
+operator --> prefix_operator, term.
+operator --> term, infix_operator, term.
+\endcode
+
+If an operator with a higher priority is used as an argument to
+an operator with a lower priority, then the term must be bracketed:
+
+\code
+X is (Y + Z) * W
+\endcode
+
+\section syntax_objects Objects
+
+Plang borrows the concept of prototype-based inheritance from
+<a href="http://en.wikipedia.org/wiki/ECMAScript">ECMAScript</a>
+to create an object model.  Objects are collections of properties
+with names and values.  A distinguished property called
+\c prototype is used to establish inheritance relationships
+between objects.
+
+Objects are further subdivided into class objects and instance
+objects.  Class objects are declared using the \ref decl_class "class"
+keyword:
+
+\code
+class vehicle
+{
+    var wheels
+}
+
+class passenger_car : vehicle
+{
+    var make, model
+
+    new(Make, Model)
+    {
+        Self.wheels = 4;
+        Self.make = Make;
+        Self.model = Model;
+    }
+}
+\endcode
+
+In the above example, the \c prototype property on the
+\c passenger_car class object will be the \c vehicle class object.
+The \c vehicle class object will not have a \c prototype property
+because it is at the root of an inheritance hierarchy.
+Class objects also have a \c className property.  At runtime,
+the relationships between the class objects can be established
+as follows:
+
+\code
+class(passenger_car, CarClass);
+class(vehicle, VehicleClass);
+
+CarClass.prototype == VehicleClass;
+CarClass.className == passenger_car;
+
+VehicleClass.className == vehicle;
+\endcode
+
+Instance objects are created with the \ref new_object_3 "new"
+keyword:
+
+\code
+new passenger_car(Car, "MegaCarz", "FastKar 2000");
+
+Car.make == "MegaCarz";
+Car.prototype == CarClass;
+Car.className == passenger_car;
+\endcode
+
+As can be seen, the \c Car object instance has inherited the value
+of the \c className property from its class object.  This becomes
+important when we introduce member predicates:
+
+\code
+class vehicle
+{
+    var owner, wheels
+
+    transferOwnership(NewOwner)
+    {
+        Self.owner := NewOwner;
+    }
+}
+
+Car.transferOwnership("Fred");
+\endcode
+
+The \c transferOwnership property is like any other property
+on the \c vehicle class object.  If \c passenger_car had its own
+implementation of the \c transferOwnership predicate, then it
+would override the one for \c vehicle.
+
+All member predicates, including constructors, are passed a hidden
+first argument that contains the object that is being operated on.
+This argument will be available to the member predicate as the
+variable \c Self.
+
+In the examples above we sometimes used \ref unify_2 "(=)/2"
+to assign values to object properties and other times we used
+\ref assign_2 "(:=)/2".  Why the difference?
+
+When an object is first constructed with \ref new_object_3 "new",
+its \c var properties will be set to unbound variables.  The
+constructor can then unify those variables on the \c Self object
+with their initial values.
+
+Later, when we want to change the value of a property to something
+else we cannot unify it again.  Instead, we need to assign a
+new value using \ref assign_2 "(:=)/2".  Because such assignment
+is destructive, the new value will persist across back-tracking.
+If you wish the property to automatically revert upon back-tracking,
+then use \ref bt_assign_2 "(:==)/2" instead.
+
+The only new term syntax that is introduced is for member variable
+references and member calls:
+
+\code
+member_variable --> variable, ".", atom.
+member_variable --> member_variable, ".", atom.
+
+member_call --> member_variable, "(", arguments, ")".
+member_call --> member_variable, "(", ")".
+\endcode
+
+Note: when "." is used for member variable references, it must
+not be followed by whitespace.  A "." followed by whitespace is
+intepreted as an end of predicate marker.
+
+See the documentation for the \ref decl_class "class" and
+\ref new_object_3 "new" keywords for more information on
+declaring and creating objects.
+
+\section syntax_predicates Predicates
+\anchor clause_op_2
+
+Predicates are declared at the top level of a Plang source file,
+and consist of a head term and an optional predicate body.
+For example:
+
+\code
+parent(fred, mary).
+parent(mary, bob).
+
+ancestor(A, B)
+{
+    parent(A, B);
+}
+ancestor(A, B)
+{
+    parent(A, C);
+    ancestor(C, B);
+}
+\endcode
+
+The <b>(:-)/2</b> operator from \ref standard "Standard Prolog"
+is not supported for predicate definition in Plang, except for
+dynamic predicates that are created with \ref asserta_1 "asserta/1"
+and \ref assertz_1 "assertz/1":
+
+\code
+create_rules()
+{
+    assertz((ancestor(A, B) :- parent(A, B)));
+    assertz((ancestor(A, B) :- parent(A, C), ancestor(C, B)));
+}
+\endcode
+
+The formal syntax for predicates follows:
+
+\code
+predicate --> predicate_head, ".".
+predicate --> predicate_head, compound_statement.
+
+predicate_head --> atom.
+predicate_head --> atom, "(", arguments, ")".
+predicate_head --> atom, "(", ")".
+\endcode
+
+Member predicates within a class can also be declared as \c static
+or instance constructors:
+
+\code
+member_predicate --> predicate.
+member_predicate --> "static", predicate.
+member_predicate --> constructor_head, ".".
+member_predicate --> constructor_head, compound_statement;
+
+constructor_head --> "new".
+constructor_head --> "new", "(", arguments, ")".
+constructor_head --> "new", "(", ")".
+\endcode
+
+Predicates can be converted into first-class terms using
+\ref predicate_2 "predicate/2".
+
+*/

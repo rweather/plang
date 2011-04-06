@@ -76,6 +76,7 @@ static void test_operators()
         { 400, P_OP_YFX, 2, "*"},
         { 400, P_OP_YFX, 2, "/"},
         { 400, P_OP_YFX, 2, "//"},
+        { 400, P_OP_YFX, 2, "%"},
         { 400, P_OP_YFX, 2, "rem"},
         { 400, P_OP_YFX, 2, "mod"},
         { 400, P_OP_YFX, 2, "<<"},

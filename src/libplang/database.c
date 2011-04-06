@@ -181,6 +181,7 @@ void _p_db_init(p_context *context)
         {"=!=",     P_OP_XFX,  700},    /* =\= */
         {"@<=",     P_OP_XFX,  700},    /* @=< */
         {"<=",      P_OP_XFX,  700},    /* =< */
+        {"%",       P_OP_YFX,  400},    /* mod */
         {"~",       P_OP_FY,   200},    /* \ */
 
         /* New operators specific to this implementation */
