@@ -43,6 +43,7 @@
  * \ref num_le_2 "(&lt;=)/2",
  * \ref num_gt_2 "(&gt;)/2",
  * \ref num_ge_2 "(&gt;=)/2",
+ * \ref atom_name_2 "atom_name/2",
  * \ref fperror_1 "fperror/1",
  * \ref isnan_1 "isnan/1",
  * \ref isinf_1 "isinf/1"
@@ -103,7 +104,10 @@
  * \ref func_string_2 "string/2"
  *
  * String functions:
+ * \ref func_char_2 "char/2",
+ * \ref func_char_to_string_1 "char_to_string/1",
  * \ref func_left_2 "left/2",
+ * \ref func_length_1 "length/1",
  * \ref func_mid_2 "mid/2",
  * \ref func_mid_3 "mid/3",
  * \ref func_right_2 "right/2"
@@ -688,6 +692,83 @@ static p_goal_result p_builtin_num_ge
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor atom_name_2
+ * <b>atom_name/2</b> - converts between atoms and strings.
+ *
+ * \par Usage
+ * \b atom_name(\em Atom, \em String)
+ *
+ * \par Description
+ * If \em Atom is an atom, then unifies \em String with
+ * the name of \em Atom.
+ * \par
+ * If \em Atom is a variable and \em String is a string, then
+ * unifies \em Atom with the atom whose name is \em String.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - both \em Atom and \em String
+ *     are variables.
+ * \li <tt>type_error(atom, \em Atom)</tt> - \em Atom is not an atom
+ *     or variable.
+ * \li <tt>type_error(string, \em String)</tt> - \em Atom is a variable
+ *     and \em String is not a string.
+ *
+ * \par Examples
+ * \code
+ * atom_name(foobar, S)         sets S to "foobar"
+ * atom_name('hi there!', S)    sets S to "hi there!"
+ * atom_name(A, "foobar")       sets A to foobar
+ * atom_name(A, "")             sets A to ''
+ * atom_name(foobar, "barfoo")  fails
+ * atom_name(A, S)              instantiation_error
+ * atom_name(1.5, S)            type_error(atom, 1.5)
+ * atom_name(A, foobar)         type_error(string, foobar)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_char_2 "char/2"
+ */
+static p_goal_result p_builtin_atom_name
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *atom = p_term_deref_member(context, args[0]);
+    p_term *string = p_term_deref_member(context, args[1]);
+    p_term *result;
+    if (!atom || !string) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (atom->header.type == P_TERM_ATOM) {
+        result = p_term_create_string_n
+            (context, p_term_name(atom), p_term_name_length(atom));
+        if (p_term_unify(context, string, result, P_BIND_DEFAULT))
+            return P_RESULT_TRUE;
+        else
+            return P_RESULT_FAIL;
+    } else if (atom->header.type & P_TERM_VARIABLE) {
+        if (string->header.type & P_TERM_VARIABLE) {
+            *error = p_create_instantiation_error(context);
+            return P_RESULT_ERROR;
+        } else if (string->header.type != P_TERM_STRING) {
+            *error = p_create_type_error(context, "string", string);
+            return P_RESULT_ERROR;
+        }
+        result = p_term_create_atom_n
+            (context, p_term_name(string), p_term_name_length(string));
+        if (p_term_unify(context, atom, result, P_BIND_DEFAULT))
+            return P_RESULT_TRUE;
+        else
+            return P_RESULT_FAIL;
+    } else {
+        *error = p_create_type_error(context, "atom", atom);
+        return P_RESULT_ERROR;
+    }
 }
 
 /**
@@ -2337,6 +2418,128 @@ static p_goal_result p_arith_ceil
 /**
  * \addtogroup arithmetic
  * <hr>
+ * \anchor func_char_2
+ * <b>char/2</b> - integer value of a specific character in a string.
+ *
+ * \par Usage
+ * \em Var \b is \b char(\em Expr, \em Index)
+ *
+ * \par Description
+ * Evaluates \em Expr and \em Index and returns the integer
+ * value of the character at position \em Index within the
+ * string \em Expr.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Index)</tt> - \em Index is
+ *     not an integer.
+ * \li <tt>domain_error(string_index, \em Index)</tt> - \em Index is
+ *     out of range for \em Expr.
+ *
+ * \par Examples
+ * \code
+ * X is char("foobar", 3)       X is set to 98 (character code of 'b')
+ * X is char(1.5, 2)            type_error(string, 1.5)
+ * X is char("foobar", 3.0)     type_error(integer, 3.0)
+ * X is char("foobar", -1)      domain_error(string_index, -1)
+ * X is char("foobar", 6)       domain_error(string_index, 6)
+ * \endcode
+ *
+ * \par See Also
+ * \ref atom_name_2 "atom_name/2",
+ * \ref func_char_to_string_1 "char_to_string/1",
+ * \ref func_length_1 "length/1"
+ */
+static p_goal_result p_arith_char
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_STRING) {
+        if (values[1].type == P_TERM_INTEGER) {
+            int index = values[1].integer_value;
+            if (index >= 0 &&
+                    index < (int)(values[0].string_value->header.size)) {
+                result->type = P_TERM_INTEGER;
+                result->integer_value =
+                    (int)((p_term_name(values[0].string_value))[index]
+                            & 0xFF);
+                return P_RESULT_TRUE;
+            } else {
+                *error = p_create_domain_error
+                    (context, "string_index", args[1]);
+                return P_RESULT_ERROR;
+            }
+        } else {
+            *error = p_create_type_error(context, "integer", args[1]);
+            return P_RESULT_ERROR;
+        }
+    } else {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_char_to_string_1
+ * <b>char_to_string/1</b> - convert an integer character code into a
+ * single-character string.
+ *
+ * \par Usage
+ * \em Var \b is \b char_to_string(\em Expr)
+ *
+ * \par Description
+ * Evaluates \em Expr and returns the single-character string
+ * that corresponds to the integer character code of \em Expr.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(integer, \em Expr)</tt> - \em Expr is
+ *     not an integer.
+ * \li <tt>representation_error(character_code)</tt> - \em Expr is
+ *     an integer that does not correspond to a valid character code.
+ *
+ * \par Examples
+ * \code
+ * X is char_to_string(98)      X is set to "b"
+ * X is char_to_string(1.5)     type_error(integer, 1.5)
+ * X is char_to_string(-1)      representation_error(character_code)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_char_2 "char/2",
+ * \ref func_length_1 "length/1"
+ */
+static p_goal_result p_arith_char_to_string
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_INTEGER) {
+        int ch = values[0].integer_value;
+        if (ch >= 0 && ch <= 255) {     /* TODO: UTF-8 */
+            char str[1];
+            str[0] = (char)ch;
+            result->type = P_TERM_STRING;
+            result->string_value =
+                p_term_create_string_n(context, str, 1);
+            return P_RESULT_TRUE;
+        } else {
+            *error = p_create_representation_error
+                (context, "character_code");
+            return P_RESULT_ERROR;
+        }
+    } else {
+        *error = p_create_type_error(context, "integer", args[0]);
+        return P_RESULT_ERROR;
+    }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
  * \anchor func_cos_1
  * <b>cos/1</b> - cosine of an arithmetic term.
  *
@@ -2862,7 +3065,7 @@ static p_goal_result p_arith_integer
  * \em Var \b is \b left(\em Expr, \em Length)
  *
  * \par Description
- * Evaluates \em Expr \em Length.  Returns the \em Length bytes
+ * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
  * at the beginning of the string.
  * \par
  * If \em Length is greater than the length of \em Expr,
@@ -2932,6 +3135,50 @@ static p_goal_result p_arith_left
     result->string_value = p_arith_mid
         (context, str, 0, (unsigned int)length);
     return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_length_1
+ * <b>length/1</b> - length of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b length(\em Expr)
+ *
+ * \par Description
+ * Evaluates \em Expr and returns the length of the string in bytes.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ *
+ * \par Examples
+ * \code
+ * X is length("foobar")        X is set to 6
+ * X is length("foo" + "bar")   X is set to 6
+ * X is length("")              X is set to 0
+ * X is length(1.5)             type_error(string, 1.5)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_char_2 "char/2",
+ * \ref func_char_to_string_1 "char_to_string/1"
+ */
+static p_goal_result p_arith_length
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_STRING) {
+        result->type = P_TERM_INTEGER;
+        result->integer_value = (int)
+            p_term_name_length(values[0].string_value);
+        return P_RESULT_TRUE;
+    } else {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
 }
 
 /**
@@ -3288,7 +3535,7 @@ static p_goal_result p_arith_pow
  * \em Var \b is \b right(\em Expr, \em Length)
  *
  * \par Description
- * Evaluates \em Expr \em Length.  Returns the \em Length bytes
+ * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
  * at the end of the string.
  * \par
  * If \em Length is greater than the length of \em Expr,
@@ -3836,6 +4083,7 @@ void _p_db_init_arith(p_context *context)
         {"=<", 2, p_builtin_num_le},
         {">", 2, p_builtin_num_gt},
         {">=", 2, p_builtin_num_ge},
+        {"atom_name", 2, p_builtin_atom_name},
         {"fperror", 1, p_builtin_fperror},
         {"isnan", 1, p_builtin_isnan},
         {"isinf", 1, p_builtin_isinf},
@@ -3865,6 +4113,8 @@ void _p_db_init_arith(p_context *context)
         {"atan2", 2, p_arith_atan2},
         {"ceil", 1, p_arith_ceil},
         {"ceiling", 1, p_arith_ceil},
+        {"char", 2, p_arith_char},
+        {"char_to_string", 1, p_arith_char_to_string},
         {"cos", 1, p_arith_cos},
         {"e", 0, p_arith_e},
         {"exp", 1, p_arith_exp},
@@ -3875,6 +4125,7 @@ void _p_db_init_arith(p_context *context)
         {"inf", 0, p_arith_inf},
         {"integer", 1, p_arith_integer},
         {"left", 2, p_arith_left},
+        {"length", 1, p_arith_length},
         {"log", 1, p_arith_log},
         {"mid", 2, p_arith_mid_2},
         {"mid", 3, p_arith_mid_3},

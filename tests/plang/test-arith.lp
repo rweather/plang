@@ -967,6 +967,50 @@ right()
     eval_error(right("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
+length()
+{
+    eval(length("foobar"), 6);
+    eval(length(""), 0);
+    eval(length("foo" + "bar"), 6);
+
+    eval_error(length(foobar), type_error(evaluable, foobar));
+    eval_error(length(1.5), type_error(string, 1.5));
+}
+
+char()
+{
+    eval(char("foobar", 3), 98);
+    eval(char("foobar", 0), 102);
+
+    eval_error(char(foobar, 2), type_error(evaluable, foobar));
+    eval_error(char("foobar", foobar), type_error(evaluable, foobar));
+    eval_error(char(1.5, 2), type_error(string, 1.5));
+    eval_error(char("foobar", -1), domain_error(string_index, -1));
+    eval_error(char("foobar", 6), domain_error(string_index, 6));
+}
+
+char_to_string()
+{
+    eval(char_to_string(98), "b");
+
+    eval_error(char_to_string(foobar), type_error(evaluable, foobar));
+    eval_error(char_to_string(1.5), type_error(integer, 1.5));
+    eval_error(char_to_string(-1), representation_error(character_code));
+}
+
+atom_name()
+{
+    verify(atom_name(foobar, S1) && S1 == "foobar");
+    verify(atom_name('hi there!', S2) && S2 == "hi there!");
+    verify(atom_name(A1, "foobar") && A1 == foobar);
+    verify(atom_name(A2, "") && A2 == '');
+    verify(!atom_name(foobar, "barfoo"));
+
+    verify_error(atom_name(A3, S3), instantiation_error);
+    verify_error(atom_name(1.5, S4), type_error(atom, 1.5));
+    verify_error(atom_name(A4, foobar), type_error(string, foobar));
+}
+
 other()
 {
     verify(!(2 is 1 + 3));
@@ -1032,6 +1076,10 @@ main(_)
     run(mid);
     run(left);
     run(right);
+    run(length);
+    run(char);
+    run(char_to_string);
+    run(atom_name);
     run(other);
     report();
 }

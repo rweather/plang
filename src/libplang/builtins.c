@@ -27,7 +27,7 @@
 /**
  * \defgroup predicates Builtin predicates - Overview
  *
- * \par Arithmetic
+ * \par Arithmetic and string operations
  * \ref is_2 "is/2",
  * \ref num_eq_2 "(=:=)/2",
  * \ref num_ne_2 "(=!=)/2",
@@ -35,6 +35,7 @@
  * \ref num_le_2 "(&lt;=)/2",
  * \ref num_gt_2 "(&gt;)/2",
  * \ref num_ge_2 "(&gt;=)/2",
+ * \ref atom_name_2 "atom_name/2",
  * \ref fperror_1 "fperror/1",
  * \ref isnan_1 "isnan/1",
  * \ref isinf_1 "isinf/1"
@@ -171,7 +172,7 @@ static p_goal_result p_builtin_unbind
 }
 
 /**
- * \defgroup arithmetic Builtin predicates - Arithmetic
+ * \defgroup arithmetic Builtin predicates - Arithmetic and string operations
  */
 /*\@{*/
 /* Predicates and functions for this group are defined in arith.c */
