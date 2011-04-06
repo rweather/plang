@@ -21,68 +21,27 @@
 \file mainpage.dox
 \mainpage
 
-Plang (pronounced "P lang") is a logic programming language,
-which borrows some concepts from
+Plang (pronounced "P lang") is an experimental logic programming
+language, which borrows the backtracking search of
 <a href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>,
-but not all elements of its syntax.
+but with a completely different C-style syntax on top.
+The aim is to explore alternatives to traditional languages
+that can help make logic programming more attractive for
+practical programming tasks.
 
-Plang's design differs from other logic programming languages
-in a number of ways.  The following concepts were followed
-when designing the syntax and semantics:
+Plang includes a number of novel features compared to other
+logic programming languages:
 
-\li Don't be cryptic.
-\li Use conventional syntax to peform conventional tasks.
-\li Context-free BNF grammar.
-\li Modern type concepts such as strings and objects are first-class
-    language features.
+\li Uses conventional syntax to perform conventional tasks; such as
+    \c if, \c for, and \c while statements.
+\li Modern type concepts such as strings and objects which are
+    first-class members of the syntax and semantics of unification.
+\li Context-free BNF grammar for the core language.
+\li Bootstraps from C - no need for a pre-existing third party
+    Prolog system to "compile the compiler".
 
-Logic programming is a very powerful concept, able to express
-problems in artificial intelligence, theorem proving, and natural
-deduction very compactly.  It is unfortunate that new users are often
-turned off by the cryptic nature of the traditional logic programming
-languages.  The following are some examples (this list is not intended
-to be exhaustive):
-
-\li <a href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>: \c !, <tt>(A -> B ; C)</tt>
-\li <a href="http://www.sics.se/isl/sicstus/docs/latest/html/sicstus.html">SICStus Prolog</a>: <tt>PointObj &gt;&gt; x(InitX)</tt> to fetch the value of the property \c x.
-\li <a href="http://en.wikipedia.org/wiki/Cyc">Cyc</a>: <tt>(#\$capitalCity #\$France #\$Paris)</tt>
-
-A proficient user of these languages will no doubt see no problem
-with the above examples.  However, the learning curve for a new
-user of the language can be quite steep.  This brings us to the
-second concept: use conventional syntax to perform conventional tasks.
-The following are some examples from Plang:
-
-\li \c ! becomes \c stop, indicating that back-tracking search
-    should stop.
-\li <tt>(A -> B ; C)</tt> becomes <tt>if (A) B else C</tt>.
-\li \c while, \c loop, and \c for constructs as alternatives to
-    tail recursion.
-\li <tt>X.name = Y</tt> to unify against an object property,
-    or <tt>X.name := Y</tt> to modify an object property.
-
-The following example performs an action on every element of a list
-in traditional Prolog:
-
-\code
-perform_action(List) :- var(List), !, fail.
-perform_action([]) :- !.
-perform_action([Head|Tail]) :- !, action(Head), perform_action(Tail).
-perform_action([_|Tail]) :- perform_action(Tail).
-\endcode
-
-In Plang, this can be expressed as follows:
-
-\code
-perform_action(List)
-{
-    for (X in List) action(X);
-}
-\endcode
-
-This version is more obvious as to what it is doing, and closer to
-how a classical programmer thinks about solving the problem.
-The Plang parser internally expands the \c for loop to a hidden
-predicate similar in structure to the traditional version.
+The \ref issues_with_prolog "Issues With Prolog" page discusses a
+number of issues with traditional Prolog implementations that have
+motivated the design of Plang.
 
 */

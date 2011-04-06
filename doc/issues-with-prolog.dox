@@ -1,0 +1,192 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file issues-with-prolog.dox
+\page issues_with_prolog Issues with Prolog
+
+This page discusses some of the issues in conventional Prolog
+systems which have motivated Plang's design:
+
+\li \ref prolog_cryptic "Cryptic syntax"
+\li \ref prolog_sugar "Syntactic sugar is not harmful!"
+\li \ref prolog_procedural "Procedural code happens"
+
+\section prolog_cryptic Cryptic syntax
+
+Logic programming is a very powerful concept, able to express
+problems in artificial intelligence, theorem proving, and natural
+deduction very compactly.  It is unfortunate that new users are often
+turned off by the cryptic nature of the traditional logic programming
+languages.  The following are some examples (this list is not intended
+to be exhaustive):
+
+\li <a href="http://en.wikipedia.org/wiki/Prolog">Prolog</a>: \c !, <tt>(A -> B ; C)</tt>
+\li <a href="http://www.sics.se/isl/sicstus/docs/latest/html/sicstus.html">SICStus Prolog</a>: <tt>PointObj &gt;&gt; x(InitX)</tt> to fetch the value of the property \c x.
+\li <a href="http://en.wikipedia.org/wiki/Cyc">Cyc</a>: <tt>(#\$capitalCity #\$France #\$Paris)</tt>
+
+A proficient user of these languages will no doubt see no problem
+with the above examples.  However, the learning curve for a new
+user of the language can be quite steep.  Key to Plang's design
+is the principle of <em>use conventional syntax to perform conventional
+tasks</em>.
+
+For Plang, \em conventional means syntactic conventions that
+mainstream programmers are already familiar with.  The following
+code is instantly recognizable:
+
+\code
+if (X < Y)
+    A;
+else
+    B;
+\endcode
+
+The Prolog equivalent is not obvious to the uninitiated without
+consulting the language manual:
+
+\code
+(X < Y) -> A ; B
+\endcode
+
+The Prolog version is also error-prone.  The following two
+statements are not equivalent:
+
+\code
+if (X < Y) A;
+
+(X < Y) -> A
+\endcode
+
+The user's natural interpretation is that execution should continue
+with the next statement if the condition is false.  In Prolog however,
+the <tt>-></tt> operator will fail the entire clause if the condition
+is false and there is no "else" clause.  It is necessary to do
+this instead:
+
+\code
+(X < Y) -> A ; true
+\endcode
+
+\section prolog_sugar Syntactic sugar is not harmful!
+
+The <tt>-></tt> operator in the previous section is an example of
+syntactic sugar.  Many Prolog systems will compile
+<tt>(A -> B ; C)</tt> by expanding it into normal Horn
+clause form first:
+
+\code
+if_stmt_123 :- A, !, B.
+if_stmt_123 :- C.
+\endcode
+
+Oddly though, adding syntactic sugar for loop constructs is
+considered heretical.  The following tail-recursive predicate
+iterates over all members of a list and performs an action:
+
+\code
+perform_action([]).
+perform_action([Head|Tail]) :- action(Head), perform_action(Tail).
+\endcode
+
+Except this code is dangerous if the \c Tail is a variable.
+It may enter an infinite loop.  A safer version is:
+
+\code
+perform_action(List) :- var(List), !, fail.
+perform_action([]).
+perform_action([Head|Tail]) :- action(Head), perform_action(Tail).
+\endcode
+
+In Plang, this can be expressed as follows:
+
+\code
+perform_action(List)
+{
+    for (X in List)
+        action(X);
+}
+\endcode
+
+This version is more obvious as to what it is doing, and closer to
+how a regular programmer thinks about solving the problem.
+The Plang parser internally expands the \c for loop to a hidden
+predicate similar in structure to the traditional version.
+
+Another more involved example happens in programs that prompt the
+user for commands and then execute those commands.  The programmer
+wants to write something like this:
+
+\code
+main_loop()
+{
+    do {
+        read_command(Cmd);
+        switch (Cmd) {
+        case 'save': save_to_file();
+        case 'load': load_from_file();
+        ...
+        case 'quit': Quit = yes;
+        default:     stdout::writeln('Invalid command');
+        }
+    } while (Quit != yes);
+}
+\endcode
+
+Prolog instead forces the code to be unwound into multiple predicates:
+
+\code
+main_loop :-
+    read_command(Cmd),
+    (Cmd != quit ->
+        execute_command(Cmd),
+        main_loop
+    ; true).
+
+execute_command(save) :- !, save_to_file.
+execute_command(load) :- !, load_from_file.
+...
+execute_command(X) :- !, write('Invalid command'), nl.
+\endcode
+
+With multiple levels of commands, parameter error reporting,
+and so on, this can very quickly snowball into dozens of
+predicates micro-managing each tiny step.  Plang's design
+recognizes that breaking code up into tiny steps is a job
+for a compiler, not a human!
+
+\section prolog_procedural Procedural code happens
+
+One response to the previous examples is that they are procedural
+rather than declarative, which is against "The Prolog Way".
+However, code like the command processor above happens a lot
+in Prolog applications.  Most applications have two main aspects:
+
+\li The core problem in theorem proving, artificial intelligence, etc,
+    that the application is trying to solve.
+\li The application shell that awaits user input, or reads data
+    from a file, and calls the core problem solver as needed.
+
+The first aspect needs the full power of backtracking search to
+solve it.  The second does not - it is implicitly procedural.
+It is possible (and encouraged!) to write declarative Horn clauses
+in Plang, but the language doesn't stop you from doing other
+things as well.
+
+*/
