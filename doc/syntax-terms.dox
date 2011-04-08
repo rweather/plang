@@ -441,7 +441,7 @@ There are presently no unary postfix operators (<tt>xf</tt> and
 </tr>
 <tr>
     <td>\ref unify_2 "(=)/2", \ref not_unifiable_2 "(!=)/2",
-        \ref univ_2 "(=..)/2", <b>in/2</b></td>
+        \ref univ_2 "(=..)/2", \ref in_2 "in/2"</td>
     <td>700</td>
     <td><tt>yfx</tt></td>
     <td><tt>f(X, b) = f(a, Y)</tt></td>

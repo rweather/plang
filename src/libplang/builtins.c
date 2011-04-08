@@ -77,6 +77,7 @@
  * \ref halt_1 "halt/1",
  * \ref if_stmt "(->)/2",
  * \ref if_stmt "if",
+ * \ref in_2 "in/2",
  * \ref once_1 "once/1",
  * \ref repeat_0 "repeat/0",
  * \ref switch_stmt "switch",
@@ -1573,6 +1574,7 @@ static p_goal_result p_builtin_load_library
  * \ref halt_1 "halt/1",
  * \ref if_stmt "(->)/2",
  * \ref if_stmt "if",
+ * \ref in_2 "in/2",
  * \ref once_1 "once/1",
  * \ref repeat_0 "repeat/0",
  * \ref switch_stmt "switch",
@@ -2080,6 +2082,7 @@ static p_goal_result p_builtin_fail
  *
  * \par See Also
  * \ref do_stmt "do",
+ * \ref in_2 "in/2",
  * \ref while_stmt "while"
  */
 static p_goal_result p_builtin_set_loop_var
@@ -2094,7 +2097,7 @@ static char const p_builtin_for[] =
     "{\n"
     "    var(List);\n"
     "    !;\n"
-    "    throw(instantiation_error);\n"
+    "    throw(error(instantiation_error, 'for'/2));\n"
     "}\n"
     "'$$for'(Vars, LoopVar, [], Body)\n"
     "{\n"
@@ -2111,7 +2114,7 @@ static char const p_builtin_for[] =
     "}\n"
     "'$$for'(Vars, LoopVar, List, Body)\n"
     "{\n"
-    "    throw(type_error(list, List));\n"
+    "    throw(error(type_error(list, List), 'for'/2));\n"
     "}\n";
 
 /**
@@ -2273,6 +2276,69 @@ static p_goal_result p_builtin_if
     context->current_node = if_node;
     return P_RESULT_TREE_CHANGE;
 }
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor in_2
+ * <b>in/2</b> - list membership testing.
+ *
+ * \par Usage
+ * \em Term \b in \em List
+ *
+ * \par Description
+ * \em Term \b in \em List succeeds multiple times whenever \em Term
+ * unifies with an element of \em List.  Fails at the end of the
+ * \em List, if \em Term does not unify with any of the elements,
+ * or the tail of \em List is not a list or <tt>[]</tt>.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em List or the tail of
+ *     \em List is a variable.  This prevents an infinite loop
+ *     if \em List is partial.
+ *
+ * \par Examples
+ * \code
+ * X in [a, b, c]       succeeds 3 times for X = a/b/c, then fails
+ * f(X) in [a]          fails
+ * X in Y               instantiation_error
+ * X in [a|Y]           succeeds with X = a, then instantiation_error
+ * \endcode
+ * \par
+ * Note: if the <b>in/2</b> predicate is used within a condition
+ * for a \ref do_stmt "do", \ref if_stmt "if", or
+ * \ref while_stmt "while" statement, then it will succeed only
+ * once for the first match.  This is because the statement conditions
+ * perform a cut, \ref cut_0 "(!)/0", after success is detected.
+ * This is useful for detecting simple list membership only:
+ * \code
+ * if (f(a) in List) {
+ *     ...
+ * }
+ * \endcode
+ * The recommended procedural loop construct for lists is
+ * \ref for_stmt "for":
+ * \code
+ * for (X in [a, b, c])
+ *     stdout::writeln(X);
+ * \endcode
+ *
+ * \par See Also
+ * \ref for_stmt "for"
+ */
+static char const p_builtin_in[] =
+    "'in'(Term, List)\n"
+    "{\n"
+    "    var(List);\n"
+    "    !;\n"
+    "    throw(error(instantiation_error, 'in'/2));\n"
+    "}\n"
+    "'in'(Term, [Term|Tail]).\n"
+    "'in'(Term, [Head|Tail])\n"
+    "{\n"
+    "    'in'(Term, Tail);\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -4739,6 +4805,7 @@ void _p_db_init_builtins(p_context *context)
     static const char * const builtin_sources[] = {
         p_builtin_do,
         p_builtin_for,
+        p_builtin_in,
         p_builtin_not_provable,
         p_builtin_once,
         p_builtin_repeat,

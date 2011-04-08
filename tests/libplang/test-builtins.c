@@ -270,6 +270,28 @@ static void test_logic_if_stmt()
     P_COMPARE(run_stmt("if (!, atom(a)) atom(b);"), P_RESULT_TRUE);
 }
 
+static void test_logic_in()
+{
+    P_COMPARE(run_goal("X in []"), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("X in [a], X == a"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("X in [a, b]"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal_error("X in Y", "instantiation_error"), P_RESULT_ERROR);
+
+    P_COMPARE(run_goal("X in [a|Y]"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_ERROR);
+
+    P_COMPARE(run_goal("f in [a]"), P_RESULT_FAIL);
+
+    P_COMPARE(run_goal("f in [a, f]"), P_RESULT_TRUE);
+    P_COMPARE(p_context_reexecute_goal(context, 0), P_RESULT_FAIL);
+}
+
 static void test_logic_switch()
 {
     P_COMPARE(run_stmt("switch (a) {}"), P_RESULT_FAIL);
@@ -399,6 +421,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(logic_halt);
     P_TEST_RUN(logic_if_expr);
     P_TEST_RUN(logic_if_stmt);
+    P_TEST_RUN(logic_in);
     P_TEST_RUN(logic_switch);
     P_TEST_RUN(logic_while);
     P_TEST_RUN(term_unification);
