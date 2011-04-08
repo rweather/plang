@@ -29,6 +29,23 @@ class foo
     bar2(X, Y) { Self.bar ::= X - Y; }
 };
 
+class vehicle
+{
+    var wheels
+}
+
+class passenger_car : vehicle
+{
+    var make, model
+
+    new(Make, Model)
+    {
+        Self.wheels = 4;
+        Self.make = Make;
+        Self.model = Model;
+    }
+}
+
 new_object()
 {
     new foo (F);
@@ -73,11 +90,45 @@ call_method()
     verify(List == [1, 7]);
 }
 
+properties()
+{
+    verify(class(passenger_car, CarClass));
+    verify(class(vehicle, VehicleClass));
+
+    verify(CarClass.prototype == VehicleClass);
+    verify(CarClass.className == passenger_car);
+
+    verify(VehicleClass.className == vehicle);
+
+    new passenger_car(Car, "MegaCarz", "FastKar 2000");
+
+    verify(Car.make == "MegaCarz");
+    verify(Car.model == "FastKar 2000");
+    verify(Car.prototype == CarClass);
+    verify(Car.className == passenger_car);
+
+    verify(Car.model := "FastKar 2001");
+    verify(Car.model == "FastKar 2001");
+
+    verify(!(Car.model := "FastKar 2002", fail));
+    verify(Car.model == "FastKar 2002");
+
+    verify(!(Car.model :== "FastKar 2003", fail));
+    verify(Car.model == "FastKar 2002");
+
+    verify(Car.model :== "FastKar 2003");
+    verify(Car.model == "FastKar 2003");
+
+    verify(!(X = f(Y), Y = a, Car.make := X, fail));
+    verify(Car.make == f(a));
+}
+
 main(_)
 {
     init("test-class");
     run(new_object);
     run(decl_errors);
     run(call_method);
+    run(properties);
     report();
 }

@@ -38,8 +38,10 @@ assign()
     verify(X == (20 + 4));
     verify(!(X := f(a, b), fail));
     verify(X == f(a, b));
-    verify(!(X := f(X)));
-    verify(X == f(a, b));
+    verify(Y := f(Y));
+    verify(Y = f(_));
+    verify(!(X := f(b, Z), fail));
+    verify((X = f(b, W), W !== Z));
 
     new foo(F);
     verify(F.bar := [a, b]);
@@ -69,6 +71,8 @@ bt_assign()
     verify(X == (20 + 4));
     verify(!(X :== f(X)));
     verify(X == (20 + 4));
+    verify(X :== f(b, Z));
+    verify((X = f(b, W), W == Z));
 
     new foo(F);
     verify(F.bar :== [a, b]);

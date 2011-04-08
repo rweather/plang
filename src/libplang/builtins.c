@@ -4380,17 +4380,11 @@ P_INLINE p_term *p_term_resolve_variable(p_context *context, p_term *var)
  * \em Var <b>:=</b> \em Term
  *
  * \par Description
- * Assigns \em Term to \em Var, replacing its previous value,
- * and succeed.  If \em Var occurs in \em Term, then the assignment
- * will fail.
- * \par
- * The assignment will be permanent; back-tracking will not
- * revert \em Var to its previous value.  However, bound variables
- * within \em Term may be reverted upon back-tracking.  Use
- * \ref copy_term_2 "copy_term/2" to make a copy of \em Term
- * that is protected from back-tracking of its bound variables.
- * \par
- * Use \ref bt_assign_2 "(:==)/2" for back-trackable assignment.
+ * Assigns a freshly renamed copy of \em Term to \em Var,
+ * replacing its previous value, and succeed.  The \em Term is
+ * renamed so that the assigned value will survive back-tracking.
+ * Use \ref bt_assign_2 "(:==)/2" to cause \em Var to revert to its
+ * original value upon back-tracking.
  *
  * \par Errors
  *
@@ -4403,8 +4397,8 @@ P_INLINE p_term *p_term_resolve_variable(p_context *context, p_term *var)
  * \code
  * X := f(a, b)             succeeds
  * X := f(b, a)             succeeds again, replacing the value
- * X := f(X, a)             fails due to occurs check
- * X := Y + Z               sets X to (Y + Z), does not evaluate
+ * X := f(X, a)             succeeds after renaming X to _X
+ * X := Y + Z               sets X to (_Y + _Z), does not evaluate
  * X := pi                  sets X to the atom pi, does not evaluate
  * X.name := 42             sets the name property of object X to 42
  * a := X                   type_error(variable, a)
@@ -4414,26 +4408,20 @@ P_INLINE p_term *p_term_resolve_variable(p_context *context, p_term *var)
  * \ref num_assign_2 "(::=)/2",
  * \ref bt_assign_2 "(:==)/2",
  * \ref bt_num_assign_2 "(::==)/2",
- * \ref unify_2 "(=)/2"
+ * \ref unify_2 "(=)/2",
+ * \ref copy_term_2 "copy_term/2"
  */
 static p_goal_result p_builtin_assign
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *var;
-    p_term *prev;
     var = p_term_resolve_variable(context, args[0]);
     if (!var) {
         *error = p_create_type_error(context, "variable", args[0]);
         return P_RESULT_ERROR;
     }
-    prev = var->var.value;
-    var->var.value = 0;
-    if (!p_term_occurs_in(var, args[1])) {
-        var->var.value = args[1];
-        return P_RESULT_TRUE;
-    }
-    var->var.value = prev;
-    return P_RESULT_FAIL;
+    var->var.value = p_term_clone(context, args[1]);
+    return P_RESULT_TRUE;
 }
 
 /**
