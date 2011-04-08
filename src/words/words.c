@@ -93,8 +93,8 @@
  * \endcode
  *
  * The predicates in the <tt>words</tt> module can also be used
- * in definite clause grammar (DCG) rules to help parse sentences
- * in English:
+ * in \ref syntax_dcg "definite clause grammar" (DCG) rules to
+ * help parse sentences in English:
  *
  * \code
  * sentence --> noun_phrase, verb_phrase.

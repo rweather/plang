@@ -1505,4 +1505,10 @@ dcg_primitive_term
             $$ = binary_term("=", input_stream->dcg_var, list);
             input_stream->dcg_var = var;
         }
+    | K_STRING                  {
+            p_term *var = p_term_create_variable(context);
+            p_term *list = p_term_create_list(context, $1, var);
+            $$ = binary_term("=", input_stream->dcg_var, list);
+            input_stream->dcg_var = var;
+        }
     ;
