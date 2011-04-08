@@ -78,7 +78,7 @@ The user's natural interpretation is that execution should continue
 with the next statement if the condition is false.  In Prolog however,
 the <tt>-></tt> operator will fail the entire clause if the condition
 is false and there is no "else" clause.  It is necessary to do
-this instead:
+this instead to capture the user's actual intent:
 
 \code
 (X < Y) -> A ; true
@@ -126,8 +126,9 @@ perform_action(List)
 
 This version is more obvious as to what it is doing, and closer to
 how a regular programmer thinks about solving the problem.
-The Plang parser internally expands the \c for loop to a hidden
-predicate similar in structure to the traditional version.
+The Plang parser internally expands the \ref for_stmt "for"
+loop to a hidden predicate similar in structure to
+\c perform_action above.
 
 Another more involved example happens in programs that prompt the
 user for commands and then execute those commands.  The programmer
@@ -186,7 +187,7 @@ in Prolog applications.  Most applications have two main aspects:
 The first aspect needs the full power of backtracking search to
 solve it.  The second does not - it is implicitly procedural.
 It is possible (and encouraged!) to write declarative Horn clauses
-in Plang, but the language doesn't stop you from doing other
-things as well.
+in Plang, but the language doesn't make it unnecessarily difficult
+to do other things as well.
 
 */

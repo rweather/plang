@@ -22,7 +22,7 @@
 #include "context-priv.h"
 
 /**
- * \defgroup errors Error Creation
+ * \defgroup errors Native C API - Error Creation
  *
  * Functions in this module assist with the creation of error terms
  * for builtin predicates.  In the predicate documentation, errors

@@ -20,6 +20,17 @@
 /**
  * \defgroup modules Modules - Overview
  *
+ * This section of the documentation describes the add-on modules
+ * that are available to Plang applications.  The predicates
+ * defined here are only available after an appropriate
+ * \ref import_1 "import/1" directive has been encountered for
+ * the module's name.  For example:
+ *
+ * \code
+ * :- import(stdout).
+ * :- import(words).
+ * \endcode
+ *
  * \par findall
  * \ref bagof_3 "bagof/3",
  * \ref findall_3 "findall/3",

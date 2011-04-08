@@ -22,7 +22,7 @@
 #include "context-priv.h"
 
 /**
- * \defgroup database Database
+ * \defgroup database Native C API - Database
  *
  * This module manages the predicate an operator database.
  */

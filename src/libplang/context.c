@@ -34,7 +34,7 @@
 #endif
 
 /**
- * \defgroup context Execution Contexts
+ * \defgroup context Native C API - Execution Contexts
  */
 /*\@{*/
 

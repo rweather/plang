@@ -42,12 +42,18 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
 }
 
 /**
- * \defgroup term Term Representation
+ * \defgroup term Native C API - Term Representation
  *
- * This module provides functions for creating Prolog terms
+ * This module provides functions for creating Plang terms
  * and operating on them.  Terms may have a number of special
  * forms, described by their p_term_type(): functors, lists,
- * atoms, strings, variables, integers, reals, and objects.
+ * atoms, strings, variables, integers, reals, objects,
+ * and predicates.
+ *
+ * This module is concerned with creating and managing terms from
+ * native C applications and builtin predicates.  See
+ * \ref syntax_terms "Language Syntax - Terms" for information
+ * on how to create terms in the Plang language.
  */
 /*\@{*/
 
