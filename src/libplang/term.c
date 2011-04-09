@@ -2258,7 +2258,12 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
         break; }
     case P_TERM_ATOM:
     case P_TERM_STRING:
-        return p_term_strcmp(term1, term2);
+        cmp = p_term_strcmp(term1, term2);
+        if (cmp < 0)
+            return -1;
+        else if (cmp > 0)
+            return 1;
+        break;
     case P_TERM_INTEGER:
 #if defined(P_TERM_64BIT)
         if (((int)(term1->header.size)) < ((int)(term2->header.size)))
