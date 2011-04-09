@@ -39,6 +39,8 @@
  * \par words
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
+ * \ref words_base_form_3 "words::base_form/3",
+ * \ref words_base_forms_3 "words::base_forms/3",
  * \ref words_description_5 "words::description/5",
  * \ref words_noun_1 "words::noun/1",
  * \ref words_overview_2 "words::overview/2",

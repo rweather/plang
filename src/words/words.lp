@@ -85,4 +85,20 @@ words::overview(Word, Result)
     if (Result == "") fail;
 }
 
+words::base_form(Word, PartOfSpeech, BaseForm)
+{
+    if (words::base_forms(Word, PartOfSpeech, [BaseForm|_]))
+        true;
+    else if (PartOfSpeech == adjective && words::adjective(Word))
+        BaseForm = Word;
+    else if (PartOfSpeech == adverb && words::adverb(Word))
+        BaseForm = Word;
+    else if (PartOfSpeech == noun && words::noun(Word))
+        BaseForm = Word;
+    else if (PartOfSpeech == verb && words::verb(Word))
+        BaseForm = Word;
+    else
+        fail;
+}
+
 /** @endcond */

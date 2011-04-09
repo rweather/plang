@@ -107,6 +107,39 @@ search()
     verify_error(words::search(walk, verb, antptr, foo, List13), type_error(word_sense, foo));
 }
 
+base_forms()
+{
+    verify(words::base_forms("eating", verb, Base1) && Base1 == ["eat"]);
+    verify(words::base_forms(eating, verb, ["eat"]));
+    verify(!words::base_forms("eat", verb, Base2));
+
+    verify(words::base_form("eating", verb, Base3) && Base3 == "eat");
+    verify(words::base_form("Eating", verb, Base4) && Base4 == "eat");
+    verify(words::base_form(eating, verb, Base5) && Base5 == "eat");
+    verify(words::base_form("Eat", verb, Base6) && Base6 == "Eat");
+    verify(words::base_form(eat, verb, Base7) && Base7 == eat);
+    verify(!words::base_form(eatb, verb, _));
+    verify(!words::base_form("bobby", verb, _));
+    verify(words::base_form("bobby", noun, "bobby"));
+
+    verify_error(words::base_forms(Word, verb, Base8), instantiation_error);
+    verify_error(words::base_forms("eating", Verb, Base9), instantiation_error);
+    verify_error(words::base_forms(1.5, verb, Base10), type_error(atom_or_string, 1.5));
+    verify_error(words::base_forms("eating", unverb, Base11), type_error(part_of_speech, unverb));
+}
+
+sentence --> noun_phrase, verb_phrase.
+noun_phrase --> det, words::noun.
+verb_phrase --> words::verb, noun_phrase.
+det --> "the".
+det --> "a".
+
+parse()
+{
+    verify(sentence(["the", "cat", "eats", "a", "bat"], []));
+    verify(sentence(["the", "car", "killed", "a", "pedestrian"], []));
+}
+
 main(_)
 {
     init("test-words");
@@ -117,5 +150,7 @@ main(_)
     run(description);
     run(overview);
     run(search);
+    run(base_forms);
+    run(parse);
     report();
 }

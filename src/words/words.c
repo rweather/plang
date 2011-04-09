@@ -182,8 +182,41 @@
  * Some familiarity with WordNet's terminology will be required to
  * correctly format an advanced query on the database.
  *
+ * \section words_base_forms Base forms of words
+ *
+ * Many words in the English language are variations on other
+ * words with the addition of a suffix.  For example, "eat" and
+ * "eating".  The WordNet database stores information on the
+ * base forms but not the suffixed forms.  The word testing
+ * predicates will check for base forms, but the advanced queries
+ * will not.
+ *
+ * Use the \ref words_base_forms_3 "base_forms/3" predicate to
+ * explicitly fetch a list of all the base forms of a word with
+ * respect to a specific part of speech:
+ *
+ * \code
+ * base_forms("eating", verb, BaseForms)
+ * \endcode
+ *
+ * The \ref words_base_forms_3 "base_forms/3" predicate will fail if
+ * the word does not have a base form.  That is, it will succeed
+ * for "eating", but not for "eat".  The
+ * \ref words_base_form_3 "base_form/3" predicate will return the
+ * first base form, or the word itself if the word does not
+ * have a base form:
+ *
+ * \code
+ * base_form("eating", verb, Base1)     Base1 will be set to "eat"
+ * base_form("eat", verb, Base2)        Base2 will be set to "eat"
+ * base_form("bobby", verb, Base3)      fails - "bobby" is not a verb
+ * base_form("bobby", noun, Base4)      Base4 will be set to "bobby"
+ * \endcode
+ *
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
+ * \ref words_base_form_3 "words::base_form/3",
+ * \ref words_base_forms_3 "words::base_forms/3",
  * \ref words_description_5 "words::description/5",
  * \ref words_noun_1 "words::noun/1",
  * \ref words_overview_2 "words::overview/2",
@@ -249,12 +282,19 @@ static p_goal_result word_check
     unsigned int ch;
     size_t len;
     p_word *current;
+    char *baseform;
+    char *wordstr;
+    int pos;
 
     /* Check that the word term is an atom or string */
     word = p_term_deref_member(context, word);
     type = p_term_type(word);
     if (type != P_TERM_ATOM && type != P_TERM_STRING)
-        return 0;
+        return P_RESULT_FAIL;
+
+    /* Check against WordNet's maximum word size */
+    if (p_term_name_length(word) >= (size_t)(WORDBUF - 1))
+        return P_RESULT_FAIL;
 
     /* Compute the hash value for the word */
     name = p_term_name(word);
@@ -292,8 +332,18 @@ static p_goal_result word_check
     p_word_strcpy(current->word, name);
     p_word_hash[hash] = current;
 
-    /* Fetch all flags for the word and cache them in the hash */
+    /* Fetch all flags for the word and its base forms
+     * and cache them in the hash */
     current->word_flags = in_wn(current->word, ALL_POS);
+    for (pos = NOUN; pos <= ADV; ++pos) {
+        if (current->word_flags & bit(pos))
+            continue;
+        wordstr = current->word;
+        while ((baseform = morphstr(wordstr, pos)) != 0) {
+            current->word_flags |= in_wn(baseform, pos);
+            wordstr = 0;
+        }
+    }
     if (current->word_flags & bit(kind))
         return P_RESULT_TRUE;
     else
@@ -474,6 +524,10 @@ static p_goal_result words_db_search
         return P_RESULT_ERROR;
     }
 
+    /* Bail out if the word is too long for WordNet */
+    if (p_term_name_length(word) >= (size_t)(WORDBUF - 1))
+        return P_RESULT_FAIL;
+
     /* Normalize the word to lower case with "_" as word separator */
     norm_word = (char *)malloc(p_term_name_length(word) + 1);
     if (!norm_word)
@@ -553,10 +607,11 @@ static p_goal_result words_db_search
  * <b>words::adjective</b>(\em Word)
  *
  * \par Description
- * If \em Word is an atom or string whose name is registered in
- * the WordNet database as an adjective, then succeed.  Fail otherwise.
- * The \em Word will be converted to lower case, with spaces
- * replaced with underscores, before testing.
+ * If \em Word is an atom or string whose name or the name of one
+ * of its base forms is registered in the WordNet database as an
+ * adjective, then succeed.  Fail otherwise.  The \em Word will
+ * be converted to lower case, with spaces replaced with
+ * underscores, before testing.
  * \par
  * There are also arity-2 and arity-3 versions of this predicate in
  * the module that can be used in definite clause grammar rules to
@@ -579,6 +634,7 @@ static p_goal_result words_db_search
  *
  * \par See Also
  * \ref words_adverb_1 "words::adverb/1",
+ * \ref words_base_form_3 "words::base_form/3",
  * \ref words_noun_1 "words::noun/1",
  * \ref words_verb_1 "words::verb/1"
  */
@@ -599,10 +655,11 @@ static p_goal_result words_adjective
  * <b>words::adverb</b>(\em Word)
  *
  * \par Description
- * If \em Word is an atom or string whose name is registered in
- * the WordNet database as an adverb, then succeed.  Fail otherwise.
- * The \em Word will be converted to lower case, with spaces
- * replaced with underscores, before testing.
+ * If \em Word is an atom or string whose name or the name of one
+ * of its base forms is registered in the WordNet database as an
+ * adverb, then succeed.  Fail otherwise.  The \em Word will be
+ * converted to lower case, with spaces replaced with underscores,
+ * before testing.
  * \par
  * There are also arity-2 and arity-3 versions of this predicate in
  * the module that can be used in definite clause grammar rules to
@@ -626,6 +683,7 @@ static p_goal_result words_adjective
  *
  * \par See Also
  * \ref words_adjective_1 "words::adjective/1",
+ * \ref words_base_form_3 "words::base_form/3",
  * \ref words_noun_1 "words::noun/1",
  * \ref words_verb_1 "words::verb/1"
  */
@@ -633,6 +691,153 @@ static p_goal_result words_adverb
     (p_context *context, p_term **args, p_term **error)
 {
     return word_check(context, args[0], ADV);
+}
+
+/**
+ * \addtogroup module_words
+ * <hr>
+ * \anchor words_base_form_3
+ * <b>words::base_form/3</b> - fetches the base form of a word or
+ * the word itself if there is no base form.
+ *
+ * \par Usage
+ * <b>words::base_form</b>(\em Word, \em PartOfSpeech, \em BaseForm)
+ *
+ * \par Description
+ * \em Word is an atom or string that is used to query the
+ * WordNet database for the base forms within the specified
+ * \em PartOfSpeech.  For example, the verb base form of
+ * "eating" is "eat".
+ * \par
+ * \em PartOfSpeech should be one of the atoms \c adjective, \c adverb,
+ * \c noun, or \c verb, indicating the part of speech to search for.
+ * \par
+ * \em BaseForm is unified with a string representing the first
+ * base form of \em Word.  If \em Word does not have any base forms,
+ * but it is a valid word according to \em PartOfSpeech,
+ * then \em BaseForm is unified with \em Word.  Fails if \em Word is
+ * not a valid word according to \em PartOfSpeech.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Word or \em PartOfSpeech,
+ *     is a variable.
+ * \li <tt>type_error(atom_or_string, \em Word)</tt> - \em Word is
+ *     not an atom or string.
+ * \li <tt>type_error(part_of_speech, \em PartOfSpeech)</tt> -
+ *     \em PartOfSpeech is not one of the atoms \c adjective,
+ *     \c adverb, \c noun, or \c verb.
+ *
+ * \par Examples
+ * \code
+ * words::base_form("eating", verb, Result)     succeeds
+ * words::base_form("eating", verb, "eat")      succeeds
+ * words::base_form("eat", verb, "eat")         succeeds
+ * words::base_form(eat, verb, eat)             succeeds
+ * words::base_form(bobby, verb, Result)        fails
+ * \endcode
+ *
+ * \par See Also
+ * \ref words_base_forms_3 "words::base_forms/3",
+ * \ref words_description_5 "words::description/5",
+ * \ref words_overview_2 "words::overview/2",
+ * \ref words_search_5 "words::search/5"
+ */
+
+/**
+ * \addtogroup module_words
+ * <hr>
+ * \anchor words_base_forms_3
+ * <b>words::base_forms/3</b> - fetches the base forms of a word.
+ *
+ * \par Usage
+ * <b>words::base_forms</b>(\em Word, \em PartOfSpeech, \em Result)
+ *
+ * \par Description
+ * \em Word is an atom or string that is used to query the
+ * WordNet database for the base forms within the specified
+ * \em PartOfSpeech.  For example, the verb base form of
+ * "eating" is "eat".
+ * \par
+ * \em PartOfSpeech should be one of the atoms \c adjective, \c adverb,
+ * \c noun, or \c verb, indicating the part of speech to search for.
+ * \par
+ * \em Result is unified with a list of base form strings.
+ * The predicate fails if \em Word does not have any base forms
+ * or the list does not unify with \em Result.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Word or \em PartOfSpeech,
+ *     is a variable.
+ * \li <tt>type_error(atom_or_string, \em Word)</tt> - \em Word is
+ *     not an atom or string.
+ * \li <tt>type_error(part_of_speech, \em PartOfSpeech)</tt> -
+ *     \em PartOfSpeech is not one of the atoms \c adjective,
+ *     \c adverb, \c noun, or \c verb.
+ *
+ * \par Examples
+ * \code
+ * words::base_forms("eating", verb, Result)
+ * words::base_forms("eating", verb, ["eat"])
+ * \endcode
+ *
+ * \par See Also
+ * \ref words_base_form_3 "words::base_form/3",
+ * \ref words_description_5 "words::description/5",
+ * \ref words_overview_2 "words::overview/2",
+ * \ref words_search_5 "words::search/5"
+ */
+static p_goal_result words_base_forms
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *word = p_term_deref_member(context, args[0]);
+    p_term *part_of_speech = p_term_deref_member(context, args[1]);
+    int type, wn_part_of_speech;
+    char *baseform;
+    p_term *head;
+    p_term *tail;
+    p_term *new_tail;
+
+    /* Validate the parameters to the predicate */
+    if (!is_instantiated(word) || !is_instantiated(part_of_speech)) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    type = p_term_type(word);
+    if (type != P_TERM_ATOM && type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "atom_or_string", word);
+        return P_RESULT_ERROR;
+    }
+    wn_part_of_speech = lookup_code(parts_of_speech, part_of_speech);
+    if (wn_part_of_speech < 0) {
+        *error = p_create_type_error(context, "part_of_speech", part_of_speech);
+        return P_RESULT_ERROR;
+    }
+
+    /* Bail out if the word is too long for WordNet */
+    if (p_term_name_length(word) >= (size_t)(WORDBUF - 1))
+        return P_RESULT_FAIL;
+
+    /* Query for the morph words */
+    baseform = morphstr((char *)p_term_name(word), wn_part_of_speech);
+    if (!baseform)
+        return P_RESULT_FAIL;
+    head = tail = p_term_create_list
+        (context, p_term_create_string(context, baseform), 0);
+    while ((baseform = morphstr(0, wn_part_of_speech)) != 0) {
+        new_tail = p_term_create_list
+            (context, p_term_create_string(context, baseform), 0);
+        p_term_set_tail(tail, new_tail);
+        tail = new_tail;
+    }
+    p_term_set_tail(tail, p_term_nil_atom(context));
+
+    /* Unify with the result argument and return */
+    if (p_term_unify(context, args[2], head, P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
 }
 
 /**
@@ -700,6 +905,7 @@ static p_goal_result words_adverb
  * \endcode
  *
  * \par See Also
+ * \ref words_base_forms_3 "words::base_forms/3",
  * \ref words_overview_2 "words::overview/2",
  * \ref words_search_5 "words::search/5"
  */
@@ -720,10 +926,10 @@ static p_goal_result words_description
  * <b>words::noun</b>(\em Word)
  *
  * \par Description
- * If \em Word is an atom or string whose name is registered in
- * the WordNet database as a noun, then succeed.  Fail otherwise.
- * The \em Word will be converted to lower case, with spaces
- * replaced with underscores, before testing.
+ * If \em Word is an atom or string whose name or the name of one
+ * of its base forms is registered in the WordNet database as a noun,
+ * then succeed.  Fail otherwise.  The \em Word will be converted to
+ * lower case, with spaces replaced with underscores, before testing.
  * \par
  * There are also arity-2 and arity-3 versions of this predicate in
  * the module that can be used in definite clause grammar rules to
@@ -748,6 +954,7 @@ static p_goal_result words_description
  * \par See Also
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
+ * \ref words_base_form_3 "words::base_form/3",
  * \ref words_verb_1 "words::verb/1"
  */
 static p_goal_result words_noun
@@ -808,6 +1015,7 @@ static p_goal_result words_noun
  * \endcode
  *
  * \par See Also
+ * \ref words_base_forms_3 "words::base_forms/3",
  * \ref words_description_5 "words::description/5",
  * \ref words_search_5 "words::search/5"
  */
@@ -877,6 +1085,7 @@ static p_goal_result words_noun
  * \endcode
  *
  * \par See Also
+ * \ref words_base_forms_3 "words::base_forms/3",
  * \ref words_description_5 "words::description/5",
  * \ref words_overview_2 "words::overview/2"
  */
@@ -897,10 +1106,11 @@ static p_goal_result words_search
  * <b>words::verb</b>(\em Word)
  *
  * \par Description
- * If \em Word is an atom or string whose name is registered in
- * the WordNet database as a verb, then succeed.  Fail otherwise.
- * The \em Word will be converted to lower case, with spaces
- * replaced with underscores, before testing.
+ * If \em Word is an atom or string whose name or the name of one
+ * of its base forms is registered in the WordNet database as a verb,
+ * then succeed.  Fail otherwise.  The \em Word will be converted
+ * to lower case, with spaces replaced with underscores,
+ * before testing.
  * \par
  * There are also arity-2 and arity-3 versions of this predicate in
  * the module that can be used in definite clause grammar rules to
@@ -925,6 +1135,7 @@ static p_goal_result words_search
  * \par See Also
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
+ * \ref words_base_form_3 "words::base_form/3",
  * \ref words_noun_1 "words::noun/1"
  */
 static p_goal_result words_verb
@@ -945,6 +1156,8 @@ void plang_module_setup(p_context *context)
         (p_term_create_atom(context, "words::adjective"), 1, words_adjective);
     p_db_set_builtin_predicate
         (p_term_create_atom(context, "words::adverb"), 1, words_adverb);
+    p_db_set_builtin_predicate
+        (p_term_create_atom(context, "words::base_forms"), 3, words_base_forms);
     p_db_set_builtin_predicate
         (p_term_create_atom(context, "words::description"), 5, words_description);
     p_db_set_builtin_predicate
