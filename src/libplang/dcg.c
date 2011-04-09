@@ -33,8 +33,6 @@ static p_term *p_term_expand_head
     (p_context *context, p_term *term, p_term *in_var, p_term *out_var)
 {
     p_term *new_term;
-    if (!term)
-        return term;
     if (term->header.type == P_TERM_ATOM) {
         new_term = p_term_create_functor(context, term, 2);
         p_term_bind_functor_arg(new_term, 0, in_var);
@@ -89,8 +87,19 @@ static p_term *p_term_expand_body
                 return p_term_create_binary
                     (context, info->unify_atom, in_var, out_var);
             }
+        } else if (term == context->cut_atom) {
+            /* Cut operator for commiting to the current rule.
+             * Convert it into (!, In = Out) */
+            *first = 0;
+            right = p_term_create_binary
+                (context, info->unify_atom, in_var, out_var);
+            return p_term_create_binary
+                (context, context->comma_atom, term, right);
+        } else {
+            /* Expand the atom into an arity-2 rule predicate */
+            *first = 0;
+            return p_term_expand_head(context, term, in_var, out_var);
         }
-        return p_term_expand_head(context, term, in_var, out_var);
     case P_TERM_FUNCTOR:
         if (term->functor.functor_name == info->or_atom &&
                 term->header.size == 2) {
@@ -120,37 +129,29 @@ static p_term *p_term_expand_body
                 return left;
             return p_term_create_binary
                 (context, context->comma_atom, left, right);
-        } else if (term->functor.functor_name == context->cut_atom) {
-            if (term->header.size == 1) {
-                /* Logical negation of a DCG term.  Convert it
-                 * into (!expand(Arg), In = Out) */
-                *first = 0;
-                middle_var = p_term_create_variable(context);
-                term = p_term_expand_body
-                    (context, term->functor.arg[0], in_var,
-                     middle_var, info, first);
-                left = p_term_create_functor
-                    (context, context->cut_atom, 1);
-                p_term_bind_functor_arg(left, 0, term);
-                right = p_term_create_binary
-                    (context, info->unify_atom, in_var, out_var);
-                return p_term_create_binary
-                    (context, context->comma_atom, left, right);
-            } else if (term->header.size == 0) {
-                /* Cut operator for commiting to the current rule.
-                 * Convert it into (!, In = Out) */
-                *first = 0;
-                right = p_term_create_binary
-                    (context, info->unify_atom, in_var, out_var);
-                return p_term_create_binary
-                    (context, context->comma_atom, term, right);
-            }
+        } else if (term->functor.functor_name == context->cut_atom &&
+                   term->header.size == 1) {
+            /* Logical negation of a DCG term.  Convert it
+             * into (!expand(Arg), In = Out) */
+            *first = 0;
+            middle_var = p_term_create_variable(context);
+            term = p_term_expand_body
+                (context, term->functor.arg[0], in_var,
+                 middle_var, info, first);
+            left = p_term_create_functor
+                (context, context->cut_atom, 1);
+            p_term_bind_functor_arg(left, 0, term);
+            right = p_term_create_binary
+                (context, info->unify_atom, in_var, out_var);
+            return p_term_create_binary
+                (context, context->comma_atom, left, right);
         } else if (term->functor.functor_name == info->compound_atom &&
                    term->header.size == 1) {
             /* Compound statement.  Convert it into (Stmt, In = Out) */
             *first = 0;
             right = p_term_create_binary
                 (context, info->unify_atom, in_var, out_var);
+            term = p_term_deref(term->functor.arg[0]);
             if (term == context->true_atom)
                 return right;
             return p_term_create_binary

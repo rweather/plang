@@ -55,9 +55,99 @@ check_sentences()
     verify(!s([a, a, b, b, b, c, c, c], []));
 }
 
+empty1 --> [].
+empty2 --> empty3, [].
+empty3 --> [a].
+
+empty_rule()
+{
+    verify(empty1([], []));
+    verify(empty2([a], []));
+}
+
+or1 --> [a] || [b].
+or2 --> ([a] || [b]), [c].
+
+or_rule()
+{
+    verify(or1([a], []));
+    verify(or1([b], []));
+    verify(or2([a, c], []));
+    verify(or2([b, c], []));
+}
+
+not1 --> [a], ![b], [c].
+
+not_rule()
+{
+    verify(not1([a, c], []));
+    verify(!not1([a, b, c], []));
+}
+
+cut1 --> [a], [b], !, [c].
+cut1 --> [a], [b], [d].
+
+cut_rule()
+{
+    verify(cut1([a, b, c], []));
+    verify(!cut1([a, b, d], []));
+}
+
+statement1 --> [X], {integer(X);}, [a].
+statement1 --> [b], [c].
+statement1 --> [c], {}, [d].
+
+statement_rule()
+{
+    verify(statement1([42, a], []));
+    verify(statement1([b, c], []));
+    verify(!statement1([b, a], []));
+    verify(statement1([c, d], []));
+}
+
+list1 --> [a], [b].
+list1 --> [a, c, D], [b].
+
+list_rule()
+{
+    verify(list1([a, b], []));
+    verify(list1([a, c, d, b], []));
+    verify(list1([a, c, e, b], []));
+}
+
+string1 --> ["a"], ["b"].
+string1 --> ["a", "c", D], ["b"].
+
+string2 --> "a", "b".
+string2 --> "a", "c", [D], "b".
+
+string3 --> string2, "f".
+
+string_rule()
+{
+    verify(string1(["a", "b"], []));
+    verify(string1(["a", "c", "d", "b"], []));
+    verify(string1(["a", "c", "e", "b"], []));
+
+    verify(string2(["a", "b"], []));
+    verify(string2(["a", "c", "d", "b"], []));
+    verify(string2(["a", "c", "e", "b"], []));
+
+    verify(string3(["a", "b", "f"], []));
+    verify(string3(["a", "c", "d", "b", "f"], []));
+    verify(string3(["a", "c", "e", "b", "f"], []));
+}
+
 main(_)
 {
     init("test-dcg");
     run(check_sentences);
+    run(empty_rule);
+    run(or_rule);
+    run(not_rule);
+    run(cut_rule);
+    run(statement_rule);
+    run(list_rule);
+    run(string_rule);
     report();
 }
