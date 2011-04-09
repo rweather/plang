@@ -51,6 +51,20 @@ int main(int argc, char *argv[])
             p_context_add_import_path(context, argv[1] + 2);
         } else if (!strncmp(argv[1], "--import=", 9)) {
             p_context_add_import_path(context, argv[1] + 9);
+        } else if (!strcmp(argv[1], "-L") || !strcmp(argv[1], "--import-lib")) {
+            ++argv;
+            --argc;
+            if (argc <= 1) {
+                fprintf(stderr, "%s: missing import library pathname\n",
+                        progname);
+                p_context_free(context);
+                return 1;
+            }
+            p_context_add_library_path(context, argv[1]);
+        } else if (!strncmp(argv[1], "-L", 2)) {
+            p_context_add_library_path(context, argv[1] + 2);
+        } else if (!strncmp(argv[1], "--import-lib=", 13)) {
+            p_context_add_library_path(context, argv[1] + 9);
         } else if (!strcmp(argv[1], "--")) {
             ++argv;
             --argc;

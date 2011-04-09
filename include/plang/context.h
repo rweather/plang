@@ -53,6 +53,7 @@ int p_context_is_debug(p_context *context);
 void p_context_set_debug(p_context *context, int debug);
 
 void p_context_add_import_path(p_context *context, const char *path);
+void p_context_add_library_path(p_context *context, const char *path);
 
 #ifdef __cplusplus
 };

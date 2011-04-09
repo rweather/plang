@@ -98,6 +98,8 @@ struct p_context
 
     struct p_path_list user_imports;
     struct p_path_list system_imports;
+    struct p_path_list user_libs;
+    struct p_path_list system_libs;
     struct p_path_list loaded_files;
 
     int unique_num;
@@ -118,7 +120,7 @@ int _p_context_record_contents_in_trail(p_context *context, void **location, voi
 
 void p_goal_call_from_parser(p_context *context, p_term *goal);
 
-int _p_context_load_library(p_context *context, const char *source_file, int source_line, const char *base_name);
+p_goal_result _p_context_load_library(p_context *context, p_term *name, p_term **error);
 
 #define p_context_add_path(list,name)   \
     do { \

@@ -834,25 +834,49 @@ void p_context_set_debug(p_context *context, int debug)
  * source files imported by \ref import_1 "import/1".
  *
  * \ingroup context
- * \sa p_context_consult_file()
+ * \sa p_context_consult_file(), p_context_add_library_path()
  */
 void p_context_add_import_path(p_context *context, const char *path)
 {
     p_context_add_path(context->user_imports, path);
 }
 
+/**
+ * \brief Adds \a path to \a context as a directory to search for
+ * library files loaded by \ref load_library_1 "load_library/1".
+ *
+ * \ingroup context
+ * \sa p_context_add_library_path()
+ */
+void p_context_add_library_path(p_context *context, const char *path)
+{
+    p_context_add_path(context->user_libs, path);
+}
+
+static p_term *p_create_load_library_error
+    (p_context *context, p_term *name, const char *message)
+{
+    p_term *error = p_term_create_functor
+        (context, p_term_create_atom(context, "load_library_error"), 2);
+    p_term_bind_functor_arg(error, 0, name);
+    p_term_bind_functor_arg
+        (error, 1, p_term_create_string(context, message));
+    return p_create_generic_error(context, error);
+}
+
 #if defined(HAVE_DLOPEN)
 
 static char *p_context_library_path
-    (const char *path, size_t path_len, const char *prefix,
+    (const char *path, const char *prefix,
      const char *base_name, const char *suffix)
 {
     char *lib_path = (char *)malloc
-        (path_len + strlen(prefix) + strlen(base_name) + strlen(suffix));
+        (strlen(path) + 1 + strlen(prefix) + strlen(base_name) + strlen(suffix) + 1);
     if (!lib_path)
         return 0;
-    strncpy(lib_path, path, path_len);
-    strcpy(lib_path + path_len, prefix);
+    strcpy(lib_path, path);
+    strcat(lib_path, "/");
+    strcat(lib_path, prefix);
     strcat(lib_path, base_name);
     strcat(lib_path, suffix);
     if (access(lib_path, 0) >= 0)
@@ -863,67 +887,56 @@ static char *p_context_library_path
 
 #endif
 
-int _p_context_load_library(p_context *context, const char *source_file, int source_line, const char *base_name)
+p_goal_result _p_context_load_library(p_context *context, p_term *name, p_term **error)
 {
 #if defined(HAVE_DLOPEN)
-    const char *path;
-    size_t len;
+    const char *base_name = p_term_name(name);
+    size_t index;
     char *lib_path;
     void *handle;
     p_library_entry_func setup_func;
     p_library_entry_func shutdown_func;
     p_library *library;
 
-    /* Validate the name: must not contain directory separators */
+    /* Validate the name: must not be empty or contain
+     * directory separators */
     if (*base_name == '\0' || strchr(base_name, '/') != 0 ||
             strchr(base_name, '\\') != 0) {
-        fprintf(stderr, "%s:%d: invalid library name `%s'\n",
-                source_file, source_line, base_name);
-        return 0;
-    }
-
-    /* Strip the final component from the source filename */
-    len = strlen(source_file);
-    while (len > 0 && source_file[len - 1] != '/' &&
-           source_file[len - 1] != '\\')
-        --len;
-    if (len) {
-        path = source_file;
-    } else {
-        path = "./";
-        len = 2;
+        *error = p_create_type_error(context, "library_name", name);
+        return P_RESULT_ERROR;
     }
 
     /* Search for the library */
-    lib_path = p_context_library_path
-        (path, len, "lib", base_name, ".so");
-    if (!lib_path) {
+    lib_path = 0;
+    for (index = 0; !lib_path && index < context->user_libs.num_paths; ++index) {
         lib_path = p_context_library_path
-            (source_file, len, ".libs/lib", base_name, ".so");
-        if (!lib_path) {
-            fprintf(stderr, "%s:%d: cannot locate library `%s'\n",
-                    source_file, source_line, base_name);
-            return 0;
-        }
+            (context->user_libs.paths[index], "lib", base_name, ".so");
+    }
+    for (index = 0; !lib_path && index < context->system_libs.num_paths; ++index) {
+        lib_path = p_context_library_path
+            (context->system_libs.paths[index], "lib", base_name, ".so");
+    }
+    if (!lib_path) {
+        *error = p_create_existence_error(context, "library", name);
+        return P_RESULT_ERROR;
     }
 
     /* Open the library and fetch the Plang entry points */
     dlerror();
     handle = dlopen(lib_path, RTLD_LAZY | RTLD_LOCAL);
     if (!handle) {
-        fprintf(stderr, "%s:%d: cannot load library `%s': %s\n",
-                source_file, source_line, base_name, dlerror());
+        *error = p_create_load_library_error(context, name, dlerror());
         free(lib_path);
-        return 0;
+        return P_RESULT_ERROR;
     }
     setup_func = (p_library_entry_func)dlsym(handle, "plang_module_setup");
     shutdown_func = (p_library_entry_func)dlsym(handle, "plang_module_shutdown");
     if (!setup_func) {
-        fprintf(stderr, "%s:%d: invalid library `%s': "
-                "plang_module_setup() entry point not found\n",
-                source_file, source_line, base_name);
+        *error = p_create_load_library_error
+            (context, name, 
+             "plang_module_setup() entry point not found");
         free(lib_path);
-        return 0;
+        return P_RESULT_ERROR;
     }
     free(lib_path);
 
@@ -938,12 +951,11 @@ int _p_context_load_library(p_context *context, const char *source_file, int sou
     context->libraries = library;
 
     /* Library is ready to go */
-    return 1;
+    return P_RESULT_TRUE;
 #else
-    /* Don't know how to load dynamic libraries */
-    fprintf(stderr, "%s:%d: cannot load library `%s'\n",
-            source_file, source_line, base_name);
-    return 0;
+    *error = p_create_load_library_error
+        (context, name, "do not know how to load libraries");
+    return P_RESULT_ERROR;
 #endif
 }
 
@@ -966,11 +978,21 @@ static void p_context_find_system_imports(p_context *context)
 #if !defined(P_WIN32)
 #if defined(P_SYSTEM_IMPORT_PATH)
     p_context_add_path(context->system_imports, P_SYSTEM_IMPORT_PATH);
-#endif
+#else
     p_context_add_path(context->system_imports, "/usr/local/share/plang/imports");
     p_context_add_path(context->system_imports, "/opt/local/share/plang/imports");
     p_context_add_path(context->system_imports, "/usr/share/plang/imports");
     p_context_add_path(context->system_imports, "/opt/share/plang/imports");
+#endif
+
+#if defined(P_SYSTEM_LIB_PATH)
+    p_context_add_path(context->system_libs, P_SYSTEM_LIB_PATH);
+#else
+    p_context_add_path(context->system_libs, "/usr/local/lib/plang");
+    p_context_add_path(context->system_libs, "/opt/local/lib/plang");
+    p_context_add_path(context->system_libs, "/usr/lib/plang");
+    p_context_add_path(context->system_libs, "/opt/lib/plang");
+#endif
 #else
     /* TODO: Win32 system import path */
 #endif

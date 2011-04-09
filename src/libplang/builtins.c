@@ -1519,17 +1519,22 @@ static p_goal_result p_builtin_import
  * in C are registered with the Plang execution engine.
  * \par
  * If the library associated with \em Name can be loaded,
- * then \b load_library(\em Name) succeeds, fails otherwise.
- * \par
- * The <b>load_library/1</b> directive can only be used within a
- * \ref directive_1 "(:-)/1" directive.  It is typically used to
- * load native predicates for a module imported with the
- * \ref import_1 "import/1" directive.
+ * then \b load_library(\em Name) succeeds.  Otherwise an
+ * error is thrown describing the reason why the library
+ * could not be loaded.
  *
  * \par Errors
  *
- * \li <tt>system_error</tt> - <b>load_library/1</b> was not used
- *     within a \ref directive_1 "(:-)/1" directive.
+ * \li <tt>instantiation_error</tt> - \em Name is a variable.
+ * \li <tt>type_error(atom_or_string, \em Name)</tt> - \em Name
+ *     is not an atom or string.
+ * \li <tt>type_error(library_name, \em Name)</tt> - \em Name is
+ *     not a valid library name.
+ * \li <tt>existence_error(library, \em Name)</tt> - \em Name
+ *     could not be located on the library search path.
+ * \li <tt>load_library_error(\em Name, \em Reason)</tt> - the library
+ *     identified by \em Name exists, but it could not be loaded by
+ *     the system because of \em Reason (a string).
  *
  * \par Examples
  * \code
@@ -1543,11 +1548,17 @@ static p_goal_result p_builtin_import
 static p_goal_result p_builtin_load_library
     (p_context *context, p_term **args, p_term **error)
 {
-    /* Library loading is only allowed when parsing a source file
-     * because it isn't possible to know the filename of the
-     * parent when executed from within a normal predicate */
-    *error = p_create_system_error(context);
-    return P_RESULT_ERROR;
+    p_term *name = p_term_deref_member(context, args[0]);
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM &&
+            name->header.type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "atom_or_string", name);
+        return P_RESULT_ERROR;
+    }
+    return _p_context_load_library(context, name, error);
 }
 
 /*\@}*/

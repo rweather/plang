@@ -1,6 +1,5 @@
 
-libdir = $(datadir)/plang/imports
-lib_LTLIBRARIES = libplang_wordnet.la
+pkglib_LTLIBRARIES = libplang_wordnet.la
 
 libplang_wordnet_la_SOURCES = \
 	words.c
