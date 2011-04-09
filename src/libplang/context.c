@@ -38,6 +38,8 @@
  */
 /*\@{*/
 
+static void p_context_find_system_imports(p_context *context);
+
 /**
  * \brief Creates and returns a new execution context.
  *
@@ -67,6 +69,7 @@ p_context *p_context_create(void)
     _p_db_init(context);
     _p_db_init_builtins(context);
     _p_db_init_arith(context);
+    p_context_find_system_imports(context);
     return context;
 }
 
@@ -954,6 +957,22 @@ static void p_context_free_libraries(p_context *context)
         dlclose(library->handle);
         library = library->next;
     }
+#endif
+}
+
+/* Find the system import directories */
+static void p_context_find_system_imports(p_context *context)
+{
+#if !defined(P_WIN32)
+#if defined(P_SYSTEM_IMPORT_PATH)
+    p_context_add_path(context->system_imports, P_SYSTEM_IMPORT_PATH);
+#endif
+    p_context_add_path(context->system_imports, "/usr/local/share/plang/imports");
+    p_context_add_path(context->system_imports, "/opt/local/share/plang/imports");
+    p_context_add_path(context->system_imports, "/usr/share/plang/imports");
+    p_context_add_path(context->system_imports, "/opt/share/plang/imports");
+#else
+    /* TODO: Win32 system import path */
 #endif
 }
 

@@ -89,6 +89,7 @@ AC_CONFIG_FILES([
   src/Makefile
   src/libplang/Makefile
   src/frontend/Makefile
+  src/imports/Makefile
   src/words/Makefile
   tests/Makefile
   tests/libplang/Makefile

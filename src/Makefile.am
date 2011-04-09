@@ -1,1 +1,1 @@
-SUBDIRS = libplang frontend @WORDS_MODULE@
+SUBDIRS = libplang frontend imports @WORDS_MODULE@
