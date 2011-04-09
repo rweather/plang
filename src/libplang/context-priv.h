@@ -118,7 +118,7 @@ struct p_trail
 int _p_context_record_in_trail(p_context *context, p_term *var);
 int _p_context_record_contents_in_trail(p_context *context, void **location, void *prev_value);
 
-void p_goal_call_from_parser(p_context *context, p_term *goal);
+p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal);
 
 p_goal_result _p_context_load_library(p_context *context, p_term *name, p_term **error);
 

@@ -655,7 +655,10 @@ directive
                 $$ = unary_term(":-", $2);
             } else {
                 /* Execute the directive immediately */
-                p_goal_call_from_parser(context, add_debug(@2, $2));
+                if (p_goal_call_from_parser(context, add_debug(@2, $2))
+                        != P_RESULT_TRUE) {
+                    ++(input_stream->error_count);
+                }
                 $$ = unary_term(":-", $2);
             }
         }

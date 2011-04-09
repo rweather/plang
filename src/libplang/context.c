@@ -236,8 +236,9 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
                     p_db_clause_assert_last(context, decl);
                 } else if (decl->functor.functor_name == goal_atom) {
                     /* Execute the initialization goal */
-                    p_goal_call_from_parser
-                        (context, p_term_arg(decl, 0));
+                    if (p_goal_call_from_parser
+                            (context, p_term_arg(decl, 0)) != P_RESULT_TRUE)
+                        ok = 0;
                 } else if (decl->functor.functor_name == test_goal_atom) {
                     /* Special goal that is used by unit tests.
                      * Ignored if unit testing is not active */
@@ -747,7 +748,7 @@ void p_context_abandon_goal(p_context *context)
 
 /* Calls a goal from the parser for immediate execution.
  * After execution, backtracks to the initial state */
-void p_goal_call_from_parser(p_context *context, p_term *goal)
+p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal)
 {
     p_term *error = 0;
     void *marker = p_context_mark_trail(context);
@@ -767,7 +768,7 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
     }
     p_context_backtrack_trail(context, marker);
     if (result == P_RESULT_TRUE)
-        return;
+        return result;
     goal = p_term_deref_member(context, goal);
     if (goal && goal->header.type == P_TERM_FUNCTOR &&
             goal->header.size == 3 &&
@@ -792,10 +793,11 @@ void p_goal_call_from_parser(p_context *context, p_term *goal)
         p_term_print(context, error, p_term_stdio_print_func, stderr);
         putc('\n', stderr);
     } else if (result == P_RESULT_HALT) {
-        fputs(": ignoring halt during directive\n", stderr);
+        fputs(": halt during directive\n", stderr);
     } else {
         fputs(": fail\n", stderr);
     }
+    return result;
 }
 
 /* Used by the unit test framework, not part of the normal API */
