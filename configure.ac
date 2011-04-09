@@ -69,15 +69,18 @@ AC_CHECK_LIB(gc, GC_gcollect)
 AC_CHECK_HEADERS(gc.h gc/gc.h fenv.h)
 
 dnl Checks for the presence of the WordNet library.
+dnl Only do this if shared libraries are enabled.
 AC_SUBST(WORDS_LIBS)
 AC_SUBST(WORDS_MODULE)
 AC_SUBST(WORDS_TESTCASE)
-AC_CHECK_LIB(WN, in_wn, [WORDS_LIBS=-lWN
-                         WORDS_MODULE=words
-                         WORDS_TESTCASE=test-words.lp],
-    [AC_CHECK_LIB(wordnet, in_wn, [WORDS_LIBS=-lwordnet
-                                   WORDS_MODULE=words
-                                   WORDS_TESTCASE=test-words.lp])])
+if test "x$enable_shared" = "xyes" ; then
+    AC_CHECK_LIB(WN, in_wn, [WORDS_LIBS=-lWN
+                             WORDS_MODULE=words
+                             WORDS_TESTCASE=test-words.lp],
+        [AC_CHECK_LIB(wordnet, in_wn, [WORDS_LIBS=-lwordnet
+                                       WORDS_MODULE=words
+                                       WORDS_TESTCASE=test-words.lp])])
+fi
 
 AC_CONFIG_FILES([
   Makefile
