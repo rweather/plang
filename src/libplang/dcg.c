@@ -205,7 +205,7 @@ static p_term *p_term_expand_body
  * definition for \a context.
  *
  * The \a term must have the functor \ref syntax_dcg "(-->)/2".
- * The returned term will have the functor \ref clause_op "(:-)/2".
+ * The returned term will have the functor \ref clause_op_2 "(:-)/2".
  *
  * \ingroup term
  */
