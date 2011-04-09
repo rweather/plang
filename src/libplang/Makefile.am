@@ -11,6 +11,7 @@ libplang_la_SOURCES = \
 	errors.c \
 	lexer.l \
 	parser.y \
+	parser-priv.h \
 	term.c \
 	term-priv.h
 
