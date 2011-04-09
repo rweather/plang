@@ -126,6 +126,8 @@ p_term *p_term_concat_string(p_context *context, p_term *str1, p_term *str2);
 
 p_term *p_term_witness(p_context *context, p_term *term, p_term **subgoal);
 
+p_term *p_term_expand_dcg(p_context *context, p_term *term);
+
 #ifdef __cplusplus
 };
 #endif

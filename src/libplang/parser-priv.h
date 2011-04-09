@@ -57,8 +57,6 @@ struct p_input_stream
     size_t max_variables;
     p_term *filename_string;
     p_term *class_name;
-    p_term *dcg_in;
-    p_term *dcg_var;
 };
 
 #ifndef YY_EXTRA_TYPE

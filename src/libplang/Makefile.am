@@ -5,6 +5,7 @@ libplang_la_SOURCES = \
 	builtins.c \
 	context.c \
 	context-priv.h \
+	dcg.c \
 	database.c \
 	database-priv.h \
 	errors.c \

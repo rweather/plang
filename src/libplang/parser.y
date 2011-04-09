@@ -423,32 +423,6 @@ static p_term *create_clause_head
     return head;
 }
 
-/* Expand a functor term to add dcg arguments */
-static p_term *expand_dcg
-    (p_context *context, p_term *term, p_term *in_var, p_term *out_var)
-{
-    p_term *new_term;
-    if (!term)
-        return term;
-    if (term->header.type == P_TERM_ATOM) {
-        new_term = p_term_create_functor(context, term, 2);
-        p_term_bind_functor_arg(new_term, 0, in_var);
-        p_term_bind_functor_arg(new_term, 1, out_var);
-    } else {
-        unsigned int index;
-        new_term = p_term_create_functor
-            (context, term->functor.functor_name,
-             p_term_arg_count(term) + 2);
-        for (index = 0; index < term->header.size; ++index) {
-            p_term_bind_functor_arg
-                (new_term, (int)index, term->functor.arg[index]);
-        }
-        p_term_bind_functor_arg(new_term, term->header.size, in_var);
-        p_term_bind_functor_arg(new_term, term->header.size + 1, out_var);
-    }
-    return new_term;
-}
-
 %}
 
 /* Bison options */
@@ -598,7 +572,8 @@ static p_term *expand_dcg
 %type <term>        loop_statement unbind_vars try_statement
 %type <term>        catch_clause switch_statement
 
-%type <term>        dcg_clause dcg_primitive_term
+%type <term>        dcg_clause dcg_body dcg_unary_term
+%type <term>        dcg_primitive_term
 
 %type <case_labels> case_label case_labels
 %type <switch_case> switch_cases switch_case
@@ -1473,42 +1448,36 @@ member_name
     ;
 
 dcg_clause
-    : callable_term K_DARROW        {
-            input_stream->dcg_var = p_term_create_variable(context);
-            input_stream->dcg_in = input_stream->dcg_var;
-        } dcg_term K_DOT_TERMINATOR {
-            p_term *head;
-            head = expand_dcg(context, $1, input_stream->dcg_in,
-                              input_stream->dcg_var);
-            $$ = binary_term(":-", head, finalize_r_list($4));
-            input_stream->dcg_var = 0;
-            input_stream->dcg_in = 0;
+    : callable_term K_DARROW dcg_body K_DOT_TERMINATOR {
+            $$ = p_term_expand_dcg(context, binary_term("-->", $1, $3));
+        }
+    ;
+
+dcg_body
+    : dcg_body K_OR dcg_term        {
+            $$ = binary_term("||", $1, finalize_r_list($3));
+        }
+    | dcg_term                      {
+            $$ = finalize_r_list($1);
         }
     ;
 
 dcg_term
-    : dcg_term ',' dcg_primitive_term   { append_r_list($$, $1, $3); }
-    | dcg_primitive_term                { create_r_list($$, $1); }
+    : dcg_term ',' dcg_unary_term   { append_r_list($$, $1, $3); }
+    | dcg_unary_term                { create_r_list($$, $1); }
+    ;
+
+dcg_unary_term
+    : '!' dcg_primitive_term    { $$ = unary_term("!", $2); }
+    | dcg_primitive_term        { $$ = $1; }
     ;
 
 dcg_primitive_term
-    : callable_term             {
-            p_term *var = p_term_create_variable(context);
-            $$ = expand_dcg(context, $1, input_stream->dcg_var, var);
-            input_stream->dcg_var = var;
-        }
-    | compound_statement        { $$ = $1; }
-    | '[' ']'                   { $$ = context->true_atom; }
-    | '[' list_members ']'      {
-            p_term *var = p_term_create_variable(context);
-            p_term *list = finalize_list_tail($2, var);
-            $$ = binary_term("=", input_stream->dcg_var, list);
-            input_stream->dcg_var = var;
-        }
-    | K_STRING                  {
-            p_term *var = p_term_create_variable(context);
-            p_term *list = p_term_create_list(context, $1, var);
-            $$ = binary_term("=", input_stream->dcg_var, list);
-            input_stream->dcg_var = var;
-        }
+    : callable_term             { $$ = $1; }
+    | compound_statement        { $$ = unary_term("$$compound", $1); }
+    | '[' ']'                   { $$ = context->nil_atom; }
+    | '[' list_members ']'      { $$ = finalize_list($2); }
+    | K_STRING                  { $$ = $1; }
+    | '(' dcg_body ')'          { $$ = $2; }
+    | '!'                       { $$ = context->cut_atom; }
     ;
