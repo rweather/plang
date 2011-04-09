@@ -18,7 +18,7 @@ libplang_la_SOURCES = \
 AM_CFLAGS = -I$(top_srcdir)/include -I$(top_builddir)/include -I. -I$(srcdir) -DP_SYSTEM_IMPORT_PATH=\"$(datadir)/plang/imports\" -LP_SYSTEM_LIB_PATH=\"$(pkglibdir)\"
 AM_YFLAGS = -d
 
-lexer.l: parser.c
+$(srcdir)/lexer.l: parser.c
 
 libplang_la_LDFLAGS = -version-info $(PLANG_VERSION) -no-undefined -lm
 
