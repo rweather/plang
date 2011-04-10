@@ -86,6 +86,7 @@ fi
 AC_CONFIG_FILES([
   Makefile
   doc/Makefile
+  examples/Makefile
   include/Makefile
   include/plang/Makefile
   src/Makefile

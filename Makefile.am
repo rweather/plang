@@ -1,4 +1,4 @@
-SUBDIRS = include src tests doc
+SUBDIRS = include src tests examples doc
 
 EXTRA_DIST = auto_gen.sh
 
