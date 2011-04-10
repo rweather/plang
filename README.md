@@ -70,6 +70,6 @@ that you have "doxygen" installed on your PATH to do this.
 ## Staying up to date with Plang
 
 The [Southern Storm](http://southern-storm.blogspot.com/) blog
-in the main place to find announcements about Plang progress.
+is the main place to find announcements about Plang progress.
 Or contact the author via e-mail (use "git log" to find the
 e-mail address).
