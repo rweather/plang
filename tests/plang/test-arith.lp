@@ -926,9 +926,14 @@ mid()
     eval(mid("foobar", 4, 3), "ar");
     eval(mid("", 0, 0), "");
     eval(mid("", 4, 2), "");
+    eval(mid("a\u00AFbc", 1, 2), "\u00AFb");
+    eval(mid("a\u00AFbc", 1, 4), "\u00AFbc");
+    eval(mid("a\u00AFbc", 2, 4), "bc");
 
     eval(mid("foobar", 1), "oobar");
     eval(mid("foobar", 0), "foobar");
+    eval(mid("a\u00AFbc", 1), "\u00AFbc");
+    eval(mid("a\u00AFbc", 0), "a\u00AFbc");
 
     eval_error(mid(foobar, 1, 4), type_error(evaluable, foobar));
     eval_error(mid(1.5, 1, 4), type_error(string, 1.5));
@@ -943,11 +948,39 @@ mid()
     eval_error(mid("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
+mid_bytes()
+{
+    eval(mid_bytes("foobar", 1, 4), "ooba");
+    eval(mid_bytes("foobar", 1, 0), "");
+    eval(mid_bytes("foobar", 10, 3), "");
+    eval(mid_bytes("foobar", 0, 6), "foobar");
+    eval(mid("foobar", 4, 3), "ar");
+    eval(mid_bytes("", 0, 0), "");
+    eval(mid_bytes("", 4, 2), "");
+
+    eval(mid_bytes("foobar", 1), "oobar");
+    eval(mid_bytes("foobar", 0), "foobar");
+
+    eval_error(mid_bytes(foobar, 1, 4), type_error(evaluable, foobar));
+    eval_error(mid_bytes(1.5, 1, 4), type_error(string, 1.5));
+    eval_error(mid_bytes("foobar", 1.0, 4), type_error(integer, 1.0));
+    eval_error(mid_bytes("foobar", 1, 4.0), type_error(integer, 4.0));
+    eval_error(mid_bytes("foobar", -1, 4), domain_error(not_less_than_zero, -1));
+    eval_error(mid_bytes("foobar", 1, -4), domain_error(not_less_than_zero, -4));
+
+    eval_error(mid_bytes(foobar, 1), type_error(evaluable, foobar));
+    eval_error(mid_bytes(1.5, 1), type_error(string, 1.5));
+    eval_error(mid_bytes("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(mid_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
 left()
 {
     eval(left("foobar", 3), "foo");
     eval(left("foobar", 10), "foobar");
     eval(left("foobar", 0), "");
+    eval(left("a\u00AFbc", 2), "a\u00AF");
+    eval(left("a\u00AFbc", 3), "a\u00AFb");
 
     eval_error(left(foobar, 1), type_error(evaluable, foobar));
     eval_error(left(1.5, 1), type_error(string, 1.5));
@@ -955,11 +988,26 @@ left()
     eval_error(left("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
+left_bytes()
+{
+    eval(left_bytes("foobar", 3), "foo");
+    eval(left_bytes("foobar", 10), "foobar");
+    eval(left_bytes("foobar", 0), "");
+    eval(left_bytes("a\xC1\x81b", 2), "a\xC1");
+
+    eval_error(left_bytes(foobar, 1), type_error(evaluable, foobar));
+    eval_error(left_bytes(1.5, 1), type_error(string, 1.5));
+    eval_error(left_bytes("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(left_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
 right()
 {
     eval(right("foobar", 3), "bar");
     eval(right("foobar", 10), "foobar");
     eval(right("foobar", 0), "");
+    eval(right("a\u00AFbc", 3), "\u00AFbc");
+    eval(right("a\u00AFbc", 4), "a\u00AFbc");
 
     eval_error(right(foobar, 1), type_error(evaluable, foobar));
     eval_error(right(1.5, 1), type_error(string, 1.5));
@@ -967,20 +1015,52 @@ right()
     eval_error(right("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
+right_bytes()
+{
+    eval(right_bytes("foobar", 3), "bar");
+    eval(right_bytes("foobar", 10), "foobar");
+    eval(right_bytes("foobar", 0), "");
+
+    eval_error(right_bytes(foobar, 1), type_error(evaluable, foobar));
+    eval_error(right_bytes(1.5, 1), type_error(string, 1.5));
+    eval_error(right_bytes("foobar", 1.0), type_error(integer, 1.0));
+    eval_error(right_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
+}
+
 length()
 {
     eval(length("foobar"), 6);
     eval(length(""), 0);
     eval(length("foo" + "bar"), 6);
+    eval(length("a\xC1\x81b"), 3);
+    eval(length("a\xC4\x81b"), 3);
+    eval(length("a\u00AFb"), 3);
 
     eval_error(length(foobar), type_error(evaluable, foobar));
     eval_error(length(1.5), type_error(string, 1.5));
+}
+
+length_bytes()
+{
+    eval(length_bytes("foobar"), 6);
+    eval(length_bytes(""), 0);
+    eval(length_bytes("foo" + "bar"), 6);
+    eval(length_bytes("a\xC1\x81b"), 4);
+    eval(length_bytes("a\xC4\x81b"), 4);
+    eval(length_bytes("a\u00AFb"), 4);
+
+    eval_error(length_bytes(foobar), type_error(evaluable, foobar));
+    eval_error(length_bytes(1.5), type_error(string, 1.5));
 }
 
 char()
 {
     eval(char("foobar", 3), 98);
     eval(char("foobar", 0), 102);
+    eval(char("a\u00AFb", 0), 0'a');
+    eval(char("a\u00AFb", 1), 0xAF);
+    eval(char("a\u00AFb", 2), 0'b');
+    eval(char("a\uFFEFb", 1), 0xFFEF);
 
     eval_error(char(foobar, 2), type_error(evaluable, foobar));
     eval_error(char("foobar", foobar), type_error(evaluable, foobar));
@@ -992,10 +1072,41 @@ char()
 char_to_string()
 {
     eval(char_to_string(98), "b");
+    eval(char_to_string(0xAF), "\u00AF");
+    eval(char_to_string(0xFFEF), "\uFFEF");
 
     eval_error(char_to_string(foobar), type_error(evaluable, foobar));
     eval_error(char_to_string(1.5), type_error(integer, 1.5));
     eval_error(char_to_string(-1), representation_error(character_code));
+    eval_error(char_to_string(0x110000), representation_error(character_code));
+}
+
+byte()
+{
+    eval(byte("foobar", 3), 98);
+    eval(byte("foobar", 0), 102);
+    eval(byte("a\xC1\x81b", 0), 0'a');
+    eval(byte("a\xC1\x81b", 1), 0xC1);
+    eval(byte("a\xC1\x81b", 2), 0x81);
+    eval(byte("a\xC1\x81b", 3), 0'b');
+
+    eval_error(byte(foobar, 2), type_error(evaluable, foobar));
+    eval_error(byte("foobar", foobar), type_error(evaluable, foobar));
+    eval_error(byte(1.5, 2), type_error(string, 1.5));
+    eval_error(byte("foobar", -1), domain_error(string_index, -1));
+    eval_error(byte("foobar", 6), domain_error(string_index, 6));
+}
+
+byte_to_string()
+{
+    eval(byte_to_string(98), "b");
+    eval(byte_to_string(0), "\0");
+    eval(byte_to_string(255), "\xff");
+
+    eval_error(byte_to_string(foobar), type_error(evaluable, foobar));
+    eval_error(byte_to_string(1.5), type_error(integer, 1.5));
+    eval_error(byte_to_string(-1), type_error(byte, -1));
+    eval_error(byte_to_string(256), type_error(byte, 256));
 }
 
 atom_name()
@@ -1074,11 +1185,17 @@ main(_)
     run(sin);
     run(tan);
     run(mid);
+    run(mid_bytes);
     run(left);
+    run(left_bytes);
     run(right);
+    run(right_bytes);
     run(length);
+    run(length_bytes);
     run(char);
     run(char_to_string);
+    run(byte);
+    run(byte_to_string);
     run(atom_name);
     run(other);
     report();

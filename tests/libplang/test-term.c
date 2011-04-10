@@ -1072,6 +1072,68 @@ static void test_witness()
     clear_parse_state();
 }
 
+int _p_term_next_utf8(const char *str, size_t len, size_t *size);
+
+static void test_utf8()
+{
+    struct utf8_type
+    {
+        const char *row;
+        const char *str1;
+        int index;
+        int ch;
+        size_t size;
+        size_t name_length;
+    };
+    static struct utf8_type const utf8_data[] = {
+        {"null", 0, 0, -1, 0, 0},
+        {"empty", "", 3, -1, 0, 0},
+
+        {"xyz_1", "xyz", 0, 'x', 1, 3},
+        {"xyz_2", "xyz", 1, 'y', 1, 3},
+        {"xyz_3", "xyz", 2, 'z', 1, 3},
+        {"xyz_4", "xyz", 3, -1, 0, 3},
+
+        {"unicode_1", "\xC1y1", 0, -1, 1, 3},
+        {"unicode_2", "\xC1\x81", 0, 0x41, 2, 1},
+        {"unicode_3", "\xE1\x81", 0, -1, 2, 1},
+        {"unicode_4", "\xE1\x81y", 0, -1, 2, 2},
+        {"unicode_5", "y\xE1\x81\x81", 1, 0x1041, 3, 2},
+        {"unicode_6", "y\xF1\x81\x81z", 1, -1, 3, 3},
+        {"unicode_7", "\xF1\xC1\x81\x81", 0, -1, 1, 3},
+        {"unicode_8", "\xF1\x81\x81\x81", 0, 0x41041, 4, 1},
+        {"unicode_9", "\xF9\x81\x81\x81\x81", 0, -1, 5, 1}
+    };
+    #define utf8_data_len    (sizeof(utf8_data) / sizeof(struct utf8_type))
+
+    size_t index, size;
+    int ch, len;
+    const char *s1;
+    p_term *term;
+    for (index = 0; index < utf8_data_len; ++index) {
+        P_TEST_SET_ROW(utf8_data[index].row);
+        s1 = utf8_data[index].str1;
+        if (s1) {
+            len = ((int)(strlen(s1))) - utf8_data[index].index;
+            if (len < 0)
+                len = 0;
+            s1 += utf8_data[index].index;
+        } else {
+            len = 0;
+        }
+
+        size = ~(size_t)0;
+        ch = _p_term_next_utf8(s1, len, &size);
+
+        P_COMPARE(ch, utf8_data[index].ch);
+        P_COMPARE(size, utf8_data[index].size);
+
+        term = p_term_create_string(context, utf8_data[index].str1);
+        P_COMPARE(p_term_name_length_utf8(term),
+                  utf8_data[index].name_length);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     P_TEST_INIT("test-term");
@@ -1091,6 +1153,7 @@ int main(int argc, char *argv[])
     P_TEST_RUN(unify);
     P_TEST_RUN(precedes);
     P_TEST_RUN(witness);
+    P_TEST_RUN(utf8);
 
     P_TEST_REPORT();
     return P_TEST_EXIT_CODE();

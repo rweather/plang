@@ -34,7 +34,9 @@
  * \addtogroup arithmetic
  *
  * Predicates and functions in this group are used to perform
- * arithmetic and string operations.
+ * arithmetic and string operations.  String operations are
+ * further subdivided into operations on UTF-8 character strings,
+ * and operations on strings of raw bytes.
  *
  * Predicates: \ref is_2 "is/2",
  * \ref num_eq_2 "(=:=)/2",
@@ -103,7 +105,7 @@
  * \ref func_string_1 "string/1",
  * \ref func_string_2 "string/2"
  *
- * String functions:
+ * UTF-8 string functions:
  * \ref func_char_2 "char/2",
  * \ref func_char_to_string_1 "char_to_string/1",
  * \ref func_left_2 "left/2",
@@ -111,6 +113,15 @@
  * \ref func_mid_2 "mid/2",
  * \ref func_mid_3 "mid/3",
  * \ref func_right_2 "right/2"
+ *
+ * Byte string functions:
+ * \ref func_byte_2 "byte/2",
+ * \ref func_byte_to_string_1 "byte_to_string/1",
+ * \ref func_left_bytes_2 "left_bytes/2",
+ * \ref func_length_bytes_1 "length_bytes/1",
+ * \ref func_mid_bytes_2 "mid_bytes/2",
+ * \ref func_mid_bytes_3 "mid_bytes/3",
+ * \ref func_right_bytes_2 "right_bytes/2"
  */
 
 /* Internal expression evaluator */
@@ -2418,15 +2429,15 @@ static p_goal_result p_arith_ceil
 /**
  * \addtogroup arithmetic
  * <hr>
- * \anchor func_char_2
- * <b>char/2</b> - integer value of a specific character in a string.
+ * \anchor func_byte_2
+ * <b>byte/2</b> - integer value of a specific byte in a string.
  *
  * \par Usage
- * \em Var \b is \b char(\em Expr, \em Index)
+ * \em Var \b is \b byte(\em Expr, \em Index)
  *
  * \par Description
  * Evaluates \em Expr and \em Index and returns the integer
- * value of the character at position \em Index within the
+ * value of the byte at position \em Index within the
  * string \em Expr.
  *
  * \par Errors
@@ -2440,19 +2451,20 @@ static p_goal_result p_arith_ceil
  *
  * \par Examples
  * \code
- * X is char("foobar", 3)       X is set to 98 (character code of 'b')
- * X is char(1.5, 2)            type_error(string, 1.5)
- * X is char("foobar", 3.0)     type_error(integer, 3.0)
- * X is char("foobar", -1)      domain_error(string_index, -1)
- * X is char("foobar", 6)       domain_error(string_index, 6)
+ * X is byte("foobar", 3)       X is set to 98 (character code of 'b')
+ * X is byte(1.5, 2)            type_error(string, 1.5)
+ * X is byte("foobar", 3.0)     type_error(integer, 3.0)
+ * X is byte("foobar", -1)      domain_error(string_index, -1)
+ * X is byte("foobar", 6)       domain_error(string_index, 6)
  * \endcode
  *
  * \par See Also
  * \ref atom_name_2 "atom_name/2",
- * \ref func_char_to_string_1 "char_to_string/1",
- * \ref func_length_1 "length/1"
+ * \ref func_byte_to_string_1 "byte_to_string/1",
+ * \ref func_char_2 "char/2",
+ * \ref func_length_bytes_1 "length_bytes/1"
  */
-static p_goal_result p_arith_char
+static p_goal_result p_arith_byte
     (p_context *context, p_arith_value *result,
      const p_arith_value *values, p_term **args, p_term **error)
 {
@@ -2484,15 +2496,150 @@ static p_goal_result p_arith_char
 /**
  * \addtogroup arithmetic
  * <hr>
+ * \anchor func_byte_to_string_1
+ * <b>byte_to_string/1</b> - convert an integer byte code into a
+ * single-byte string.
+ *
+ * \par Usage
+ * \em Var \b is \b byte_to_string(\em Expr)
+ *
+ * \par Description
+ * Evaluates \em Expr and returns the single-byte string
+ * that corresponds to the integer value of \em Expr.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(integer, \em Expr)</tt> - \em Expr is
+ *     not an integer.
+ * \li <tt>type_error(byte, \em Expr)</tt> - \em Expr is
+ *     an integer that is not within the range 0 to 255.
+ *
+ * \par Examples
+ * \code
+ * X is byte_to_string(98)      X is set to "b"
+ * X is byte_to_string(0xC1)    X is set to "\xC1"
+ * X is byte_to_string(1.5)     type_error(integer, 1.5)
+ * X is byte_to_string(-1)      type_error(byte, -1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_byte_2 "byte/2",
+ * \ref func_char_to_string_1 "char_to_string/1",
+ * \ref func_length_bytes_1 "length_bytes/1"
+ */
+static p_goal_result p_arith_byte_to_string
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_INTEGER) {
+        int ch = values[0].integer_value;
+        if (ch >= 0 && ch <= 255) {
+            char str[1];
+            str[0] = (char)ch;
+            result->type = P_TERM_STRING;
+            result->string_value =
+                p_term_create_string_n(context, str, 1);
+            return P_RESULT_TRUE;
+        } else {
+            *error = p_create_type_error(context, "byte", args[0]);
+            return P_RESULT_ERROR;
+        }
+    } else {
+        *error = p_create_type_error(context, "integer", args[0]);
+        return P_RESULT_ERROR;
+    }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_char_2
+ * <b>char/2</b> - integer value of a specific character in a
+ * UTF-8 string.
+ *
+ * \par Usage
+ * \em Var \b is \b char(\em Expr, \em Index)
+ *
+ * \par Description
+ * Evaluates \em Expr and \em Index and returns the Unicode integer
+ * value of the UTF-8 character at position \em Index within the
+ * string \em Expr.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Index)</tt> - \em Index is
+ *     not an integer.
+ * \li <tt>domain_error(string_index, \em Index)</tt> - \em Index is
+ *     out of range for \em Expr.
+ *
+ * \par Examples
+ * \code
+ * X is char("foobar", 3)       X is set to 98 (character code of 'b')
+ * X is char("\u00AF", 0)       X is set to 0x00AF
+ * X is char(1.5, 2)            type_error(string, 1.5)
+ * X is char("foobar", 3.0)     type_error(integer, 3.0)
+ * X is char("foobar", -1)      domain_error(string_index, -1)
+ * X is char("foobar", 6)       domain_error(string_index, 6)
+ * X is char("\u00AF", 1)       domain_error(string_index, 1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref atom_name_2 "atom_name/2",
+ * \ref func_byte_2 "byte/2",
+ * \ref func_char_to_string_1 "char_to_string/1",
+ * \ref func_length_1 "length/1"
+ */
+static p_goal_result p_arith_char
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_STRING) {
+        if (values[1].type == P_TERM_INTEGER) {
+            int index = values[1].integer_value;
+            const char *str = p_term_name(values[0].string_value);
+            size_t len = p_term_name_length(values[0].string_value);
+            size_t size;
+            int ch;
+            while (index > 0 && len > 0) {
+                ch = _p_term_next_utf8(str, len, &size);
+                str += size;
+                len -= size;
+                --index;
+            }
+            if (index == 0 && len > 0) {
+                ch = _p_term_next_utf8(str, len, &size);
+                result->type = P_TERM_INTEGER;
+                result->integer_value = ch;
+                return P_RESULT_TRUE;
+            } else {
+                *error = p_create_domain_error
+                    (context, "string_index", args[1]);
+                return P_RESULT_ERROR;
+            }
+        } else {
+            *error = p_create_type_error(context, "integer", args[1]);
+            return P_RESULT_ERROR;
+        }
+    } else {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
  * \anchor func_char_to_string_1
- * <b>char_to_string/1</b> - convert an integer character code into a
- * single-character string.
+ * <b>char_to_string/1</b> - convert a Unicode integer character
+ * code into a single-character UTF-8 string.
  *
  * \par Usage
  * \em Var \b is \b char_to_string(\em Expr)
  *
  * \par Description
- * Evaluates \em Expr and returns the single-character string
+ * Evaluates \em Expr and returns the single-character UTF-8 string
  * that corresponds to the integer character code of \em Expr.
  *
  * \par Errors
@@ -2505,11 +2652,13 @@ static p_goal_result p_arith_char
  * \par Examples
  * \code
  * X is char_to_string(98)      X is set to "b"
+ * X is char_to_string(0x00AF)  X is set to "\u00AF"
  * X is char_to_string(1.5)     type_error(integer, 1.5)
  * X is char_to_string(-1)      representation_error(character_code)
  * \endcode
  *
  * \par See Also
+ * \ref func_byte_to_string_1 "byte_to_string/1",
  * \ref func_char_2 "char/2",
  * \ref func_length_1 "length/1"
  */
@@ -2519,12 +2668,31 @@ static p_goal_result p_arith_char_to_string
 {
     if (values[0].type == P_TERM_INTEGER) {
         int ch = values[0].integer_value;
-        if (ch >= 0 && ch <= 255) {     /* TODO: UTF-8 */
-            char str[1];
-            str[0] = (char)ch;
+        if (ch >= 0 && ch <= 0x10FFFF) {
+            char str[4];
+            size_t len;
+            if (ch < 0x80) {
+                str[0] = (char)ch;
+                len = 1;
+            } else if (ch < (1 << (5 + 6))) {
+                str[0] = (char)(0xC0 | (ch >> 6));
+                str[1] = (char)(0x80 | (ch & 0x3F));
+                len = 2;
+            } else if (ch < (1 << (4 + 6 + 6))) {
+                str[0] = (char)(0xE0 | (ch >> 12));
+                str[1] = (char)(0x80 | ((ch >> 6) & 0x3F));
+                str[2] = (char)(0x80 | (ch & 0x3F));
+                len = 3;
+            } else {
+                str[0] = (char)(0xF0 | (ch >> 18));
+                str[1] = (char)(0x80 | ((ch >> 12) & 0x3F));
+                str[2] = (char)(0x80 | ((ch >> 6) & 0x3F));
+                str[3] = (char)(0x80 | (ch & 0x3F));
+                len = 4;
+            }
             result->type = P_TERM_STRING;
             result->string_value =
-                p_term_create_string_n(context, str, 1);
+                p_term_create_string_n(context, str, len);
             return P_RESULT_TRUE;
         } else {
             *error = p_create_representation_error
@@ -3065,8 +3233,8 @@ static p_goal_result p_arith_integer
  * \em Var \b is \b left(\em Expr, \em Length)
  *
  * \par Description
- * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
- * at the beginning of the string.
+ * Evaluates \em Expr and \em Length.  Returns the \em Length
+ * UTF-8 characters at the beginning of the string.
  * \par
  * If \em Length is greater than the length of \em Expr,
  * then the whole string is returned.
@@ -3091,6 +3259,7 @@ static p_goal_result p_arith_integer
  * \endcode
  *
  * \par See Also
+ * \ref func_left_bytes_2 "left_bytes/2",
  * \ref func_mid_2 "mid/2",
  * \ref func_mid_3 "mid/3",
  * \ref func_right_2 "right/2"
@@ -3099,16 +3268,33 @@ static p_term *p_arith_mid
     (p_context *context, p_term *str, unsigned int start,
      unsigned int length)
 {
-    if (!str->header.size)
+    size_t slen = p_term_name_length_utf8(str);
+    const char *sstart;
+    const char *sposn;
+    size_t ch_size;
+    if (!slen)
         return str;
-    if (start >= str->header.size)
+    if (start >= slen)
         return p_term_create_string_n(context, "", 0);
-    if (start == 0 && length >= str->header.size)
+    if (start == 0 && length >= slen)
         return str;
-    if (length > (str->header.size - start))
-        length = str->header.size - start;
-    return p_term_create_string_n
-        (context, str->string.name + start, length);
+    if (length > (slen - start))
+        length = (unsigned int)(slen - start);
+    sstart = p_term_name(str);
+    while (slen > 0 && start > 0) {
+        _p_term_next_utf8(sstart, slen, &ch_size);
+        sstart += ch_size;
+        --slen;
+        --start;
+    }
+    sposn = sstart;
+    while (slen > 0 && length > 0) {
+        _p_term_next_utf8(sposn, slen, &ch_size);
+        sposn += ch_size;
+        --slen;
+        --length;
+    }
+    return p_term_create_string_n(context, sstart, sposn - sstart);
 }
 static p_goal_result p_arith_left
     (p_context *context, p_arith_value *result,
@@ -3140,8 +3326,138 @@ static p_goal_result p_arith_left
 /**
  * \addtogroup arithmetic
  * <hr>
+ * \anchor func_left_bytes_2
+ * <b>left_bytes/2</b> - extract the left portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b left_bytes(\em Expr, \em Length)
+ *
+ * \par Description
+ * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
+ * at the beginning of the string.
+ * \par
+ * If \em Length is greater than the length of \em Expr,
+ * then the whole string is returned.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is left_bytes("foobar", 3)     X is set to "foo"
+ * X is left_bytes("foobar", 10)    X is set to "foobar"
+ * X is left_bytes("foobar", 0)     X is set to ""
+ * X is left_bytes(1.5, 1)          type_error(string, 1.5)
+ * X is left_bytes("foobar", 1.0)   type_error(integer, 1.0)
+ * X is left_bytes("foobar", -1)    domain_error(not_less_than_zero, -1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_left_2 "left/2",
+ * \ref func_mid_bytes_2 "mid_bytes/2",
+ * \ref func_mid_bytes_3 "mid_bytes/3",
+ * \ref func_right_bytes_2 "right_bytes/2"
+ */
+static p_term *p_arith_mid_bytes
+    (p_context *context, p_term *str, unsigned int start,
+     unsigned int length)
+{
+    if (!str->header.size)
+        return str;
+    if (start >= str->header.size)
+        return p_term_create_string_n(context, "", 0);
+    if (start == 0 && length >= str->header.size)
+        return str;
+    if (length > (str->header.size - start))
+        length = str->header.size - start;
+    return p_term_create_string_n
+        (context, str->string.name + start, length);
+}
+static p_goal_result p_arith_left_bytes
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int length;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    length = values[1].integer_value;
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid_bytes
+        (context, str, 0, (unsigned int)length);
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
  * \anchor func_length_1
- * <b>length/1</b> - length of a string.
+ * <b>length/1</b> - length of a string in UTF-8 characters.
+ *
+ * \par Usage
+ * \em Var \b is \b length(\em Expr)
+ *
+ * \par Description
+ * Evaluates \em Expr and returns the length of the string in
+ * UTF-8 characters.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ *
+ * \par Examples
+ * \code
+ * X is length("foobar")        X is set to 6
+ * X is length("foo" + "bar")   X is set to 6
+ * X is length("")              X is set to 0
+ * X is length("\u00AF")        X is set to 1
+ * X is length(1.5)             type_error(string, 1.5)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_char_2 "char/2",
+ * \ref func_char_to_string_1 "char_to_string/1",
+ * \ref func_length_bytes_1 "length_bytes/1"
+ */
+static p_goal_result p_arith_length
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    if (values[0].type == P_TERM_STRING) {
+        result->type = P_TERM_INTEGER;
+        result->integer_value = (int)
+            p_term_name_length_utf8(values[0].string_value);
+        return P_RESULT_TRUE;
+    } else {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_length_bytes_1
+ * <b>length_bytes/1</b> - length of a string in bytes.
  *
  * \par Usage
  * \em Var \b is \b length(\em Expr)
@@ -3156,17 +3472,19 @@ static p_goal_result p_arith_left
  *
  * \par Examples
  * \code
- * X is length("foobar")        X is set to 6
- * X is length("foo" + "bar")   X is set to 6
- * X is length("")              X is set to 0
- * X is length(1.5)             type_error(string, 1.5)
+ * X is length_bytes("foobar")          X is set to 6
+ * X is length_bytes("foo" + "bar")     X is set to 6
+ * X is length_bytes("")                X is set to 0
+ * X is length_bytes("\u00AF")          X is set to 2
+ * X is length_bytes(1.5)               type_error(string, 1.5)
  * \endcode
  *
  * \par See Also
- * \ref func_char_2 "char/2",
- * \ref func_char_to_string_1 "char_to_string/1"
+ * \ref func_byte_2 "byte/2",
+ * \ref func_byte_to_string_1 "byte_to_string/1",
+ * \ref func_length_1 "length/1"
  */
-static p_goal_result p_arith_length
+static p_goal_result p_arith_length_bytes
     (p_context *context, p_arith_value *result,
      const p_arith_value *values, p_term **args, p_term **error)
 {
@@ -3253,8 +3571,8 @@ static p_goal_result p_arith_log
  *
  * \par Description
  * Evaluates \em Expr, \em Start, and \em Length.  Returns the
- * \em Length bytes starting at index \em Start within \em Expr.
- * The first byte is at index 0.
+ * \em Length UTF-8 characters starting at index \em Start within
+ * \em Expr.  The first character is at index 0.
  * \par
  * If \em Length is omited, then the returned string starts at
  * \em Start and extends to the end of \em Expr.
@@ -3263,7 +3581,7 @@ static p_goal_result p_arith_log
  * string is returned.
  * \par
  * If (\em Start + \em Length) is greater than the length of
- * \em Expr, then as many bytes as are available are returned,
+ * \em Expr, then as many characters as are available are returned,
  * starting at \em Start.
  *
  * \par Errors
@@ -3357,6 +3675,131 @@ static p_goal_result p_arith_mid_3
     }
     result->type = P_TERM_STRING;
     result->string_value = p_arith_mid
+        (context, str, (unsigned int)start, (unsigned int)length);
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_mid_bytes_2
+ * \anchor func_mid_bytes_3
+ * <b>mid_bytes/2</b>, <b>mid_bytes/3</b> - extract the middle
+ * portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b mid_bytes(\em Expr, \em Start, \em Length)
+ * \par
+ * \em Var \b is \b mid_bytes(\em Expr, \em Start)
+ *
+ * \par Description
+ * Evaluates \em Expr, \em Start, and \em Length.  Returns the
+ * \em Length bytes starting at index \em Start within \em Expr.
+ * The first byte is at index 0.
+ * \par
+ * If \em Length is omited, then the returned string starts at
+ * \em Start and extends to the end of \em Expr.
+ * \par
+ * If \em Start is beyond the end of \em Expr, then the empty
+ * string is returned.
+ * \par
+ * If (\em Start + \em Length) is greater than the length of
+ * \em Expr, then as many bytes as are available are returned,
+ * starting at \em Start.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Start)</tt> - \em Start is
+ *     not an integer.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Start)</tt> -
+ *     \em Start is an integer that is less than zero.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is mid_bytes("foobar", 1, 4)   X is set to "ooba"
+ * X is mid_bytes("foobar", 1, 0)   X is set to ""
+ * X is mid_bytes("foobar", 10, 3)  X is set to ""
+ * X is mid_bytes("foobar", 4, 3)   X is set to "ar"
+ * X is mid_bytes("foobar", 4)      X is set to "ar"
+ * X is mid_bytes(1.5, 1)           type_error(string, 1.5)
+ * X is mid_bytes("foobar", 1.0, 4) type_error(integer, 1.0)
+ * X is mid_bytes("foobar", 1, 4.0) type_error(integer, 4.0)
+ * X is mid_bytes("foobar", -1)     domain_error(not_less_than_zero, -1)
+ * X is mid_bytes("foobar", 1, -4)  domain_error(not_less_than_zero, -4)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_left_bytes_2 "left_bytes/2",
+ * \ref func_mid_2 "mid/2",
+ * \ref func_mid_3 "mid/3",
+ * \ref func_right_bytes_2 "right_bytes/2"
+ */
+static p_goal_result p_arith_mid_bytes_2
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int start;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    start = values[1].integer_value;
+    if (start < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid_bytes
+        (context, str, (unsigned int)start, str->header.size);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_arith_mid_bytes_3
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int start;
+    int length;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    if (values[2].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[2]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    start = values[1].integer_value;
+    length = values[2].integer_value;
+    if (start < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[2]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    result->string_value = p_arith_mid_bytes
         (context, str, (unsigned int)start, (unsigned int)length);
     return P_RESULT_TRUE;
 }
@@ -3535,8 +3978,8 @@ static p_goal_result p_arith_pow
  * \em Var \b is \b right(\em Expr, \em Length)
  *
  * \par Description
- * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
- * at the end of the string.
+ * Evaluates \em Expr and \em Length.  Returns the \em Length
+ * characters at the end of the string.
  * \par
  * If \em Length is greater than the length of \em Expr,
  * then the whole string is returned.
@@ -3563,9 +4006,85 @@ static p_goal_result p_arith_pow
  * \par See Also
  * \ref func_left_2 "left/2",
  * \ref func_mid_2 "mid/2",
- * \ref func_mid_3 "mid/3"
+ * \ref func_mid_3 "mid/3",
+ * \ref func_right_bytes_2 "right_bytes/2"
  */
 static p_goal_result p_arith_right
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    p_term *str;
+    int length;
+    size_t str_len;
+    if (values[0].type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", args[0]);
+        return P_RESULT_ERROR;
+    }
+    if (values[1].type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "integer", args[1]);
+        return P_RESULT_ERROR;
+    }
+    str = values[0].string_value;
+    length = values[1].integer_value;
+    if (length < 0) {
+        *error = p_create_domain_error
+            (context, "not_less_than_zero", args[1]);
+        return P_RESULT_ERROR;
+    }
+    result->type = P_TERM_STRING;
+    str_len = p_term_name_length_utf8(str);
+    if (((size_t)length) >= str_len) {
+        result->string_value = str;
+    } else {
+        result->string_value = p_arith_mid
+            (context, str, (unsigned int)(str_len - (size_t)length),
+             (unsigned int)length);
+    }
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor func_right_bytes_2
+ * <b>right_bytes/2</b> - extract the right portion of a string.
+ *
+ * \par Usage
+ * \em Var \b is \b right_bytes(\em Expr, \em Length)
+ *
+ * \par Description
+ * Evaluates \em Expr and \em Length.  Returns the \em Length bytes
+ * at the end of the string.
+ * \par
+ * If \em Length is greater than the length of \em Expr,
+ * then the whole string is returned.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(string, \em Expr)</tt> - \em Expr is
+ *     not a string.
+ * \li <tt>type_error(integer, \em Length)</tt> - \em Length is
+ *     not an integer.
+ * \li <tt>domain_error(not_less_than_zero, \em Length)</tt> -
+ *     \em Start is an integer that is less than zero.
+ *
+ * \par Examples
+ * \code
+ * X is right_bytes("foobar", 3)    X is set to "bar"
+ * X is right_bytes("foobar", 10)   X is set to "foobar"
+ * X is right_bytes("foobar", 0)    X is set to ""
+ * X is right_bytes(1.5, 1)         type_error(string, 1.5)
+ * X is right_bytes("foobar", 1.0)  type_error(integer, 1.0)
+ * X is right_bytes("foobar", -1)   domain_error(not_less_than_zero, -1)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_left_bytes_2 "left_bytes/2",
+ * \ref func_mid_bytes_2 "mid_bytes/2",
+ * \ref func_mid_bytes_3 "mid_bytes/3",
+ * \ref func_right_2 "right/2"
+ */
+static p_goal_result p_arith_right_bytes
     (p_context *context, p_arith_value *result,
      const p_arith_value *values, p_term **args, p_term **error)
 {
@@ -3590,7 +4109,7 @@ static p_goal_result p_arith_right
     if (length >= str->header.size) {
         result->string_value = str;
     } else {
-        result->string_value = p_arith_mid
+        result->string_value = p_arith_mid_bytes
             (context, str, str->header.size - (unsigned int)length,
              (unsigned int)length);
     }
@@ -4111,6 +4630,8 @@ void _p_db_init_arith(p_context *context)
         {"asin", 1, p_arith_asin},
         {"atan", 1, p_arith_atan},
         {"atan2", 2, p_arith_atan2},
+        {"byte", 2, p_arith_byte},
+        {"byte_to_string", 1, p_arith_byte_to_string},
         {"ceil", 1, p_arith_ceil},
         {"ceiling", 1, p_arith_ceil},
         {"char", 2, p_arith_char},
@@ -4125,16 +4646,21 @@ void _p_db_init_arith(p_context *context)
         {"inf", 0, p_arith_inf},
         {"integer", 1, p_arith_integer},
         {"left", 2, p_arith_left},
+        {"left_bytes", 2, p_arith_left_bytes},
         {"length", 1, p_arith_length},
+        {"length_bytes", 1, p_arith_length_bytes},
         {"log", 1, p_arith_log},
         {"mid", 2, p_arith_mid_2},
         {"mid", 3, p_arith_mid_3},
+        {"mid_bytes", 2, p_arith_mid_bytes_2},
+        {"mid_bytes", 3, p_arith_mid_bytes_3},
         {"mod", 2, p_arith_mod},
         {"nan", 0, p_arith_nan},
         {"pi", 0, p_arith_pi},
         {"pow", 2, p_arith_pow},
         {"rem", 2, p_arith_rem},
         {"right", 2, p_arith_right},
+        {"right_bytes", 2, p_arith_right_bytes},
         {"round", 1, p_arith_round},
         {"sign", 1, p_arith_sign},
         {"sin", 1, p_arith_sin},

@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdarg.h>
 #include "parser.h"
 #include "parser-priv.h"
 #include "term-priv.h"
@@ -116,6 +117,7 @@ unsigned int p_term_lex_variable_count(p_input_stream *stream, p_term *var)
 }
 
 static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, int type, int quote);
+static void yylex_error_printf(yyscan_t scanner, const char *format, ...);
 
 %}
 
@@ -296,6 +298,47 @@ NEG             (-?)
         } \
         buf[buflen++] = (char)(ch); \
     } while (0)
+#define BUF_ADD_UTF8_CHAR(ch)   \
+    do { \
+        if (ch < 0x80) { \
+            BUF_ADD_CHAR(ch); \
+        } else if (ch < (1 << (5 + 6))) { \
+            BUF_ADD_CHAR(0xC0 | (ch >> 6)); \
+            BUF_ADD_CHAR(0x80 | (ch & 0x3F)); \
+        } else if (ch < (1 << (4 + 6 + 6))) { \
+            BUF_ADD_CHAR(0xE0 | (ch >> 12)); \
+            BUF_ADD_CHAR(0x80 | ((ch >> 6) & 0x3F)); \
+            BUF_ADD_CHAR(0x80 | (ch & 0x3F)); \
+        } else { \
+            BUF_ADD_CHAR(0xF0 | (ch >> 18)); \
+            BUF_ADD_CHAR(0x80 | ((ch >> 12) & 0x3F)); \
+            BUF_ADD_CHAR(0x80 | ((ch >> 6) & 0x3F)); \
+            BUF_ADD_CHAR(0x80 | (ch & 0x3F)); \
+        } \
+    } while (0)
+
+/* Read a hexadecimal character sequence within a string */
+static int p_term_read_hex(yyscan_t scanner, int num_digits, int *value)
+{
+    int ch;
+    *value = 0;
+    while (num_digits > 0) {
+        ch = input(scanner);
+        if (ch >= '0' && ch <= '9')
+            *value = (*value << 4) + (ch - '0');
+        else if (ch >= 'A' && ch <= 'F')
+            *value = (*value << 4) + (ch - 'A' + 10);
+        else if (ch >= 'a' && ch <= 'f')
+            *value = (*value << 4) + (ch - 'a' + 10);
+        else {
+            yylex_error_printf
+                (scanner, "insufficient digits for hex character");
+            return ch;
+        }
+        --num_digits;
+    }
+    return -1;
+}
 
 /* Read a quoted string from the input stream */
 static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, int type, int quote)
@@ -305,9 +348,17 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
     char *buf = static_buf;
     size_t buflen = 0;
     size_t bufmax = sizeof(buf);
-    int ch;
+    int ch, preget_ch, value;
     p_term *term;
-    while ((ch = input(scanner)) >= 0 && ch != quote) {
+    ch = 0;
+    preget_ch = 0;
+    for (;;) {
+        if (!preget_ch)
+            ch = input(scanner);
+        else
+            preget_ch = 0;
+        if (ch < 0 || ch == quote)
+            break;
         if (ch == '\\') {
             ch = input(scanner);
             if (ch == 'n') {
@@ -320,13 +371,32 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
                 BUF_ADD_CHAR('\f');
             } else if (ch == 'v') {
                 BUF_ADD_CHAR('\v');
+            } else if (ch == 'x') {
+                /* Raw byte value */
+                ch = p_term_read_hex(scanner, 2, &value);
+                if (ch >= 0)
+                    preget_ch = 1;
+                BUF_ADD_CHAR(value);
+            } else if (ch == 'u') {
+                /* 4-digit unicode character */
+                ch = p_term_read_hex(scanner, 4, &value);
+                if (ch >= 0)
+                    preget_ch = 1;
+                BUF_ADD_UTF8_CHAR(value);
+            } else if (ch == 'U') {
+                /* 8-digit unicode character */
+                ch = p_term_read_hex(scanner, 8, &value);
+                if (ch >= 0)
+                    preget_ch = 1;
+                BUF_ADD_UTF8_CHAR(value);
             } else if (ch == '0') {
                 BUF_ADD_CHAR('\0');
             } else {
                 BUF_ADD_CHAR(ch);
             }
         } else if (ch == '\r' || ch == '\n') {
-            /* TODO: report an error for unexpected end of line */
+            yylex_error_printf
+                (scanner, "unexpected end of line in string");
             if (ch == '\n')
                 ++yylineno;
             break;
@@ -334,18 +404,42 @@ static p_term *p_term_read_quoted_string(p_context *context, yyscan_t scanner, i
             BUF_ADD_CHAR(ch);
         }
     }
-    if (ch < 0) {
-        /* TODO: report an error for unexpected EOF */
-    }
+    if (ch < 0)
+        yylex_error_printf(scanner, "unexpected end of file in string");
     BUF_ADD_CHAR('\0');
     if (type == K_ATOM) {
         term = p_term_create_atom_n(context, buf, buflen - 1);
     } else if (type == K_STRING) {
         term = p_term_create_string_n(context, buf, buflen - 1);
     } else {
-        term = p_term_create_integer(context, ((int)(buf[0])) & 0xFF);
+        size_t ch_size;
+        ch = _p_term_next_utf8(buf, buflen - 1, &ch_size);
+        if (ch < 0) {
+            yylex_error_printf
+                (scanner, "invalid character in 0' sequence");
+        } else if (ch_size != (buflen - 1)) {
+            yylex_error_printf
+                (scanner, "single character expected in 0' sequence");
+        }
+        term = p_term_create_integer(context, ch);
     }
     if (buf != static_buf)
         free(buf);
     return term;
+}
+
+static void yylex_error_printf(yyscan_t scanner, const char *format, ...)
+{
+    struct yyguts_t *yyg = (struct yyguts_t *)scanner;
+    va_list va;
+    va_start(va, format);
+    p_input_stream *stream = yyextra;
+    if (stream->filename)
+        fprintf(stderr, "%s:%d: ", stream->filename, yylineno);
+    else
+        fprintf(stderr, "%d: ", yylineno);
+    vfprintf(stderr, format, va);
+    putc('\n', stderr);
+    ++(stream->error_count);
+    va_end(va);
 }

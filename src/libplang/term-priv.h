@@ -156,6 +156,8 @@ union p_term {
 #define p_term_malloc(context, type, size)  ((type *)GC_MALLOC((size)))
 #define p_term_new(context, type)           (GC_NEW(type))
 
+int _p_term_next_utf8(const char *str, size_t len, size_t *size);
+
 /** @endcond */
 
 #ifdef __cplusplus

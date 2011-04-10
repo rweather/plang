@@ -731,7 +731,7 @@ int p_term_arg_count(const p_term *term)
  *
  * \ingroup term
  * \sa p_term_type(), p_term_create_functor(), p_term_create_atom()
- * \sa p_term_name_length()
+ * \sa p_term_name_length(), p_term_name_length_utf8()
  */
 const char *p_term_name(const p_term *term)
 {
@@ -763,10 +763,12 @@ const char *p_term_name(const p_term *term)
  * atom, or variable contained in \a term, or zero if \a term does
  * not have a name.
  *
- * The \a term is automatically dereferenced.
+ * The \a term is automatically dereferenced.  The returned length
+ * is in bytes.  Use p_term_name_length_utf8() to get the length
+ * in logical characters.
  *
  * \ingroup term
- * \sa p_term_name()
+ * \sa p_term_name(), p_term_name_length_utf8()
  */
 size_t p_term_name_length(const p_term *term)
 {
@@ -787,6 +789,122 @@ size_t p_term_name_length(const p_term *term)
     default: break;
     }
     return 0;
+}
+
+/* Fetch the next UTF-8 character from a string */
+int _p_term_next_utf8(const char *str, size_t len, size_t *size)
+{
+    int ch, ch2;
+    size_t req, sz;
+    if (!len) {
+        *size = 0;
+        return -1;
+    }
+    ch = ((int)(*str)) & 0xFF;
+    sz = 1;
+    if (ch < 0x80) {
+        req = 0;
+    } else if ((ch & 0xE0) == 0xC0) {
+        ch &= 0x1F;
+        req = 1;
+        ++str;
+        --len;
+    } else if ((ch & 0xF0) == 0xE0) {
+        ch &= 0x0F;
+        req = 2;
+        ++str;
+        --len;
+    } else if ((ch & 0xF8) == 0xF0) {
+        ch &= 0x07;
+        req = 3;
+        ++str;
+        --len;
+    } else {
+        ++str;
+        --len;
+    invalid:
+        /* Invalid UTF-8 char: search for a re-synchronization point */
+        while (len > 0) {
+            ch = ((int)(*str)) & 0xFF;
+            if (ch < 0x80 || (ch & 0xE0) == 0xC0 ||
+                    (ch & 0xF0) == 0xE0 || (ch & 0xF8) == 0xF0)
+                break;
+            ++sz;
+            ++str;
+            --len;
+        }
+        *size = sz;
+        return -1;
+    }
+    while (req > 0) {
+        if (!len)
+            goto invalid;
+        ch2 = ((int)(*str)) & 0xFF;
+        if ((ch2 & 0xC0) == 0x80)
+            ch = (ch << 6) | (ch2 & 0x3F);
+        else
+            goto invalid;
+        ++str;
+        --len;
+        ++sz;
+        --req;
+    }
+    *size = sz;
+    return ch;
+}
+
+/**
+ * \brief Returns the UTF-8 length of the name of the functor,
+ * predicate, atom, or variable contained in \a term, or zero
+ * if \a term does not have a name.
+ *
+ * The \a term is automatically dereferenced.  The returned length
+ * is in logcial UTF-8 characters.  Use p_term_name_length()
+ * to get the length in bytes.
+ *
+ * \ingroup term
+ * \sa p_term_name(), p_term_name_length()
+ */
+size_t p_term_name_length_utf8(const p_term *term)
+{
+    const char *name;
+    size_t byte_len;
+    size_t utf8_len;
+    size_t ch_size;
+    if (!term)
+        return 0;
+    term = p_term_deref_non_null(term);
+    switch (term->header.type) {
+    case P_TERM_FUNCTOR:
+        return p_term_name_length_utf8(term->functor.functor_name);
+    case P_TERM_PREDICATE:
+        return p_term_name_length_utf8(term->predicate.name);
+    case P_TERM_ATOM:
+        name = term->atom.name;
+        byte_len = term->header.size;
+        break;
+    case P_TERM_STRING:
+        name = term->string.name;
+        byte_len = term->header.size;
+        break;
+    case P_TERM_VARIABLE:
+        byte_len = term->header.size;
+        if (!byte_len)
+            return 0;
+        name = (const char *)(&(term->var) + 1);
+        break;
+    case P_TERM_MEMBER_VARIABLE:
+        return p_term_name_length_utf8(term->member_var.name);
+    default: return 0;
+    }
+    utf8_len = 0;
+    while (byte_len > 0) {
+        _p_term_next_utf8(name, byte_len, &ch_size);
+        name += ch_size;
+        byte_len -= ch_size;
+        ++utf8_len;
+    }
+    return utf8_len;
 }
 
 /**

@@ -191,6 +191,13 @@ squote_char --> ordinary_char || escape_char || "\"".
 
 ordinary_char --> any character except "\"", "'", "\\", or a newline.
 
+escape_char --> "\\x", hex_digit, hex_digit.    // raw byte value
+
+// Unicode characters, which will be converted into UTF-8.
+escape_char --> "\\u", hex_digit, hex_digit, hex_digit, hex_digit.
+escape_char --> "\\U", hex_digit, hex_digit, hex_digit, hex_digit,
+                       hex_digit, hex_digit, hex_digit, hex_digit.
+
 escape_char --> "\\", control_char.
 escape_char --> "\\", other_char.       // same as other_char
 

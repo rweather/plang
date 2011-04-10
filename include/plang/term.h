@@ -79,6 +79,7 @@ int p_term_type(const p_term *term);
 int p_term_arg_count(const p_term *term);
 const char *p_term_name(const p_term *term);
 size_t p_term_name_length(const p_term *term);
+size_t p_term_name_length_utf8(const p_term *term);
 p_term *p_term_functor(const p_term *term);
 p_term *p_term_arg(const p_term *term, int index);
 int p_term_integer_value(const p_term *term);
