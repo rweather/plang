@@ -4647,44 +4647,57 @@ static p_goal_result p_builtin_bt_num_assign
 
 /*\@}*/
 
-/* Dummy implementations for stdout/stderr printing until
- * we get a better I/O system up and running */
+/* Implementations for stdout/stderr printing */
 static p_goal_result p_builtin_print
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term_print_unquoted
-        (context, args[0], p_term_stdio_print_func, stdout);
+    p_term *term = p_term_deref_member(context, args[1]);
+    if (p_term_integer_value(args[0]) == 1)
+        p_term_print(context, term, p_term_stdio_print_func, stdout);
+    else
+        p_term_print(context, term, p_term_stdio_print_func, stderr);
     return P_RESULT_TRUE;
 }
-static p_goal_result p_builtin_println
+static p_goal_result p_builtin_print_byte
     (p_context *context, p_term **args, p_term **error)
 {
-    putc('\n', stdout);
+    p_term *term = p_term_deref_member(context, args[1]);
+    if (!term || (term->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    } else if (term->header.type != P_TERM_INTEGER) {
+        *error = p_create_type_error(context, "byte", term);
+        return P_RESULT_ERROR;
+    } else {
+        int value = p_term_integer_value(term);
+        if (value < 0 || value > 255) {
+            *error = p_create_type_error(context, "byte", term);
+            return P_RESULT_ERROR;
+        }
+        if (p_term_integer_value(args[0]) == 1)
+            putc(value, stdout);
+        else
+            putc(value, stderr);
+    }
     return P_RESULT_TRUE;
 }
-static p_goal_result p_builtin_printq
+static p_goal_result p_builtin_print_string
     (p_context *context, p_term **args, p_term **error)
 {
-    p_term_print(context, args[0], p_term_stdio_print_func, stdout);
-    return P_RESULT_TRUE;
-}
-static p_goal_result p_builtin_print_error
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_term_print_unquoted
-        (context, args[0], p_term_stdio_print_func, stderr);
-    return P_RESULT_TRUE;
-}
-static p_goal_result p_builtin_println_error
-    (p_context *context, p_term **args, p_term **error)
-{
-    putc('\n', stderr);
-    return P_RESULT_TRUE;
-}
-static p_goal_result p_builtin_printq_error
-    (p_context *context, p_term **args, p_term **error)
-{
-    p_term_print(context, args[0], p_term_stdio_print_func, stderr);
+    p_term *term = p_term_deref_member(context, args[1]);
+    if (!term || (term->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    } else if (term->header.type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "string", term);
+        return P_RESULT_ERROR;
+    } else if (p_term_integer_value(args[0]) == 1) {
+        p_term_print_unquoted
+            (context, term, p_term_stdio_print_func, stdout);
+    } else {
+        p_term_print_unquoted
+            (context, term, p_term_stdio_print_func, stderr);
+    }
     return P_RESULT_TRUE;
 }
 
@@ -4781,12 +4794,9 @@ void _p_db_init_builtins(p_context *context)
         {"object", 2, p_builtin_object_2},
         {"predicate", 1, p_builtin_predicate_1},
         {"predicate", 2, p_builtin_predicate_2},
-        {"$$print", 1, p_builtin_print},
-        {"$$println", 0, p_builtin_println},
-        {"$$printq", 1, p_builtin_printq},
-        {"$$print_error", 1, p_builtin_print_error},
-        {"$$println_error", 0, p_builtin_println_error},
-        {"$$printq_error", 1, p_builtin_printq_error},
+        {"$$print", 2, p_builtin_print},
+        {"$$print_byte", 2, p_builtin_print_byte},
+        {"$$print_string", 2, p_builtin_print_string},
         {"retract", 1, p_builtin_retract},
         {"$$set_loop_var", 2, p_builtin_set_loop_var},
         {"string", 1, p_builtin_string},

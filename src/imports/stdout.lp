@@ -17,34 +17,65 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
+:- import(iostream).
+
 /** @cond */
-class stdout
+class stdout : iostream
 {
+    canWrite() { true; }
+
+    writeByte(Byte)
+    {
+        '$$print_byte'(1, Byte);
+    }
+
+    writeBytes(Bytes)
+    {
+        '$$print_string'(1, Bytes);
+    }
+
+    // TODO: remove writeTerm() from here once iostream is finished.
+    writeTerm(Term)
+    {
+        '$$print'(1, Term);
+    }
+    writeTerm(Term, Vars)
+    {
+        '$$print'(1, Term);
+    }
+
     static write(Term)
     {
-        '$$print'(Term);
+        var(Term);
+        !;
+        '$$print'(1, Term);
+    }
+    static write(A + B)
+    {
+        !;
+        stdout::write(A);
+        stdout::write(B);
+    }
+    static write(Term)
+    {
+        string(Term);
+        !;
+        '$$print_string'(1, Term);
+    }
+    static write(Term)
+    {
+        '$$print'(1, Term);
     }
 
     static writeln(Term)
     {
-        '$$print'(Term);
-        '$$println'();
+        stdout::write(Term);
+        '$$print_string'(1, "\n");
     }
 
     static writeln()
     {
-        '$$println'();
-    }
-
-    static writeq(Term)
-    {
-        '$$printq'(Term);
-    }
-
-    static writeqln(Term)
-    {
-        '$$printq'(Term);
-        '$$println'();
+        '$$print_string'(1, "\n");
     }
 }
 /** @endcond */

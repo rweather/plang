@@ -1,0 +1,136 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\addtogroup class_stdout
+
+The \c stdout and \c stderr classes provide I/O stream
+implementations that write to the process's standard output
+and standard error streams.  The two classes implement the
+\ref class_iostream "iostream" API, and can be used as follows:
+
+\code
+:- import(stdout).
+:- import(stderr).
+
+main(_)
+{
+    new stdout(Stdout);
+    Stdout.writeLine("Hello World!");
+
+    new stderr(Stderr);
+    Stderr.writeLine("Hello Error!");
+}
+\endcode
+
+The \c stdout and \c stderr classes also provide some static
+convenience methods which remove the need to create an object first:
+
+\code
+:- import(stdout).
+:- import(stderr).
+
+main(Args)
+{
+    stdout::writeln("Hello World!");
+    stderr::writeln("Hello Error!");
+    stdout::writeln("Arguments: " + Args);
+}
+\endcode
+
+\par Class members
+See the documentation for \ref class_iostream "iostream".  The
+\c stdout and \c stderr streams are write-only.
+
+\par Static class members
+\ref stdout_write "write()",
+\ref stdout_writeln "writeln()"
+
+\par See Also
+\ref class_iostream "iostream"
+
+<hr>
+\anchor stdout_write
+<b>stdout::write</b>(\em Term)
+<br>
+<b>stderr::write</b>(\em Term)
+
+\par Description
+If \em Term is a string, then write it directly to standard output
+(or standard error) without quoting.
+\par
+If \em Term has the form (\em A + \em B), then write \em A and \em B
+to the output without the plus sign.  This rule is applied recursively
+for writing terms such as (\em A + \em B + \em C + ...).
+\par
+If \em Term is not a string or of the form (\em A + \em B),
+then write it using the same representation and quoting rules as
+\ref iostream_writeTerm "iostream::writeTerm()".
+
+\par Examples
+\code
+Answer is 2 + 2;
+stdout::write("The answer is: " + Answer);
+stdout::writeln();
+
+The answer is: 4
+\endcode
+
+\par See Also
+\ref stdout_writeln "writeln()",
+\ref iostream_writeTerm "iostream::writeTerm()"
+
+<hr>
+\anchor stdout_writeln
+<b>stdout::writeln</b>(\em Term)
+<br>
+<b>stdout::writeln</b>()
+<br>
+<b>stderr::writeln</b>(\em Term)
+<br>
+<b>stderr::writeln</b>()
+
+\par Description
+If \em Term is a string, then write it directly to standard output
+(or standard error) without quoting.
+\par
+If \em Term has the form (\em A + \em B), then write \em A and \em B
+to the output without the plus sign.  This rule is applied recursively
+for writing terms such as (\em A + \em B + \em C + ...).
+\par
+If \em Term is not a string or of the form (\em A + \em B),
+then write it using the same representation and quoting rules as
+\ref iostream_writeTerm "iostream::writeTerm()".
+\par
+A newline is written after \em Term.  If \em Term is omitted,
+then only a newline is written.
+
+\par Examples
+\code
+Answer is 2 + 2;
+stdout::writeln("The answer is: " + Answer);
+
+The answer is: 4
+\endcode
+
+\par See Also
+\ref stdout_write "write()",
+\ref iostream_writeTerm "iostream::writeTerm()"
+
+*/

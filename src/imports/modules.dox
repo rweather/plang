@@ -32,7 +32,9 @@
  * \endcode
  *
  * \par stream classes
- * \ref class_iostream "iostream"
+ * \ref class_iostream "iostream",
+ * \ref class_stderr "stderr",
+ * \ref class_stdout "stdout"
  *
  * \par findall module
  * \ref bagof_3 "bagof/3",
@@ -55,7 +57,15 @@
  * \defgroup class_iostream Classes - iostream
  */
 /*\@{*/
-/* Defined in iostream.lp */
+/* Defined in iostream.dox */
+/*\@}*/
+
+/**
+ * \defgroup class_stdout Classes - stdout and stderr
+ * \anchor class_stderr
+ */
+/*\@{*/
+/* Defined in stdout.dox */
 /*\@}*/
 
 /**

@@ -45,6 +45,9 @@ acts as the base of a hierarchy of related I/O handling classes.
 \ref iostream_writeLine "writeLine()",
 \ref iostream_writeTerm "writeTerm()"
 
+\par See Also
+\ref class_stderr "stderr", \ref class_stdout "stdout"
+
 <hr>
 \anchor iostream_canRead
 \em Stream.<b>canRead</b>()
