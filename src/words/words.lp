@@ -19,8 +19,6 @@
 
 :- load_library(plang_wordnet).
 
-/** @cond */
-
 // DCG-compatible word checking predicates.
 
 words::adjective([Word|Out], Out)
@@ -100,5 +98,3 @@ words::base_form(Word, PartOfSpeech, BaseForm)
     else
         fail;
 }
-
-/** @endcond */

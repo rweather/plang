@@ -19,7 +19,6 @@
 
 :- import(iostream).
 
-/** @cond */
 class stdout : iostream
 {
     canWrite() { true; }
@@ -78,4 +77,3 @@ class stdout : iostream
         '$$print'(1, Term, Vars);
     }
 }
-/** @endcond */

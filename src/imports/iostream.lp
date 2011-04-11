@@ -17,7 +17,6 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-/** @cond */
 class iostream
 {
     canRead() { fail; }
@@ -130,4 +129,3 @@ class iostream
         '$$iostream_writeTerm'(Self, Term, Vars);
     }
 }
-/** @endcond */

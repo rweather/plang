@@ -6,7 +6,9 @@ imports_DATA = \
 	stdout.lp
 
 EXTRA_DOCS = \
+	findall.lp \
 	iostream.dox \
-	modules.dox
+	modules.dox \
+	stdout.dox
 
 EXTRA_DIST = $(imports_DATA) $(EXTRA_DOCS)

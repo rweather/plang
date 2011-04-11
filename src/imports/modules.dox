@@ -76,12 +76,12 @@
  * \ref setof_3 "setof/3"
  */
 /*\@{*/
-/* Defined in findall.lp */
+/* Defined in findall.dox */
 /*\@}*/
 
 /**
  * \defgroup module_words Modules - words
  */
 /*\@{*/
-/* Defined in words.lp */
+/* Defined in words.c */
 /*\@}*/
