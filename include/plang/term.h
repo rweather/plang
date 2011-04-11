@@ -115,6 +115,7 @@ void p_term_stdio_print_func(void *data, const char *format, ...);
 
 void p_term_print(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
 void p_term_print_unquoted(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data);
+void p_term_print_with_vars(p_context *context, const p_term *term, p_term_print_func print_func, void *print_data, const p_term *vars);
 
 int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2);
 

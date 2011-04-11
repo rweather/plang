@@ -49,6 +49,9 @@ p_goal_result p_context_reexecute_goal
     (p_context *context, p_term **error);
 void p_context_abandon_goal(p_context *context);
 
+p_goal_result p_context_call_once
+    (p_context *context, p_term *goal, p_term **error);
+
 int p_context_is_debug(p_context *context);
 void p_context_set_debug(p_context *context, int debug);
 

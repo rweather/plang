@@ -121,7 +121,7 @@ class iostream
 
     writeTerm(Term)
     {
-        '$$iostream_writeTerm'(Self, Term);
+        '$$iostream_writeTerm'(Self, Term, []);
     }
 
     writeTerm(Term, Vars)

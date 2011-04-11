@@ -80,6 +80,8 @@ struct p_context
     p_term *fail_atom;
     p_term *cut_atom;
     p_term *call_member_atom;
+    p_term *call_args_atom;
+    p_term *unify_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trail *trail;

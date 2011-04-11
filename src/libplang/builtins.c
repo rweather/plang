@@ -20,6 +20,8 @@
 #include <plang/database.h>
 #include <plang/errors.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
 #include "term-priv.h"
 #include "database-priv.h"
 #include "context-priv.h"
@@ -4647,26 +4649,71 @@ static p_goal_result p_builtin_bt_num_assign
 
 /*\@}*/
 
+/* Validate a variable list that was passed to iostream::writeTerm() */
+static int p_builtin_validate_var_list
+    (p_context *context, p_term *vars, p_term **error)
+{
+    p_term *save_vars = vars;
+    p_term *head;
+    p_term *name;
+    if (!vars || (vars->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return 0;
+    }
+    while (vars && vars->header.type == P_TERM_LIST) {
+        head = p_term_deref(vars->list.head);
+        if (!head || head->header.type != P_TERM_FUNCTOR ||
+                head->header.size != 2 ||
+                head->functor.functor_name != context->unify_atom) {
+            *error = p_create_type_error
+                (context, "variable_names", save_vars);
+            return 0;
+        }
+        name = p_term_deref(p_term_arg(head, 0));
+        if (!name || (name->header.type != P_TERM_ATOM &&
+                      name->header.type != P_TERM_STRING)) {
+            *error = p_create_type_error
+                (context, "variable_names", save_vars);
+            return 0;
+        }
+        vars = p_term_deref(vars->list.tail);
+    }
+    if (vars != context->nil_atom) {
+        *error = p_create_type_error
+            (context, "variable_names", save_vars);
+        return 0;
+    }
+    return 1;
+}
+
 /* Implementations for stdout/stderr printing */
 static p_goal_result p_builtin_print
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *term = p_term_deref_member(context, args[1]);
-    if (p_term_integer_value(args[0]) == 1)
-        p_term_print(context, term, p_term_stdio_print_func, stdout);
-    else
-        p_term_print(context, term, p_term_stdio_print_func, stderr);
+    if (p_term_integer_value(args[0]) == 1) {
+        p_term_print_with_vars
+            (context, term, p_term_stdio_print_func, stdout, 0);
+    } else {
+        p_term_print_with_vars
+            (context, term, p_term_stdio_print_func, stderr, 0);
+    }
     return P_RESULT_TRUE;
 }
 static p_goal_result p_builtin_print_3
     (p_context *context, p_term **args, p_term **error)
 {
-    /* TODO: print using the variable list */
     p_term *term = p_term_deref_member(context, args[1]);
-    if (p_term_integer_value(args[0]) == 1)
-        p_term_print(context, term, p_term_stdio_print_func, stdout);
-    else
-        p_term_print(context, term, p_term_stdio_print_func, stderr);
+    p_term *vars = p_term_deref_member(context, args[2]);
+    if (!p_builtin_validate_var_list(context, vars, error))
+        return P_RESULT_ERROR;
+    if (p_term_integer_value(args[0]) == 1) {
+        p_term_print_with_vars
+            (context, term, p_term_stdio_print_func, stdout, vars);
+    } else {
+        p_term_print_with_vars
+            (context, term, p_term_stdio_print_func, stderr, vars);
+    }
     return P_RESULT_TRUE;
 }
 static p_goal_result p_builtin_print_byte
@@ -4710,6 +4757,127 @@ static p_goal_result p_builtin_print_string
             (context, term, p_term_stdio_print_func, stderr);
     }
     return P_RESULT_TRUE;
+}
+
+/** @cond */
+struct p_write_term_data
+{
+    p_context *context;
+    p_term *stream;
+    char buffer[512];
+    size_t buflen;
+    p_term *error;
+    p_term *writeString;
+    p_goal_result result;
+};
+/** @endcond */
+
+static void p_write_term_flush(struct p_write_term_data *data)
+{
+    p_term *str = p_term_create_string_n
+        (data->context, data->buffer, data->buflen);
+    p_term *call = p_term_create_functor
+        (data->context, data->context->call_member_atom, 2);
+    p_term *args = p_term_create_functor
+        (data->context, data->context->call_args_atom, 2);
+    p_term_bind_functor_arg(args, 0, data->stream);
+    p_term_bind_functor_arg(args, 1, str);
+    p_term_bind_functor_arg
+        (call, 0, p_term_create_member_variable
+            (data->context, data->stream, data->writeString, 0));
+    p_term_bind_functor_arg(call, 1, args);
+    data->buflen = 0;
+    data->result = p_context_call_once
+        (data->context, call, &(data->error));
+}
+
+static void p_write_term_func(void *_data, const char *format, ...)
+{
+    struct p_write_term_data *data = (struct p_write_term_data *)_data;
+    va_list va;
+    va_start(va, format);
+    while (*format != '\0') {
+        if (data->result != P_RESULT_TRUE)
+            break;
+        if (*format == '%') {
+            ++format;
+            if (*format == '\0') {
+                break;
+            } else if (*format == 's') {
+                const char *str = va_arg(va, const char *);
+                size_t len = strlen(str);
+                size_t temp_len;
+                while (len > 0) {
+                    if (data->buflen >= sizeof(data->buffer)) {
+                        p_write_term_flush(data);
+                        if (data->result != P_RESULT_TRUE)
+                            break;
+                    }
+                    temp_len = sizeof(data->buffer) - data->buflen;
+                    if (temp_len > len)
+                        temp_len = len;
+                    memcpy(data->buffer + data->buflen, str, temp_len);
+                    str += temp_len;
+                    len -= temp_len;
+                    data->buflen += temp_len;
+                }
+            } else if (*format == 'c') {
+                int ch = va_arg(va, int);
+                if (data->buflen >= sizeof(data->buffer))
+                    p_write_term_flush(data);
+                data->buffer[(data->buflen)++] = (char)ch;
+            } else {
+                /* Assume this is some format like %d or %.10g and
+                 * that it is the last and only format present */
+                if (data->buflen >= (sizeof(data->buffer) - 64))
+                    p_write_term_flush(data);
+#if defined(HAVE_VSNPRINTF)
+                vsnprintf(data->buffer + data->buflen,
+                          sizeof(data->buffer) - data->buflen,
+                          format - 1, va);
+#elif defined(HAVE__VSNPRINTF)
+                _vsnprintf(data->buffer + data->buflen,
+                           sizeof(data->buffer) - data->buflen,
+                           format - 1, va);
+#else
+                vsprintf(data->buffer + data->buflen, format - 1, va);
+#endif
+                data->buflen += strlen(data->buffer + data->buflen);
+                va_end(va);
+                return;
+            }
+        } else {
+            if (data->buflen >= sizeof(data->buffer))
+                p_write_term_flush(data);
+            data->buffer[(data->buflen)++] = *format;
+        }
+        ++format;
+    }
+    va_end(va);
+}
+
+/* Writing terms to an iostream */
+static p_goal_result p_builtin_iostream_writeTerm
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *stream = p_term_deref_member(context, args[0]);
+    p_term *term = p_term_deref_member(context, args[1]);
+    p_term *vars = p_term_deref_member(context, args[2]);
+    struct p_write_term_data data;
+    if (!p_builtin_validate_var_list(context, vars, error))
+        return P_RESULT_ERROR;
+    data.context = context;
+    data.stream = stream;
+    data.buflen = 0;
+    data.error = 0;
+    data.writeString = p_term_create_atom(context, "writeString");
+    data.result = P_RESULT_TRUE;
+    p_term_print_with_vars
+        (context, term, p_write_term_func, &data, vars);
+    if (data.buflen > 0 && data.result == P_RESULT_TRUE)
+        p_write_term_flush(&data);
+    *error = data.error;
+    return data.result;
 }
 
 /* $$line(filename, number, goal) encountered in the code */
@@ -4794,6 +4962,7 @@ void _p_db_init_builtins(p_context *context)
         {"import", 1, p_builtin_import},
         {"initialization", 1, p_builtin_call},
         {"integer", 1, p_builtin_integer},
+        {"$$iostream_writeTerm", 3, p_builtin_iostream_writeTerm},
         {"$$line", 3, p_builtin_line},
         {"load_library", 1, p_builtin_load_library},
         {"$$new", 2, p_builtin_new},

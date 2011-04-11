@@ -158,7 +158,24 @@ If \em Vars is present, then it must be a list of
 \em Name = \em Var declarations.  If \em Var is encountered as
 an unbound variable in \em Term, then it will be written to
 \em Stream as \em Name.  Variables not listed in \em Vars will
-be written as "_N", defining a unique name not present in \em Vars.
+be written as "_N", where "N" is the variable's pointer value.
+If \em Vars is not present, then all unbound variables are
+written as "_N".  \em Name must be an atom or string.
+
+\par Errors
+
+\li <tt>instantiation_error</tt> - \em Vars is a variable.
+\li <tt>type_error(variable_names, \em Vars)</tt> - \em Vars is
+    not a valid list of variable names.
+
+\par Examples
+\code
+stdout::writeTerm(A - B * 1.5 + pi / 2);
+    produces: _1f95460 - _1f95420 * 1.5 + pi / 2
+
+stdout::writeTerm(A - B * 1.5 + pi / 2, ["A" = A, "B" = B]);
+    produces: A - B * 1.5 + pi / 2
+\endcode
 
 \par See Also
 \ref stdout_write "write()",

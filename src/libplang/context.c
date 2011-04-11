@@ -65,6 +65,8 @@ p_context *p_context_create(void)
     context->fail_atom = p_term_create_atom(context, "fail");
     context->cut_atom = p_term_create_atom(context, "!");
     context->call_member_atom = p_term_create_atom(context, "$$call_member");
+    context->call_args_atom = p_term_create_atom(context, "$$");
+    context->unify_atom = p_term_create_atom(context, "=");
     context->trail_top = P_TRACE_SIZE;
     _p_db_init(context);
     _p_db_init_builtins(context);
@@ -733,7 +735,6 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
  *
  * \ingroup context
  * \sa p_context_execute_goal(), p_context_reexecute_goal()
- * \sa p_context_uncaught_error()
  */
 void p_context_abandon_goal(p_context *context)
 {
@@ -744,6 +745,40 @@ void p_context_abandon_goal(p_context *context)
         context->current_node = 0;
         context->fail_node = 0;
     }
+}
+
+/**
+ * \brief Calls \a goal once on \a context.  Returns a result code
+ * and an optional error term in \a error.
+ *
+ * This function is intended for calling back from a builtin
+ * function into the Plang execution engine.  Back-tracking of
+ * the top level of \a goal is not supported.
+ *
+ * \ingroup context
+ * \sa p_context_execute_goal()
+ */
+p_goal_result p_context_call_once
+    (p_context *context, p_term *goal, p_term **error)
+{
+    p_goal_result result;
+    p_exec_node *current = context->current_node;
+    p_exec_node *fail = context->fail_node;
+    p_exec_node *goal_node = GC_NEW(p_exec_node);
+    p_term *error_node = 0;
+    if (goal_node) {
+        goal_node->goal = goal;
+        context->current_node = goal_node;
+        context->fail_node = 0;
+        result = p_goal_execute(context, &error_node);
+        context->current_node = current;
+        context->fail_node = fail;
+    } else {
+        result = P_RESULT_FAIL;
+    }
+    if (error)
+        *error = error_node;
+    return result;
 }
 
 /* Calls a goal from the parser for immediate execution.
