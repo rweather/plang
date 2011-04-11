@@ -29,9 +29,9 @@ class stderr : iostream
         '$$print_byte'(2, Byte);
     }
 
-    writeBytes(Bytes)
+    writeString(String)
     {
-        '$$print_string'(2, Bytes);
+        '$$print_string'(2, String);
     }
 
     // TODO: remove writeTerm() from here once iostream is finished.

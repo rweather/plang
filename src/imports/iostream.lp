@@ -92,7 +92,7 @@ class iostream
     {
         string(Term);
         !;
-        Self.writeBytes(Term);
+        Self.writeString(Term);
     }
     write(Term)
     {
@@ -104,20 +104,20 @@ class iostream
         throw(error(permission_error(output, stream, Self), iostream::writeByte/2));
     }
 
-    writeBytes(Bytes)
+    writeString(String)
     {
-        throw(error(permission_error(output, stream, Self), iostream::writeBytes/2));
+        throw(error(permission_error(output, stream, Self), iostream::writeString/2));
     }
 
     writeln(Term)
     {
         Self.write(Term);
-        Self.writeBytes("\n");
+        Self.writeString("\n");
     }
 
     writeln()
     {
-        Self.writeBytes("\n");
+        Self.writeString("\n");
     }
 
     writeTerm(Term)

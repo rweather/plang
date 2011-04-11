@@ -56,6 +56,9 @@ main(Args)
 }
 \endcode
 
+\par Parent class
+\ref class_iostream "iostream"
+
 \par Class members
 See the documentation for \ref class_iostream "iostream".  The
 \c stdout and \c stderr streams are write-only.
@@ -63,9 +66,6 @@ See the documentation for \ref class_iostream "iostream".  The
 \par Static class members
 \ref stdout_write "write()",
 \ref stdout_writeln "writeln()"
-
-\par See Also
-\ref class_iostream "iostream"
 
 <hr>
 \anchor stdout_write

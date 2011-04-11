@@ -42,8 +42,8 @@ acts as the base of a hierarchy of related I/O handling classes.
 \ref iostream_tell "tell()",
 \ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()",
 \ref iostream_writeTerm "writeTerm()"
 
 \par See Also
@@ -102,7 +102,7 @@ The default implementation always fails.
 If a subclass overrides <b>canWrite()</b> and indicates that
 \em Stream is capable of writing, then the subclass should
 also override \ref iostream_writeByte "writeByte()" and
-\ref iostream_writeBytes "writeBytes()".
+\ref iostream_writeString "writeString()".
 
 \par See Also
 \ref iostream_canRead "canRead()",
@@ -110,8 +110,8 @@ also override \ref iostream_writeByte "writeByte()" and
 \ref iostream_flush "flush()",
 \ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -140,8 +140,8 @@ and then succeeds.
 \ref iostream_canWrite "canWrite()",
 \ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -225,7 +225,7 @@ and there are no bytes available.
 \ref iostream_readByte "readByte()",
 \ref iostream_readLine "readLine()",
 \ref iostream_readTerm "readTerm()",
-\ref iostream_writeByte "writeBytes()"
+\ref iostream_writeString "writeString()"
 
 <hr>
 \anchor iostream_readLine
@@ -367,7 +367,7 @@ cannot return the seek position within files larger than 2 Gb in size.
 
 \par Description
 If \em Term is a string, then write it directly to the stream
-using \ref iostream_writeBytes "writeBytes()".
+using \ref iostream_writeString "writeString()".
 \par
 If \em Term has the form (\em A + \em B), then write \em A and \em B
 to the stream without the plus sign.  This rule is applied recursively
@@ -390,8 +390,8 @@ The answer is: 4
 \ref iostream_flush "flush()",
 \ref iostream_readLine "readLine()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -416,32 +416,8 @@ between 0 and 255.
 \ref iostream_flush "flush()",
 \ref iostream_readByte "readByte()",
 \ref iostream_write "write()",
-\ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeln "writeln()",
-\ref iostream_writeTerm "writeTerm()"
-
-<hr>
-\anchor iostream_writeBytes
-\em Stream.<b>writeBytes</b>(\em Bytes)
-
-\par Description
-Writes the string \em Bytes to \em Stream.
-
-\par Errors
-
-\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
-    is not capable of writing.  This error is thrown by the default
-    implementation.
-\li <tt>instantiation_error</tt> - \em Bytes is a variable.
-\li <tt>type_error(string, \em Bytes)</tt> - \em Bytes is not a string.
-
-\par See Also
-\ref iostream_canWrite "canWrite()",
-\ref iostream_flush "flush()",
-\ref iostream_readBytes "readBytes()",
-\ref iostream_write "write()",
-\ref iostream_writeByte "writeByte()",
-\ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -452,7 +428,7 @@ Writes the string \em Bytes to \em Stream.
 
 \par Description
 If \em Term is a string, then write it directly to the stream
-using \ref iostream_writeBytes "writeBytes()".
+using \ref iostream_writeString "writeString()".
 \par
 If \em Term has the form (\em A + \em B), then write \em A and \em B
 to the stream without the plus sign.  This rule is applied recursively
@@ -478,7 +454,34 @@ The answer is: 4
 \ref iostream_readLine "readLine()",
 \ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeString "writeString()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_writeString
+\em Stream.<b>writeString</b>(\em String)
+
+\par Description
+Writes \em String to \em Stream as an unquoted string literal.
+Use \ref iostream_writeTerm "writeTerm()" instead to quote
+the string.
+
+\par Errors
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.  This error is thrown by the default
+    implementation.
+\li <tt>instantiation_error</tt> - \em String is a variable.
+\li <tt>type_error(string, \em String)</tt> - \em String is
+    not a string.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_write "write()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -499,7 +502,7 @@ an unbound variable in \em Term, then it will be written to
 be written as "_N", defining a unique name not present in \em Vars.
 \par
 The default implementation will call
-\ref iostream_writeBytes "writeBytes()" with a succession of
+\ref iostream_writeString "writeString()" with a succession of
 string values, each making up a part of \em Term.  It is undefined
 as to which parts of \em Term each string corresponds to, other
 than the requirement that the strings must serialize the \em Term
@@ -519,7 +522,7 @@ from left to right.
 \ref iostream_readLine "readLine()",
 \ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeln "writeln()"
+\ref iostream_writeln "writeln()",
+\ref iostream_writeString "writeString()"
 
 */

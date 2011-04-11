@@ -29,9 +29,9 @@ class stdout : iostream
         '$$print_byte'(1, Byte);
     }
 
-    writeBytes(Bytes)
+    writeString(String)
     {
-        '$$print_string'(1, Bytes);
+        '$$print_string'(1, String);
     }
 
     // TODO: remove writeTerm() from here once iostream is finished.
