@@ -29,13 +29,15 @@ and standard error streams.  The two classes implement the
 :- import(stdout).
 :- import(stderr).
 
-main(_)
+main(Args)
 {
     new stdout(Stdout);
-    Stdout.writeLine("Hello World!");
+    Stdout.writeln("Hello World!");
 
     new stderr(Stderr);
-    Stderr.writeLine("Hello Error!");
+    Stderr.writeln("Hello Error!");
+
+    Stdout.writeln("Arguments: " + Args);
 }
 \endcode
 

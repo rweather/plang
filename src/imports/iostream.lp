@@ -76,6 +76,29 @@ class iostream
         throw(error(permission_error(reposition, stream, Self), iostream::tell/2));
     }
 
+    write(Term)
+    {
+        var(Term);
+        !;
+        Self.writeTerm(Term);
+    }
+    write(A + B)
+    {
+        !;
+        Self.write(A);
+        Self.write(B);
+    }
+    write(Term)
+    {
+        string(Term);
+        !;
+        Self.writeBytes(Term);
+    }
+    write(Term)
+    {
+        Self.writeTerm(Term);
+    }
+
     writeByte(Byte)
     {
         throw(error(permission_error(output, stream, Self), iostream::writeByte/2));
@@ -86,9 +109,14 @@ class iostream
         throw(error(permission_error(output, stream, Self), iostream::writeBytes/2));
     }
 
-    writeLine(Line)
+    writeln(Term)
     {
-        Self.writeBytes(Line);
+        Self.write(Term);
+        Self.writeBytes("\n");
+    }
+
+    writeln()
+    {
         Self.writeBytes("\n");
     }
 

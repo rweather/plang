@@ -40,9 +40,10 @@ acts as the base of a hierarchy of related I/O handling classes.
 \ref iostream_readTerm "readTerm()",
 \ref iostream_seek "seek()",
 \ref iostream_tell "tell()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
 \ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeLine "writeLine()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 \par See Also
@@ -107,9 +108,10 @@ also override \ref iostream_writeByte "writeByte()" and
 \ref iostream_canRead "canRead()",
 \ref iostream_canSeek "canSeek()",
 \ref iostream_flush "flush()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
 \ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeLine "writeLine()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -136,9 +138,10 @@ and then succeeds.
 
 \par See Also
 \ref iostream_canWrite "canWrite()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
 \ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeLine "writeLine()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -149,6 +152,8 @@ and then succeeds.
 Unifies \em Length with the length of \em Stream.  Because \em Length
 is represented as a 32-bit integer, this method cannot return the
 length of streams that are larger than 2 Gb in size.
+
+\par Errors
 
 \li <tt>permission_error(reposition, stream, \em Stream)</tt> -
     \em Stream is not capable of seeking.  This error is thrown
@@ -172,6 +177,8 @@ Unifies \em Byte with the integer value of the next byte of
 If \em Stream is non-blocking and there are no bytes available
 at present, then the method will succeed and \em Byte will be
 unified with -1.
+
+\par Errors
 
 \li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
     is not capable of reading.  This error is thrown by the default
@@ -201,6 +208,8 @@ insufficient bytes available at present.  It is possible
 for an empty string to be returned in \em Bytes if
 \em MaxLength is zero, or if \em Stream is non-blocking
 and there are no bytes available.
+
+\par Errors
 
 \li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
     is not capable of reading.  This error is thrown by the default
@@ -238,6 +247,8 @@ CRLF or LF sequence, then <b>readLine()</b> will act as though
 it does.  The following call to <b>readLine()</b> will fail,
 indicating end of stream.
 
+\par Errors
+
 \li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
     is not capable of reading.  This error is thrown by the default
     implementation.
@@ -247,7 +258,7 @@ indicating end of stream.
 \ref iostream_readByte "readByte()",
 \ref iostream_readBytes "readBytes()",
 \ref iostream_readTerm "readTerm()",
-\ref iostream_writeLine "writeLine()"
+\ref iostream_writeln "writeln()"
 
 <hr>
 \anchor iostream_readTerm
@@ -272,6 +283,8 @@ the \em Vars list have the form <tt>\em Name = \em Var</tt>
 where \em Name is a string and \em Var is the unbound variable that
 \em Name refers to in \em Term.  Each \em Name will appear only
 once in the list.
+
+\par Errors
 
 \li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
     is not capable of reading.
@@ -304,6 +317,8 @@ cannot seek directly to a position within a stream larger than
 2 Gb in size.  The \em Origin values of \c current and \c end
 can be used to hop through the file in 2 Gb or smaller steps.
 
+\par Errors
+
 \li <tt>permission_error(reposition, stream, \em Stream)</tt> -
     \em Stream is not capable of seeking.  This error is thrown
     by the default implementation.
@@ -333,6 +348,8 @@ seek position within \em Stream.
 Because \em Position is limited to a 32-bit integer, this predicate
 cannot return the seek position within files larger than 2 Gb in size.
 
+\par Errors
+
 \li <tt>permission_error(reposition, stream, \em Stream)</tt> -
     \em Stream is not capable of seeking.  This error is thrown
     by the default implementation.
@@ -345,12 +362,47 @@ cannot return the seek position within files larger than 2 Gb in size.
 \ref iostream_seek "seek()"
 
 <hr>
+\anchor iostream_write
+\em Stream.<b>write</b>(\em Term)
+
+\par Description
+If \em Term is a string, then write it directly to the stream
+using \ref iostream_writeBytes "writeBytes()".
+\par
+If \em Term has the form (\em A + \em B), then write \em A and \em B
+to the stream without the plus sign.  This rule is applied recursively
+for writing terms such as (\em A + \em B + \em C + ...).
+\par
+If \em Term is not a string or of the form (\em A + \em B),
+then write it using \ref iostream_writeTerm "writeTerm()".
+
+\par Examples
+\code
+Answer is 2 + 2;
+Stream.write("The answer is: " + Answer);
+Stream.writeln();
+
+The answer is: 4
+\endcode
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readLine "readLine()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeln "writeln()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
 \anchor iostream_writeByte
 \em Stream.<b>writeByte</b>(\em Byte)
 
 \par Description
 Writes \em Byte to \em Stream.  The \em Byte must be an integer
 between 0 and 255.
+
+\par Errors
 
 \li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
     is not capable of writing.  This error is thrown by the default
@@ -363,8 +415,9 @@ between 0 and 255.
 \ref iostream_canWrite "canWrite()",
 \ref iostream_flush "flush()",
 \ref iostream_readByte "readByte()",
+\ref iostream_write "write()",
 \ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeLine "writeLine()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
@@ -373,6 +426,8 @@ between 0 and 255.
 
 \par Description
 Writes the string \em Bytes to \em Stream.
+
+\par Errors
 
 \li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
     is not capable of writing.  This error is thrown by the default
@@ -384,29 +439,44 @@ Writes the string \em Bytes to \em Stream.
 \ref iostream_canWrite "canWrite()",
 \ref iostream_flush "flush()",
 \ref iostream_readBytes "readBytes()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
-\ref iostream_writeLine "writeLine()",
+\ref iostream_writeln "writeln()",
 \ref iostream_writeTerm "writeTerm()"
 
 <hr>
-\anchor iostream_writeLine
-\em Stream.<b>writeLine</b>(\em Line)
+\anchor iostream_writeln
+\em Stream.<b>writeln</b>(\em Term)
+<br>
+\em Stream.<b>writeln</b>()
 
 \par Description
-Writes the string \em Line to \em Stream followed by an end
-of line marker.  The default implementation calls
-\ref iostream_writeBytes "writeBytes()" twice, once for
-\em Line, and the second time for "\n".
+If \em Term is a string, then write it directly to the stream
+using \ref iostream_writeBytes "writeBytes()".
+\par
+If \em Term has the form (\em A + \em B), then write \em A and \em B
+to the stream without the plus sign.  This rule is applied recursively
+for writing terms such as (\em A + \em B + \em C + ...).
+\par
+If \em Term is not a string or of the form (\em A + \em B),
+then write it using \ref iostream_writeTerm "writeTerm()".
+\par
+A newline is written after \em Term.  If \em Term is omitted,
+then only a newline is written.
 
-\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
-    is not capable of writing.
-\li <tt>instantiation_error</tt> - \em Line is a variable.
-\li <tt>type_error(string, \em Line)</tt> - \em Line is not a string.
+\par Examples
+\code
+Answer is 2 + 2;
+Stream.writeln("The answer is: " + Answer);
+
+The answer is: 4
+\endcode
 
 \par See Also
 \ref iostream_canWrite "canWrite()",
 \ref iostream_flush "flush()",
 \ref iostream_readLine "readLine()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
 \ref iostream_writeBytes "writeBytes()",
 \ref iostream_writeTerm "writeTerm()"
@@ -431,7 +501,11 @@ be written as "_N", defining a unique name not present in \em Vars.
 The default implementation will call
 \ref iostream_writeBytes "writeBytes()" with a succession of
 string values, each making up a part of \em Term.  It is undefined
-as to which parts of \em Term each string corresponds to.
+as to which parts of \em Term each string corresponds to, other
+than the requirement that the strings must serialize the \em Term
+from left to right.
+
+\par Errors
 
 \li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
     is not capable of writing.
@@ -443,8 +517,9 @@ as to which parts of \em Term each string corresponds to.
 \ref iostream_canWrite "canWrite()",
 \ref iostream_flush "flush()",
 \ref iostream_readLine "readLine()",
+\ref iostream_write "write()",
 \ref iostream_writeByte "writeByte()",
 \ref iostream_writeBytes "writeBytes()",
-\ref iostream_writeLine "writeLine()"
+\ref iostream_writeln "writeln()"
 
 */
