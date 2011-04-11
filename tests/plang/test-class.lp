@@ -27,6 +27,8 @@ class foo
     bar1(X) { X = b; }
     bar2(X, Y) { Self.bar ::= X + Y; }
     bar2(X, Y) { Self.bar ::= X - Y; }
+
+    abstract baz().
 };
 
 class vehicle
@@ -88,6 +90,9 @@ call_method()
     (solutions(F) || true);
     retract(sols(List));
     verify(List == [1, 7]);
+
+    verify_error(F.baz(), existence_error(member_predicate, foo::baz/1));
+    verify_error(F.bay(), existence_error(member_predicate, foo::bay/1));
 }
 
 properties()

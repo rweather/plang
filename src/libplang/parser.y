@@ -538,6 +538,7 @@ static p_term *create_clause_head
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
 %token K_BT_GETS        "`:=='"
+%token K_ABSTRACT       "`abstract'"
 %token K_CASE           "`case'"
 %token K_CATCH          "`catch'"
 %token K_CLASS          "`class'"
@@ -588,6 +589,7 @@ static p_term *create_clause_head
 %type <member_list> class_members class_member
 %type <member_ref>  member_reference
 %type <clause>      member_clause member_clause_head
+%type <clause>      regular_member_clause_head
 
 /* Shift/reduce: dangling "else" in if_statement */
 /* Shift/reduce: "!" used as cut vs "!" used as logical negation */
@@ -712,6 +714,7 @@ atom
     | K_CATCH       { $$ = p_term_create_atom(context, "catch"); }
     | K_CLASS       { $$ = p_term_create_atom(context, "class"); }
     | K_STATIC      { $$ = p_term_create_atom(context, "static"); }
+    | K_ABSTRACT    { $$ = p_term_create_atom(context, "abstract"); }
     ;
 
 arguments
@@ -1330,33 +1333,28 @@ member_clause
             $$ = $1;
             $$.body = $2;
         }
+    | K_ABSTRACT regular_member_clause_head K_DOT_TERMINATOR {
+            /* Construct a body for the abstract predicate that
+             * will throw an existence_error at runtime */
+            p_term *pred;
+            p_term *error;
+            pred = p_term_create_functor
+                (context, context->slash_atom, 2);
+            p_term_bind_functor_arg(pred, 0, p_term_functor($2.head));
+            p_term_bind_functor_arg
+                (pred, 1, p_term_create_integer
+                    (context, p_term_arg_count($2.head)));
+            error = binary_term
+                ("existence_error",
+                 p_term_create_atom(context, "member_predicate"), pred);
+            error = binary_term("error", error, pred);
+            $$ = $2;
+            $$.body = unary_term("throw", error);
+        }
     ;
 
 member_clause_head
-    : member_name                               {
-            $$.name = $1;
-            $$.kind = p_term_create_atom(context, "member");
-            $$.head = create_clause_head
-                (context, input_stream, $1, 0, 0, 0);
-            $$.body = 0;
-            $$.has_constructor = 0;
-        }
-    | member_name '(' ')'                       {
-            $$.name = $1;
-            $$.kind = p_term_create_atom(context, "member");
-            $$.head = create_clause_head
-                (context, input_stream, $1, 0, 0, 0);
-            $$.body = 0;
-            $$.has_constructor = 0;
-        }
-    | member_name '(' arguments ')'             {
-            $$.name = $1;
-            $$.kind = p_term_create_atom(context, "member");
-            $$.head = create_clause_head
-                (context, input_stream, $1, $3.args, $3.num_args, 0);
-            $$.body = 0;
-            $$.has_constructor = 0;
-        }
+    : regular_member_clause_head                { $$ = $1; }
     | K_STATIC member_name                      {
             $$.name = $2;
             $$.kind = p_term_create_atom(context, "static");
@@ -1408,6 +1406,33 @@ member_clause_head
                  $3.args, $3.num_args, 0);
             $$.body = 0;
             $$.has_constructor = 1;
+        }
+    ;
+
+regular_member_clause_head
+    : member_name                               {
+            $$.name = $1;
+            $$.kind = p_term_create_atom(context, "member");
+            $$.head = create_clause_head
+                (context, input_stream, $1, 0, 0, 0);
+            $$.body = 0;
+            $$.has_constructor = 0;
+        }
+    | member_name '(' ')'                       {
+            $$.name = $1;
+            $$.kind = p_term_create_atom(context, "member");
+            $$.head = create_clause_head
+                (context, input_stream, $1, 0, 0, 0);
+            $$.body = 0;
+            $$.has_constructor = 0;
+        }
+    | member_name '(' arguments ')'             {
+            $$.name = $1;
+            $$.kind = p_term_create_atom(context, "member");
+            $$.head = create_clause_head
+                (context, input_stream, $1, $3.args, $3.num_args, 0);
+            $$.body = 0;
+            $$.has_constructor = 0;
         }
     ;
 

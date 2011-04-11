@@ -763,19 +763,27 @@ predicate_head --> atom, "(", arguments, ")".
 predicate_head --> atom, "(", ")".
 \endcode
 
-Member predicates within a class can also be declared as \c static
-or instance constructors:
+Member predicates within a class can also be declared as \c static,
+\c abstract, or instance constructors:
 
 \code
 member_predicate --> predicate.
 member_predicate --> "static", predicate.
+member_predicate --> "abstract", predicate_head, ".".
 member_predicate --> constructor_head, ".".
-member_predicate --> constructor_head, compound_statement;
+member_predicate --> constructor_head, compound_statement.
 
 constructor_head --> "new".
 constructor_head --> "new", "(", arguments, ")".
 constructor_head --> "new", "(", ")".
 \endcode
+
+Abstract member predicates will throw
+<tt>existence_error(member_predicate, \em Pred)</tt> at runtime if
+called.  This is the same as what will happen if the member predicate
+is not defined at all.  Explicit declaration can be useful for
+documentation purposes and to override a member in the parent class
+to redefine it as abstract.
 
 Predicates can be converted into first-class terms using
 \ref predicate_2 "predicate/2".
