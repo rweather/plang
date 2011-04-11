@@ -1,0 +1,447 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\addtogroup class_iostream
+
+This module defines a single class called \c iostream that
+acts as the base of a hierarchy of related I/O handling classes.
+
+\code
+:- import(iostream).
+\endcode
+
+\par Class members
+\ref iostream_canRead "canRead()",
+\ref iostream_canSeek "canSeek()",
+\ref iostream_canWrite "canWrite()",
+\ref iostream_close "close()",
+\ref iostream_flush "flush()",
+\ref iostream_length "length()",
+\ref iostream_readByte "readByte()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_readLine "readLine()",
+\ref iostream_readTerm "readTerm()",
+\ref iostream_seek "seek()",
+\ref iostream_tell "tell()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeLine "writeLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_canRead
+\em Stream.<b>canRead</b>()
+
+\par Description
+Succeeds if \em Stream supports reading; fails otherwise.
+The default implementation always fails.
+\par
+If a subclass overrides <b>canRead()</b> and indicates that
+\em Stream is capable of reading, then the subclass should
+also override \ref iostream_readByte "readByte()",
+\ref iostream_readBytes "readBytes()", and
+\ref iostream_readBytes "readLine()".
+
+\par See Also
+\ref iostream_canSeek "canSeek()",
+\ref iostream_canWrite "canWrite()",
+\ref iostream_readByte "readByte()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_readLine "readLine()",
+\ref iostream_readTerm "readTerm()"
+
+<hr>
+\anchor iostream_canSeek
+\em Stream.<b>canSeek</b>()
+
+\par Description
+Succeeds if \em Stream supports seeking; fails otherwise.
+The default implementation always fails.
+\par
+If a subclass overrides <b>canSeek()</b> and indicates that
+\em Stream is capable of seeking, then the subclass should
+also override \ref iostream_length "length()",
+\ref iostream_seek "seek()", and \ref iostream_tell "tell()".
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_canWrite "canWrite()",
+\ref iostream_length "length()",
+\ref iostream_seek "seek()",
+\ref iostream_tell "tell()"
+
+<hr>
+\anchor iostream_canWrite
+\em Stream.<b>canWrite</b>()
+
+\par Description
+Succeeds if \em Stream supports writing; fails otherwise.
+The default implementation always fails.
+\par
+If a subclass overrides <b>canWrite()</b> and indicates that
+\em Stream is capable of writing, then the subclass should
+also override \ref iostream_writeByte "writeByte()" and
+\ref iostream_writeBytes "writeBytes()".
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_canSeek "canSeek()",
+\ref iostream_flush "flush()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeLine "writeLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_close
+\em Stream.<b>close</b>()
+
+\par Description
+Closes \em Stream, releasing all resources associated with it,
+and then succeeds.  The default implementation always succeeds.
+
+<hr>
+\anchor iostream_flush
+\em Stream.<b>flush</b>()
+
+\par Description
+Flushes all data that has been written so far to \em Stream,
+and then succeeds.
+
+\par Errors
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.  This error is thrown by the default
+    implementation.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeLine "writeLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_length
+\em Stream.<b>length</b>(\em Length)
+
+\par Description
+Unifies \em Length with the length of \em Stream.  Because \em Length
+is represented as a 32-bit integer, this method cannot return the
+length of streams that are larger than 2 Gb in size.
+
+\li <tt>permission_error(reposition, stream, \em Stream)</tt> -
+    \em Stream is not capable of seeking.  This error is thrown
+    by the default implementation.
+\li <tt>representation_error(seek_position)</tt> - the stream length
+    cannot be represented as a 32-bit integer.
+
+\par See Also
+\ref iostream_canSeek "canSeek()",
+\ref iostream_seek "seek()",
+\ref iostream_tell "tell()"
+
+<hr>
+\anchor iostream_readByte
+\em Stream.<b>readByte</b>(\em Byte)
+
+\par Description
+Unifies \em Byte with the integer value of the next byte of
+\em Stream and succeeds; or fails if at the end of \em Stream.
+\par
+If \em Stream is non-blocking and there are no bytes available
+at present, then the method will succeed and \em Byte will be
+unified with -1.
+
+\li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
+    is not capable of reading.  This error is thrown by the default
+    implementation.
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_readLine "readLine()",
+\ref iostream_readTerm "readTerm()",
+\ref iostream_writeByte "writeByte()"
+
+<hr>
+\anchor iostream_readBytes
+\em Stream.<b>readBytes</b>(\em Bytes, \em MaxLength)
+
+\par Description
+Reads up to \em MaxLength bytes from \em Stream and then
+unifies \em Bytes with a string containing the bytes that
+were read.  Fails if the end of stream has been reached and
+no bytes were available for reading.
+\par
+The number of bytes returned in \em Bytes may be less
+than \em MaxLength if the end of file has almost been
+reached or \em Stream is non-blocking and there are
+insufficient bytes available at present.  It is possible
+for an empty string to be returned in \em Bytes if
+\em MaxLength is zero, or if \em Stream is non-blocking
+and there are no bytes available.
+
+\li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
+    is not capable of reading.  This error is thrown by the default
+    implementation.
+\li <tt>instantiation_error</tt> - \em MaxLength is a variable.
+\li <tt>type_error(integer, \em MaxLength)</tt> - \em MaxLength
+    is not an integer.
+\li <tt>domain_error(not_less_than_zero, \em MaxLength)</tt> -
+    \em MaxLength is an integer that is less than zero.
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_readByte "readByte()",
+\ref iostream_readLine "readLine()",
+\ref iostream_readTerm "readTerm()",
+\ref iostream_writeByte "writeBytes()"
+
+<hr>
+\anchor iostream_readLine
+\em Stream.<b>readLine</b>(\em Line)
+
+\par Description
+Reads a single UTF-8 text line from \em Stream, unifies it with
+\em Line, and succeeds.  End of line CRLF or LF sequences are
+stripped from \em Line.  Fails if the end of stream has been
+reached and no bytes are available for reading.
+\par
+The <b>readLine()</b> method is always blocking, even if \em Stream
+is not.  On non-blocking streams, this method will force \em Stream
+to block until an end of line character or the end of stream
+is reached.
+\par
+If the last line of \em Stream is non-empty and does not end in a
+CRLF or LF sequence, then <b>readLine()</b> will act as though
+it does.  The following call to <b>readLine()</b> will fail,
+indicating end of stream.
+
+\li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
+    is not capable of reading.  This error is thrown by the default
+    implementation.
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_readByte "readByte()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_readTerm "readTerm()",
+\ref iostream_writeLine "writeLine()"
+
+<hr>
+\anchor iostream_readTerm
+\em Stream.<b>readTerm</b>(\em Term)
+<br>
+\em Stream.<b>readTerm</b>(\em Term, \em Vars)
+
+\par Description
+Reads a single \ref syntax_terms "term" from \em Stream
+and unifies it with \em Term.  Fails if the end of stream has
+been reached.
+\par
+Internally, the default implementation of <b>readTerm()</b> calls
+\ref iostream_readLine "readLine()" to fetch the raw textual data.
+Reading continues until a line is encountered that ends in ".".
+All of the lines read up until that point are parsed using the
+Plang source parser to create a term.
+\par
+If \em Vars is present, then it is unified with a list of
+variable names and references within \em Term.  The members of
+the \em Vars list have the form <tt>\em Name = \em Var</tt>
+where \em Name is a string and \em Var is the unbound variable that
+\em Name refers to in \em Term.  Each \em Name will appear only
+once in the list.
+
+\li <tt>permission_error(input, stream, \em Stream)</tt> - \em Stream
+    is not capable of reading.
+\li <tt>syntax_error(\em Message)</tt> - a syntax error was
+    encountered while reading the term.  \em Message is set to a
+    string describing the error.
+
+\par See Also
+\ref iostream_canRead "canRead()",
+\ref iostream_readByte "readByte()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_readLine "readLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_seek
+\em Stream.<b>seek</b>(\em Position)
+<br>
+\em Stream.<b>seek</b>(\em Position, \em Origin)
+
+\par Description
+Seeks to offset \em Position within \em Stream.  If \em Origin
+is present, then it must be one of the atoms \c start, \c current,
+or \c end, which indicate whether \em Position should be interepreted
+relative to the start, current position, or end of \em Stream
+respectively.
+\par
+Because \em Position is limited to a 32-bit integer, this predicate
+cannot seek directly to a position within a stream larger than
+2 Gb in size.  The \em Origin values of \c current and \c end
+can be used to hop through the file in 2 Gb or smaller steps.
+
+\li <tt>permission_error(reposition, stream, \em Stream)</tt> -
+    \em Stream is not capable of seeking.  This error is thrown
+    by the default implementation.
+\li <tt>instantiation_error</tt> - \em Position or \em Origin
+    is a variable.
+\li <tt>type_error(integer, \em Position)</tt> - \em Position is not
+    an integer.
+\li <tt>type_error(seek_origin, \em Origin)</tt> - \em Origin is not
+    one of the atoms \c start, \c current, or \c end.
+\li <tt>domain_error(seek_position, \em Position / \em Origin)</tt> -
+    \em Position and \em Origin do not define a valid seek position,
+    although \em Stream is otherwise capable of seeking.
+
+\par See Also
+\ref iostream_canSeek "canSeek()",
+\ref iostream_length "length()",
+\ref iostream_tell "tell()"
+
+<hr>
+\anchor iostream_tell
+\em Stream.<b>tell</b>(\em Position)
+
+\par Description
+Unifies \em Position with the an integer representing the current
+seek position within \em Stream.
+\par
+Because \em Position is limited to a 32-bit integer, this predicate
+cannot return the seek position within files larger than 2 Gb in size.
+
+\li <tt>permission_error(reposition, stream, \em Stream)</tt> -
+    \em Stream is not capable of seeking.  This error is thrown
+    by the default implementation.
+\li <tt>representation_error(seek_position)</tt> - the current position
+    cannot be represented as a 32-bit integer.
+
+\par See Also
+\ref iostream_canSeek "canSeek()",
+\ref iostream_length "length()",
+\ref iostream_seek "seek()"
+
+<hr>
+\anchor iostream_writeByte
+\em Stream.<b>writeByte</b>(\em Byte)
+
+\par Description
+Writes \em Byte to \em Stream.  The \em Byte must be an integer
+between 0 and 255.
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.  This error is thrown by the default
+    implementation.
+\li <tt>instantiation_error</tt> - \em Byte is a variable.
+\li <tt>type_error(byte, \em Byte)</tt> - \em Byte is not an integer
+    between 0 and 255.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readByte "readByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeLine "writeLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_writeBytes
+\em Stream.<b>writeBytes</b>(\em Bytes)
+
+\par Description
+Writes the string \em Bytes to \em Stream.
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.  This error is thrown by the default
+    implementation.
+\li <tt>instantiation_error</tt> - \em Bytes is a variable.
+\li <tt>type_error(string, \em Bytes)</tt> - \em Bytes is not a string.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readBytes "readBytes()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeLine "writeLine()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_writeLine
+\em Stream.<b>writeLine</b>(\em Line)
+
+\par Description
+Writes the string \em Line to \em Stream followed by an end
+of line marker.  The default implementation calls
+\ref iostream_writeBytes "writeBytes()" twice, once for
+\em Line, and the second time for "\n".
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.
+\li <tt>instantiation_error</tt> - \em Line is a variable.
+\li <tt>type_error(string, \em Line)</tt> - \em Line is not a string.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readLine "readLine()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeTerm "writeTerm()"
+
+<hr>
+\anchor iostream_writeTerm
+\em Stream.<b>writeTerm</b>(\em Term)
+<br>
+\em Stream.<b>writeTerm</b>(\em Term, \em Vars)
+
+\par Description
+Write \em Term to \em Stream in a form that is compatible with
+the Plang source parser for \ref syntax_terms "terms".
+The \em Term is not terminated with a "." or end of line marker.
+\par
+If \em Vars is present, then it must be a list of
+\em Name = \em Var declarations.  If \em Var is encountered as
+an unbound variable in \em Term, then it will be written to
+\em Stream as \em Name.  Variables not listed in \em Vars will
+be written as "_N", defining a unique name not present in \em Vars.
+\par
+The default implementation will call
+\ref iostream_writeBytes "writeBytes()" with a succession of
+string values, each making up a part of \em Term.  It is undefined
+as to which parts of \em Term each string corresponds to.
+
+\li <tt>permission_error(output, stream, \em Stream)</tt> - \em Stream
+    is not capable of writing.
+\li <tt>instantiation_error</tt> - \em Vars is a variable.
+\li <tt>type_error(variable_names, \em Vars)</tt> - \em Vars is
+    not a valid list of variable names.
+
+\par See Also
+\ref iostream_canWrite "canWrite()",
+\ref iostream_flush "flush()",
+\ref iostream_readLine "readLine()",
+\ref iostream_writeByte "writeByte()",
+\ref iostream_writeBytes "writeBytes()",
+\ref iostream_writeLine "writeLine()"
+
+*/

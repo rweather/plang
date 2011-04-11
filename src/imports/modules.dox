@@ -18,25 +18,28 @@
  */
 
 /**
- * \defgroup modules Modules - Overview
+ * \defgroup modules Module and Classes - Overview
  *
  * This section of the documentation describes the add-on modules
- * that are available to Plang applications.  The predicates
- * defined here are only available after an appropriate
- * \ref import_1 "import/1" directive has been encountered for
- * the module's name.  For example:
+ * and classes that are available to Plang applications.
+ * The predicates defined here are only available after an
+ * appropriate \ref import_1 "import/1" directive has been
+ * encountered for the name of the class or module.  For example:
  *
  * \code
  * :- import(stdout).
  * :- import(words).
  * \endcode
  *
- * \par findall
+ * \par stream classes
+ * \ref class_iostream "iostream"
+ *
+ * \par findall module
  * \ref bagof_3 "bagof/3",
  * \ref findall_3 "findall/3",
  * \ref setof_3 "setof/3"
  *
- * \par words
+ * \par words module
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
  * \ref words_base_form_3 "words::base_form/3",
@@ -47,6 +50,13 @@
  * \ref words_search_5 "words::search/5",
  * \ref words_verb_1 "words::verb/1"
  */
+
+/**
+ * \defgroup class_iostream Classes - iostream
+ */
+/*\@{*/
+/* Defined in iostream.lp */
+/*\@}*/
 
 /**
  * \defgroup module_findall Modules - findall
