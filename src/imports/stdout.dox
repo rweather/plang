@@ -65,7 +65,8 @@ See the documentation for \ref class_iostream "iostream".  The
 
 \par Static class members
 \ref stdout_write "write()",
-\ref stdout_writeln "writeln()"
+\ref stdout_writeln "writeln()",
+\ref stdout_writeTerm "writeTerm()"
 
 <hr>
 \anchor stdout_write
@@ -83,7 +84,7 @@ for writing terms such as (\em A + \em B + \em C + ...).
 \par
 If \em Term is not a string or of the form (\em A + \em B),
 then write it using the same representation and quoting rules as
-\ref iostream_writeTerm "iostream::writeTerm()".
+\ref stdout_writeTerm "writeTerm()".
 
 \par Examples
 \code
@@ -96,7 +97,8 @@ The answer is: 4
 
 \par See Also
 \ref stdout_writeln "writeln()",
-\ref iostream_writeTerm "iostream::writeTerm()"
+\ref stdout_writeTerm "writeTerm()",
+\ref iostream_write "iostream::write()"
 
 <hr>
 \anchor stdout_writeln
@@ -118,7 +120,7 @@ for writing terms such as (\em A + \em B + \em C + ...).
 \par
 If \em Term is not a string or of the form (\em A + \em B),
 then write it using the same representation and quoting rules as
-\ref iostream_writeTerm "iostream::writeTerm()".
+\ref stdout_writeTerm "writeTerm()".
 \par
 A newline is written after \em Term.  If \em Term is omitted,
 then only a newline is written.
@@ -133,6 +135,34 @@ The answer is: 4
 
 \par See Also
 \ref stdout_write "write()",
+\ref stdout_writeTerm "writeTerm()",
+\ref iostream_writeln "iostream::writeln()"
+
+<hr>
+\anchor stdout_writeTerm
+<b>stdout::writeTerm</b>(\em Term)
+<br>
+<b>stdout::writeTerm</b>(\em Term, \em Vars)
+<br>
+<b>stderr::writeTerm</b>(\em Term)
+<br>
+<b>stderr::writeTerm</b>(\em Term, \em Vars)
+
+\par Description
+Write \em Term to standard output (or standard error) in a form that
+is compatible with the Plang source parser for
+\ref syntax_terms "terms".  The \em Term is not terminated
+with a "." or end of line marker.
+\par
+If \em Vars is present, then it must be a list of
+\em Name = \em Var declarations.  If \em Var is encountered as
+an unbound variable in \em Term, then it will be written to
+\em Stream as \em Name.  Variables not listed in \em Vars will
+be written as "_N", defining a unique name not present in \em Vars.
+
+\par See Also
+\ref stdout_write "write()",
+\ref stdout_writeln "writeln()",
 \ref iostream_writeTerm "iostream::writeTerm()"
 
 */

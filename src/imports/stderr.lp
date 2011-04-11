@@ -34,16 +34,6 @@ class stderr : iostream
         '$$print_string'(2, String);
     }
 
-    // TODO: remove writeTerm() from here once iostream is finished.
-    writeTerm(Term)
-    {
-        '$$print'(2, Term);
-    }
-    writeTerm(Term, Vars)
-    {
-        '$$print'(2, Term);
-    }
-
     static write(Term)
     {
         var(Term);
@@ -76,6 +66,16 @@ class stderr : iostream
     static writeln()
     {
         '$$print_string'(2, "\n");
+    }
+
+    static writeTerm(Term)
+    {
+        '$$print'(2, Term);
+    }
+
+    static writeTerm(Term, Vars)
+    {
+        '$$print'(2, Term, Vars);
     }
 }
 /** @endcond */

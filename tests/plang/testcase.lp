@@ -26,11 +26,7 @@ fail(Message)
 {
     current_suite(Suite);
     current_test(Name);
-    stdout::write(Suite);
-    stdout::write(": ");
-    stdout::write(Name);
-    stdout::write(": ");
-    stdout::writeln(Message);
+    stdout::writeln(Suite + ": " + Name + ": " + Message);
     throw(test_case_failed);
 }
 
@@ -38,13 +34,7 @@ fail(Message, Message2)
 {
     current_suite(Suite);
     current_test(Name);
-    stdout::write(Suite);
-    stdout::write(": ");
-    stdout::write(Name);
-    stdout::write(": ");
-    stdout::write(Message);
-    stdout::write(" ");
-    stdout::writeln(Message2);
+    stdout::writeln(Suite + ": " + Name + ": " + Message + " " + Message2);
     throw(test_case_failed);
 }
 
@@ -52,11 +42,7 @@ warning(Message)
 {
     current_suite(Suite);
     current_test(Name);
-    stdout::write(Suite);
-    stdout::write(": ");
-    stdout::write(Name);
-    stdout::write(": warning: ");
-    stdout::writeln(Message);
+    stdout::writeln(Suite + ": " + Name + ": warning: " + Message);
 }
 
 verify(Goal)
@@ -66,11 +52,8 @@ verify(Goal)
     } else {
         current_suite(Suite);
         current_test(Name);
-        stdout::write(Suite);
-        stdout::write(": ");
-        stdout::write(Name);
-        stdout::write(": ");
-        stdout::write(Goal);
+        stdout::write(Suite + ": " + Name + ": ");
+        stdout::writeTerm(Goal);
         stdout::writeln(" failed");
         throw(test_case_failed);
     }
@@ -94,13 +77,10 @@ compare(Actual, Expected)
     if (Actual !== Expected) {
         current_suite(Suite);
         current_test(Name);
-        stdout::write(Suite);
-        stdout::write(": ");
-        stdout::write(Name);
-        stdout::write(": ");
-        stdout::writeq(Actual);
+        stdout::write(Suite + ": " + Name + ": ");
+        stdout::writeTerm(Actual);
         stdout::write(" == ");
-        stdout::writeq(Expected);
+        stdout::writeTerm(Expected);
         stdout::writeln(" failed");
         throw(test_case_failed);
     }
@@ -126,11 +106,9 @@ run(Name)
         TestFailed = true;
     } catch (Error) {
         current_suite(Suite);
-        stdout::write(Suite);
-        stdout::write(": ");
-        stdout::write(Name);
-        stdout::write(": ");
-        stdout::writeqln(Error);
+        stdout::write(Suite + ": " + Name + ": ");
+        stdout::writeTerm(Error);
+        stdout::writeln();
         TestFailed = true;
     }
     if (nonvar(TestFailed)) {
@@ -139,10 +117,7 @@ run(Name)
         assertz(current_results(Pass, Fail2));
     } else {
         current_suite(Suite);
-        stdout::write(Suite);
-        stdout::write(": ");
-        stdout::write(Name);
-        stdout::writeln(": ok");
+        stdout::writeln(Suite + ": " + Name + ": ok");
         retract(current_results(Pass, Fail));
         Pass2 is Pass + 1;
         assertz(current_results(Pass2, Fail));
@@ -153,12 +128,7 @@ report()
 {
     current_suite(Suite);
     current_results(Pass, Fail);
-    stdout::write(Suite);
-    stdout::write(": ");
-    stdout::write(Pass);
-    stdout::write(" passed, ");
-    stdout::write(Fail);
-    stdout::writeln(" failed");
+    stdout::writeln(Suite + ": " + Pass + " passed, " + Fail + " failed");
     if (Fail !== 0)
         fail;
 }

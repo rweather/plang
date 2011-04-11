@@ -4658,6 +4658,17 @@ static p_goal_result p_builtin_print
         p_term_print(context, term, p_term_stdio_print_func, stderr);
     return P_RESULT_TRUE;
 }
+static p_goal_result p_builtin_print_3
+    (p_context *context, p_term **args, p_term **error)
+{
+    /* TODO: print using the variable list */
+    p_term *term = p_term_deref_member(context, args[1]);
+    if (p_term_integer_value(args[0]) == 1)
+        p_term_print(context, term, p_term_stdio_print_func, stdout);
+    else
+        p_term_print(context, term, p_term_stdio_print_func, stderr);
+    return P_RESULT_TRUE;
+}
 static p_goal_result p_builtin_print_byte
     (p_context *context, p_term **args, p_term **error)
 {
@@ -4795,6 +4806,7 @@ void _p_db_init_builtins(p_context *context)
         {"predicate", 1, p_builtin_predicate_1},
         {"predicate", 2, p_builtin_predicate_2},
         {"$$print", 2, p_builtin_print},
+        {"$$print", 3, p_builtin_print_3},
         {"$$print_byte", 2, p_builtin_print_byte},
         {"$$print_string", 2, p_builtin_print_string},
         {"retract", 1, p_builtin_retract},
