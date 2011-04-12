@@ -42,6 +42,9 @@
  * \ref findall_3 "findall/3",
  * \ref setof_3 "setof/3"
  *
+ * \par shell module
+ * \ref shell_main_1 "shell::main/1"
+ *
  * \par words module
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
@@ -85,6 +88,13 @@
  */
 /*\@{*/
 /* Defined in findall.dox */
+/*\@}*/
+
+/**
+ * \defgroup module_shell Modules - shell
+ */
+/*\@{*/
+/* Defined in shell.lp */
 /*\@}*/
 
 /**

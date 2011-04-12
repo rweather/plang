@@ -22,6 +22,19 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <config.h>
+
+static const char shell_main[] =
+    ":- import(shell).\n"
+    ":- import(stdout).\n"
+    "main(_)\n"
+    "{\n"
+    "    stdout::writeln(\"Plang version " VERSION "\");\n"
+    "    stdout::writeln(\"Copyright (c) 2011 Southern Storm Software, Pty Ltd.\");\n"
+    "    stdout::writeln(\"Type 'help.' for help\");\n"
+    "    stdout::writeln();\n"
+    "    shell::main(\"| ?- \");\n"
+    "}\n";
 
 int main(int argc, char *argv[])
 {
@@ -33,6 +46,7 @@ int main(int argc, char *argv[])
     int error, index;
     p_goal_result result;
     int exitval;
+    const char *filename;
 
     /* Process leading options for the plang engine itself */
     context = p_context_create();
@@ -79,22 +93,22 @@ int main(int argc, char *argv[])
         --argc;
     }
 
-    /* Bail out if no input file provided */
+    /* Load the contents of the input file.  If no file supplied,
+     * then load up an interactive shell */
     if (argc < 2) {
-        fprintf(stderr, "Usage: %s program [args ...]\n", progname);
-        p_context_free(context);
-        return 1;
+        error = p_context_consult_string(context, shell_main);
+        filename = "shell.lp";
+    } else {
+        filename = argv[1];
+        error = p_context_consult_file(context, argv[1]);
     }
-
-    /* Load the contents of the input file */
-    error = p_context_consult_file(context, argv[1]);
     if (error == EINVAL) {
         /* Syntax error that should have already been reported */
         p_context_free(context);
         return 1;
     } else if (error != 0) {
         /* Filesystem error */
-        fprintf(stderr, "%s: %s\n", argv[1], strerror(error));
+        fprintf(stderr, "%s: %s\n", filename, strerror(error));
         p_context_free(context);
         return 1;
     }
@@ -121,7 +135,7 @@ int main(int argc, char *argv[])
         if (exitval < 0 || exitval > 127)
             exitval = 127;
     } else {
-        fprintf(stderr, "%s: main/1 threw uncaught error: ", argv[1]);
+        fprintf(stderr, "%s: main/1 threw uncaught error: ", filename);
         p_term_print(context, error_term, p_term_stdio_print_func, stderr);
         putc('\n', stderr);
         exitval = 1;
