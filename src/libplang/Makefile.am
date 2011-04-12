@@ -9,6 +9,7 @@ libplang_la_SOURCES = \
 	database.c \
 	database-priv.h \
 	errors.c \
+	io.c \
 	lexer.l \
 	parser.y \
 	parser-priv.h \
