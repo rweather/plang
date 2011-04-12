@@ -23,6 +23,16 @@ class stdout : iostream
 {
     canWrite() { true; }
 
+    flush()
+    {
+        '$$print_flush'(1);
+    }
+
+    static flush()
+    {
+        '$$print_flush'(1);
+    }
+
     writeByte(Byte)
     {
         '$$print_byte'(1, Byte);

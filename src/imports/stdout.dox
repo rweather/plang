@@ -64,9 +64,31 @@ See the documentation for \ref class_iostream "iostream".  The
 \c stdout and \c stderr streams are write-only.
 
 \par Static class members
+\ref stdout_flush "flush()",
 \ref stdout_write "write()",
 \ref stdout_writeln "writeln()",
 \ref stdout_writeTerm "writeTerm()"
+
+<hr>
+\anchor stdout_flush
+<b>stdout::flush</b>()
+<br>
+<b>stderr::flush</b>()
+
+\par Description
+Flushes all data that has been written so far to standard output
+(or standard error).
+
+\par Examples
+\code
+stdout::write("| ?- ");
+stdout::flush();
+stdin::readTerm(Term);
+\endcode
+
+\par See Also
+\ref stdout_write "write()",
+\ref iostream_flush "iostream::flush()"
 
 <hr>
 \anchor stdout_write
@@ -96,6 +118,7 @@ The answer is: 4
 \endcode
 
 \par See Also
+\ref stdout_flush "flush()",
 \ref stdout_writeln "writeln()",
 \ref stdout_writeTerm "writeTerm()",
 \ref iostream_write "iostream::write()"

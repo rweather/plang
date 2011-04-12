@@ -4739,6 +4739,15 @@ static p_goal_result p_builtin_print_byte
     }
     return P_RESULT_TRUE;
 }
+static p_goal_result p_builtin_print_flush
+    (p_context *context, p_term **args, p_term **error)
+{
+    if (p_term_integer_value(args[0]) == 1)
+        fflush(stdout);
+    else
+        fflush(stderr);
+    return P_RESULT_TRUE;
+}
 static p_goal_result p_builtin_print_string
     (p_context *context, p_term **args, p_term **error)
 {
@@ -4977,6 +4986,7 @@ void _p_db_init_builtins(p_context *context)
         {"$$print", 2, p_builtin_print},
         {"$$print", 3, p_builtin_print_3},
         {"$$print_byte", 2, p_builtin_print_byte},
+        {"$$print_flush", 1, p_builtin_print_flush},
         {"$$print_string", 2, p_builtin_print_string},
         {"retract", 1, p_builtin_retract},
         {"$$set_loop_var", 2, p_builtin_set_loop_var},

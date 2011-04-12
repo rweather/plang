@@ -23,6 +23,16 @@ class stderr : iostream
 {
     canWrite() { true; }
 
+    flush()
+    {
+        '$$print_flush'(2);
+    }
+
+    static flush()
+    {
+        '$$print_flush'(2);
+    }
+
     writeByte(Byte)
     {
         '$$print_byte'(2, Byte);
