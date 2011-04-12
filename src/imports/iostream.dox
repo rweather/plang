@@ -27,27 +27,56 @@ acts as the base of a hierarchy of related I/O handling classes.
 :- import(iostream).
 \endcode
 
+\par Parent class
+None.
+
 \par Class members
-\ref iostream_canRead "canRead()",
-\ref iostream_canSeek "canSeek()",
-\ref iostream_canWrite "canWrite()",
-\ref iostream_close "close()",
-\ref iostream_flush "flush()",
-\ref iostream_length "length()",
-\ref iostream_readByte "readByte()",
-\ref iostream_readBytes "readBytes()",
-\ref iostream_readLine "readLine()",
-\ref iostream_readTerm "readTerm()",
-\ref iostream_seek "seek()",
-\ref iostream_tell "tell()",
-\ref iostream_write "write()",
-\ref iostream_writeByte "writeByte()",
-\ref iostream_writeln "writeln()",
-\ref iostream_writeString "writeString()",
-\ref iostream_writeTerm "writeTerm()"
+\ref iostream_canRead "canRead"()
+<br>
+\ref iostream_canSeek "canSeek"()
+<br>
+\ref iostream_canWrite "canWrite"()
+<br>
+\ref iostream_close "close"()
+<br>
+\ref iostream_flush "flush"()
+<br>
+\ref iostream_length "length"(\em Length)
+<br>
+\ref iostream_readByte "readByte"(\em Byte)
+<br>
+\ref iostream_readBytes "readBytes"(\em Bytes)
+<br>
+\ref iostream_readLine "readLine"(\em Line)
+<br>
+\ref iostream_readTerm "readTerm"(\em Term)
+<br>
+\ref iostream_readTerm "readTerm"(\em Term, \em Vars)
+<br>
+\ref iostream_seek "seek"(\em Position)
+<br>
+\ref iostream_seek "seek"(\em Position, \em Origin)
+<br>
+\ref iostream_tell "tell"(\em Position)
+<br>
+\ref iostream_write "write"(\em Term)
+<br>
+\ref iostream_writeByte "writeByte"(\em Byte)
+<br>
+\ref iostream_writeln "writeln"(\em Term)
+<br>
+\ref iostream_writeln "writeln"()
+<br>
+\ref iostream_writeString "writeString"(\em String)
+<br>
+\ref iostream_writeTerm "writeTerm"(\em Term)
+<br>
+\ref iostream_writeTerm "writeTerm"(\em Term, \em Vars)
 
 \par See Also
-\ref class_stderr "stderr", \ref class_stdout "stdout"
+\ref class_stderr "stderr",
+\ref class_stdin "stdin",
+\ref class_stdout "stdout"
 
 <hr>
 \anchor iostream_canRead

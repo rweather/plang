@@ -44,6 +44,15 @@ the convenience methods of \ref class_stdout "stdout".
 \ref class_iostream "iostream"
 
 \par Class members
-See the documentation for \ref class_iostream "iostream".  The
-\c stdin stream is read-only.
+\c override \ref iostream_canRead "canRead"()
+<br>
+\c override \ref iostream_readByte "readByte"(\em Byte)
+<br>
+\c override \ref iostream_readBytes "readBytes"(\em Bytes)
+<br>
+\c override \ref iostream_readLine "readLine"(\em Line)
+
+\par See Also
+\ref class_stdout "stdout",
+\ref class_stderr "stderr"
 */

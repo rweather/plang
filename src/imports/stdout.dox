@@ -60,14 +60,28 @@ main(Args)
 \ref class_iostream "iostream"
 
 \par Class members
-See the documentation for \ref class_iostream "iostream".  The
-\c stdout and \c stderr streams are write-only.
+\c override \ref iostream_canWrite "canWrite"()
+<br>
+\c override \ref iostream_flush "flush"()
+<br>
+\c override \ref iostream_writeByte "writeByte"(\em Byte)
+<br>
+\c override \ref iostream_writeString "writeString"(\em String)
+<br>
+\c static \ref stdout_flush "flush"()
+<br>
+\c static \ref stdout_write "write"(\em Term)
+<br>
+\c static \ref stdout_writeln "writeln"(\em Term)
+<br>
+\c static \ref stdout_writeln "writeln"()
+<br>
+\c static \ref stdout_writeTerm "writeTerm"(\em Term)
+<br>
+\c static \ref stdout_writeTerm "writeTerm"(\em Term, \em Vars)
 
-\par Static class members
-\ref stdout_flush "flush()",
-\ref stdout_write "write()",
-\ref stdout_writeln "writeln()",
-\ref stdout_writeTerm "writeTerm()"
+\par See Also
+\ref class_stdin "stdin"
 
 <hr>
 \anchor stdout_flush
