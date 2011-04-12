@@ -37,17 +37,24 @@ typedef void *yyscan_t;
 
 struct p_input_var
 {
+    p_term *name;
     p_term *var;
     unsigned int count;
 };
 
 typedef struct p_input_stream p_input_stream;
+
+typedef int (*p_input_read_func)
+    (p_input_stream *stream, char *buf, size_t max_size);
+
 struct p_input_stream
 {
+    p_context *context;
     FILE *stream;
     const char *filename;
     const char *buffer;
     size_t buffer_len;
+    p_input_read_func read_func;
     int close_stream;
     int error_count;
     int warning_count;
@@ -57,6 +64,9 @@ struct p_input_stream
     size_t max_variables;
     p_term *filename_string;
     p_term *class_name;
+    p_term *read_term;
+    p_term *vars;
+    int generate_vars;
 };
 
 #ifndef YY_EXTRA_TYPE

@@ -1,0 +1,49 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\addtogroup class_stdin
+
+The \c stdin class provides an I/O stream implementations that
+reads from the process's standard input stream.  The following
+example reads all lines from standard input and echoes them
+to standard output:
+
+\code
+:- import(stdin).
+:- import(stdout).
+
+main(_)
+{
+    new stdin(Stdin);
+    while (Stdin.readLine(Line))
+        stdout::writeln(Line);
+}
+\endcode
+
+The \c stdin class does not provide any static methods similar to
+the convenience methods of \ref class_stdout "stdout".
+
+\par Parent class
+\ref class_iostream "iostream"
+
+\par Class members
+See the documentation for \ref class_iostream "iostream".  The
+\c stdin stream is read-only.
+*/

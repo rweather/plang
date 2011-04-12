@@ -31,27 +31,7 @@
 /* Get the buffer of input from the input stream */
 #define	YY_INPUT(buf,result,maxSize) \
     { \
-        if (yyextra->stream) { \
-            /* Read from a stdio-based file stream */ \
-            errno = 0; \
-            while ((result = fread((buf), 1, (maxSize), yyextra->stream)) == 0 && ferror(yyextra->stream)) { \
-                if (errno != EINTR) \
-                    break; \
-                errno = 0; \
-                clearerr(yyextra->stream); \
-            } \
-        } else { \
-            /* Read from a memory buffer */ \
-            size_t len = (maxSize); \
-            if (len > yyextra->buffer_len) \
-                len = yyextra->buffer_len; \
-            if (len > 0) { \
-                memcpy((buf), yyextra->buffer, len); \
-                yyextra->buffer += len; \
-                yyextra->buffer_len -= len; \
-            } \
-            result = (int)len; \
-        } \
+        result = (*(yyextra->read_func))(yyextra, (buf), (maxSize)); \
     }
 
 /* Update the line number information and return a token code */
@@ -75,16 +55,19 @@ p_term *p_term_lex_create_variable
     (p_context *context, p_input_stream *stream, const char *name)
 {
     size_t index;
+    p_term *name_term;
     p_term *var;
     struct p_input_var *vars;
     for (index = 0; index < stream->num_variables; ++index) {
-        if (!strcmp(p_term_name(stream->variables[index].var), name)) {
+        if (!strcmp(p_term_name(stream->variables[index].name), name)) {
             ++(stream->variables[index].count);
             return stream->variables[index].var;
         }
     }
-    var = p_term_create_named_variable(context, name);
+    name_term = p_term_create_string(context, name);
+    var = p_term_create_variable(context);
     if (stream->num_variables < stream->max_variables) {
+        stream->variables[stream->num_variables].name = name_term;
         stream->variables[stream->num_variables].var = var;
         stream->variables[(stream->num_variables)++].count = 1;
         return var;
@@ -100,6 +83,7 @@ p_term *p_term_lex_create_variable
         GC_FREE(stream->variables);
     }
     stream->variables = vars;
+    vars[stream->num_variables].name = name_term;
     vars[stream->num_variables].var = var;
     vars[(stream->num_variables)++].count = 1;
     return var;
@@ -146,6 +130,7 @@ NEG             (-?)
 ":-"            { RETURNTOK(K_COLON_DASH); }
 "?-"            { RETURNTOK(K_QUEST_DASH); }
 "??--"          { RETURNTOK(K_TEST_GOAL); }
+"??-"           { RETURNTOK(K_READ_TERM); }
 "->"            { RETURNTOK(K_ARROW); }
 "-->"           { RETURNTOK(K_DARROW); }
 "."/{AFTERDOT}  { RETURNTOK(K_DOT_TERMINATOR); }

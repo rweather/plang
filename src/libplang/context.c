@@ -194,7 +194,7 @@ int p_term_lex_init_extra(p_input_stream *extra, yyscan_t *scanner);
 int p_term_lex_destroy(yyscan_t scanner);
 int p_term_parse(p_context *context, yyscan_t scanner);
 
-static int p_context_consult(p_context *context, p_input_stream *stream)
+int p_context_consult(p_context *context, p_input_stream *stream)
 {
     yyscan_t scanner;
     int error, ok;
@@ -212,6 +212,31 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
     if (stream->error_count != 0)
         ok = 0;
 
+    /* Create a variable list if requested by "iostream::readTerm()" */
+    if (stream->generate_vars) {
+        size_t index;
+        p_term *tail = 0;
+        p_term *new_tail;
+        for (index = 0; index < stream->num_variables; ++index) {
+            p_term *head = p_term_create_functor
+                (context, context->unify_atom, 2);
+            p_term_bind_functor_arg
+                (head, 0, stream->variables[index].name);
+            p_term_bind_functor_arg
+                (head, 1, stream->variables[index].var);
+            new_tail = p_term_create_list(context, head, 0);
+            if (tail)
+                p_term_set_tail(tail, new_tail);
+            else
+                stream->vars = new_tail;
+            tail = new_tail;
+        }
+        if (tail)
+            p_term_set_tail(tail, context->nil_atom);
+        else
+            stream->vars = context->nil_atom;
+    }
+
     /* Close the input stream */
     if (stream->variables)
         GC_FREE(stream->variables);
@@ -225,6 +250,7 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
         p_term *clause_atom = context->clause_atom;
         p_term *goal_atom = p_term_create_atom(context, "?-");
         p_term *test_goal_atom = p_term_create_atom(context, "\?\?--");
+        p_term *read_atom = p_term_create_atom(context, "\?\?-");
         p_term *decl;
         while (list->header.type == P_TERM_LIST) {
             decl = p_term_deref(list->list.head);
@@ -246,12 +272,29 @@ static int p_context_consult(p_context *context, p_input_stream *stream)
                      * Ignored if unit testing is not active */
                     if (context->allow_test_goals)
                         context->test_goal = p_term_arg(decl, 0);
+                } else if (decl->functor.functor_name == read_atom) {
+                    stream->read_term = p_term_arg(decl, 0);
                 }
             }
             list = list->list.tail;
         }
     }
     return ok ? 0 : EINVAL;
+}
+
+static int p_stdio_read_func
+    (p_input_stream *stream, char *buf, size_t max_size)
+{
+    size_t result;
+    errno = 0;
+    while ((result = fread(buf, 1, max_size, stream->stream)) == 0
+                && ferror(stream->stream)) {
+        if (errno != EINTR)
+            break;
+        errno = 0;
+        clearerr(stream->stream);
+    }
+    return (int)result;
 }
 
 /**
@@ -276,6 +319,8 @@ int p_context_consult_file(p_context *context, const char *filename)
 {
     p_input_stream stream;
     memset(&stream, 0, sizeof(stream));
+    stream.context = context;
+    stream.read_func = p_stdio_read_func;
     if (!strcmp(filename, "-")) {
         stream.stream = stdin;
         stream.filename = "(standard-input)";
@@ -294,6 +339,19 @@ int p_context_consult_file(p_context *context, const char *filename)
         p_context_add_path(context->loaded_files, filename);
     }
     return p_context_consult(context, &stream);
+}
+
+int p_string_read_func(p_input_stream *stream, char *buf, size_t max_size)
+{
+    size_t len = max_size;
+    if (len > stream->buffer_len)
+        len = stream->buffer_len;
+    if (len > 0) {
+        memcpy(buf, stream->buffer, len);
+        stream->buffer += len;
+        stream->buffer_len -= len;
+    }
+    return (int)len;
 }
 
 /**
@@ -317,8 +375,10 @@ int p_context_consult_string(p_context *context, const char *str)
     if (!str)
         return ENOENT;
     memset(&stream, 0, sizeof(stream));
+    stream.context = context;
     stream.buffer = str;
     stream.buffer_len = strlen(str);
+    stream.read_func = p_string_read_func;
     return p_context_consult(context, &stream);
 }
 

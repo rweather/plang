@@ -83,7 +83,7 @@ Flushes all data that has been written so far to standard output
 \code
 stdout::write("| ?- ");
 stdout::flush();
-stdin::readTerm(Term);
+Stdin.readTerm(Term);
 \endcode
 
 \par See Also

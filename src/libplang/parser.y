@@ -506,6 +506,7 @@ static p_term *create_clause_head
 %token K_COLON_DASH     "`:-'"
 %token K_QUEST_DASH     "`?-'"
 %token K_TEST_GOAL      "`??--'"
+%token K_READ_TERM      "`??-'"
 %token K_ARROW          "`->'"
 %token K_DARROW         "`-->'"
 %token K_DOT_TERMINATOR "`.'"
@@ -602,6 +603,12 @@ static p_term *create_clause_head
 file
     : declaration_list      {
             input_stream->declarations = finalize_list($1);
+        }
+    | K_READ_TERM term K_DOT_TERMINATOR {
+            input_stream->declarations =
+                p_term_create_list
+                    (context, unary_term("\?\?-", $2),
+                     context->nil_atom);
         }
     | /* empty */
     ;

@@ -18,7 +18,7 @@
  */
 
 /**
- * \defgroup modules Module and Classes - Overview
+ * \defgroup modules Modules and Classes - Overview
  *
  * This section of the documentation describes the add-on modules
  * and classes that are available to Plang applications.
@@ -34,6 +34,7 @@
  * \par stream classes
  * \ref class_iostream "iostream",
  * \ref class_stderr "stderr",
+ * \ref class_stdin "stdin",
  * \ref class_stdout "stdout"
  *
  * \par findall module
@@ -66,6 +67,13 @@
  */
 /*\@{*/
 /* Defined in stdout.dox */
+/*\@}*/
+
+/**
+ * \defgroup class_stdin Classes - stdin
+ */
+/*\@{*/
+/* Defined in stdin.dox */
 /*\@}*/
 
 /**
