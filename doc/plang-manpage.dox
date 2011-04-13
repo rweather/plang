@@ -1,0 +1,117 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file plang-manpage.dox
+\page plang_manpage Manual page for the plang command
+
+\section manpage_synopsis SYNOPSIS
+
+\b plang [\em options] [\em filename.lp [\em arguments ...]]
+
+\section manpage_description DESCRIPTION
+
+The \b plang command is used to run applications that are written
+in the \ref syntax "Plang logic programming language".  The
+command-line starts with a list of \ref manpage_options "options"
+for the \b plang command itself.  The options are followed by
+the name of the <tt>*.lp</tt> source file to be executed.
+The remaining \em arguments are passed to the <tt>main</tt>
+predicate of \em filename.lp.
+
+\section manpage_options OPTIONS
+
+<b>-I</b> \em dir
+<br>
+<b>--import=</b>\em dir
+\par
+Adds \em dir to the list of directories to search for
+imports when processing an \ref import_1 "import/1" directive.
+The directories added by the <b>-I</b> option will be searched
+before the predefined system import directories.
+
+<b>-L</b> \em dir
+<br>
+<b>--import-lib=</b>\em dir
+\par
+Adds \em dir to the list of directories to search for import
+libraries when processing a \ref load_library_1 "load_library/1"
+directive.  The directories added by the <b>-L</b> option
+will be searched before the predefined system import library
+directories.
+
+<b>-m</b> \em name
+<br>
+<b>--main=</b>\em name
+\par
+Sets \em name as the main entry point predicate to be executed.
+The default is <tt>main</tt>.  The predicate is assumed to take a
+single parameter corresponding to the list
+[\em filename.lp, \em arguments, ...].
+
+\section manpage_shell SHELL MODE
+
+If the \em filename.lp and \em arguments are omitted, then \b plang
+will enter "shell mode".  A brief introductory header is displayed,
+and then the user is prompted to enter Plang expressions for
+evaluation:
+
+\code
+$ plang
+Plang version 0.0.1
+Copyright (c) 2011 Southern Storm Software, Pty Ltd.
+Type 'help.' for help
+
+| ?-
+\endcode
+
+Shell mode stops when the user types "exit." or "quit.", or otherwise
+causes an end-of-file indication on standard input.
+
+\section manpage_exec EXECUTABLE MODE
+
+Under Unix-like systems such as GNU/Linux, it is possible to
+mark \em filename.lp as an executable with <b>chmod +x</b>.
+Add the following line to the top of \em filename.lp:
+
+\code
+#!/usr/bin/env plang
+\endcode
+
+After that, the Plang application can be run directly:
+
+\code
+$ ./filename.lp
+\endcode
+
+\section manpage_seealso SEE ALSO
+
+\ref syntax "Plang language manual".
+
+\section manpage_diag DIAGNOSTICS
+
+The exit status will be zero if \em filename.lp was loaded
+without error and the <tt>main</tt> predicate completed successfully.
+The exit status will be 1 if a load error occurred, the <tt>main</tt>
+predicate failed, or an uncaught error was thrown using
+\ref throw_1 "throw/1".  If the application executes
+\ref halt_0 "halt/0" or \ref halt_1 "halt/1", then the exit status
+will be set accordingly.
+
+*/

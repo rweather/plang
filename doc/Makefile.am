@@ -5,6 +5,7 @@ EXTRA_DIST = \
 	issues-with-prolog.dox \
 	hello-world.dox \
 	mainpage.dox \
+	plang-manpage.dox \
 	syntax.dox \
 	syntax-dcg.dox \
 	syntax-statements.dox \

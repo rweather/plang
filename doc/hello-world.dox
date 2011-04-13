@@ -42,6 +42,9 @@ Hello World!
 The ".lp" file extension is recommended for Plang source files.
 It stands for "Logic Program".
 
+See the \ref plang_manpage "manual page" for the \c plang
+front-end for more information on running applications with it.
+
 \section hello_cmdline Processing command-line arguments
 
 A more complex example uses an \ref if_stmt "if" statement to

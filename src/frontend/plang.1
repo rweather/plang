@@ -1,0 +1,103 @@
+.\" plang logic programming language
+.\" Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+.\"
+.\" The plang package is free software: you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public License
+.\" as published by the Free Software Foundation, either version 3 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The plang package is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU Lesser General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU Lesser General Public
+.\" License along with the libcompiler library.  If not,
+.\" see <http://www.gnu.org/licenses/>.
+.TH plang 1 "April 2011" "Southern Storm Software" "Plang Language Tools"
+.SH NAME
+plang \- run applications in the Plang language
+.SH SYNOPSIS
+\fBplang\fR [ \fIoptions\fR ] [ \fIfilename.lp\fR [ \fIarguments\fR ... ] ]
+.SH DESCRIPTION
+The
+.B plang
+command is used to run applications that are written
+in the Plang logic programming language.  The command-line starts
+with a list of \fIoptions\fR for the \fBplang\fR command itself.
+The options are followed by the name of the \fB*.lp\fR source file
+to be executed.  The remaining \fIarguments\fR are passed to the
+\fBmain\fR predicate of \fIfilename.lp\fR.
+.SH OPTIONS
+.TP
+.B \-I DIR, \-\-import=DIR
+Adds \fBDIR\fR to the list of directories to search for imports when
+processing an \fBimport\fR directive.  The directories added by
+the \fB\-I\fR option will be searched before the predefined
+system import directories.
+.TP
+.B \-L DIR, \-\-import\-lib=DIR
+Adds \fBDIR\fR to the list of directories to search for import
+libraries when processing a \fBload_library/1\fR directive.
+The directories added by the \fB-L\fR option will be searched
+before the predefined system import library directories.
+.TP
+.B \-m NAME, \-\-main=NAME
+Sets \fBNAME\fR as the main entry point predicate to be executed.
+The default is \fBmain\fR.  The predicate is assumed to take a
+single parameter corresponding to the list
+\fB[\fIfilename.lp\fR, \fIarguments\fR, ...\fB]\fR.
+.SH "SHELL MODE"
+If the \fIfilename.lp\fR and \fIarguments\fR are omitted, then
+\fBplang\fR will enter "shell mode".  A brief introductory header
+is displayed, and then the user is prompted to enter Plang
+expressions for evaluation:
+.RS
+.nf
+\fC
+\code
+$ plang
+Plang version 0.0.1
+Copyright (c) 2011 Southern Storm Software, Pty Ltd.
+Type 'help.' for help
+
+| ?-
+\fR
+.fi
+.RE
+
+Shell mode stops when the user types "\fBexit.\fR" or "\fBquit.\fR",
+or otherwise causes an end-of-file indication on standard input.
+.SH "EXECUTABLE MODE"
+Under Unix-like systems such as GNU/Linux, it is possible to
+mark \fIfilename.lp\fR as an executable with \fBchmod +x\fR.
+Add the following line to the top of \fIfilename.lp\fR:
+.RS
+.nf
+\fC
+#!/usr/bin/env plang
+\fR
+.fi
+.RE
+
+After that, the Plang application can be run directly:
+.RS
+.nf
+\fC
+$ ./filename.lp
+\fR
+.fi
+.RE
+.SH "AUTHOR"
+Written by Southern Storm Software, Pty Ltd.
+
+http://southern-storm.blogspot.com/
+.SH "SEE ALSO"
+Plang language manual.
+.SH "DIAGNOSTICS"
+The exit status will be zero if \fIfilename.lp\fR was loaded
+without error and the \fBmain\fR predicate completed successfully.
+The exit status will be 1 if a load error occurred, the \fBmain\fR
+predicate failed, or an uncaught error was thrown using
+\fBthrow/1\fR.  If the application executes \fBhalt/0\fR or
+\fBhalt/1\fR then the exit status will be set accordingly.
