@@ -18,7 +18,8 @@
  */
 
 /**
-\defgroup syntax_terms Language syntax - Terms
+\file syntax-terms.dox
+\page syntax_terms Language syntax - Terms
 
 Terms are the fundamental knowledge representation tool in Plang.
 Everything, including programs, are ultimately represented as

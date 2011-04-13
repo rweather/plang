@@ -18,7 +18,8 @@
  */
 
 /**
-\defgroup syntax_dcg Language syntax - Definite clause grammars
+\file syntax-dcg.dox
+\page syntax_dcg Language syntax - Definite clause grammars
 
 \section dcg_intro Introduction
 

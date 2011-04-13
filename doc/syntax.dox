@@ -1,0 +1,46 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file syntax.dox
+\page syntax Language syntax
+
+Plang uses a C-style syntax for statements, and a Prolog-style
+syntax for expressions (usually called "terms").  The simplest
+application is the traditional "Hello World":
+
+\code
+:- import(stdout).
+
+main(Args)
+{
+    stdout::writeln("Hello World!");
+}
+\endcode
+
+See the \ref hello_world "Hello World" example for a more complex
+introduction to Plang's syntax.
+
+The following sections describe the various aspects of the
+Plang syntax:
+
+\li \ref syntax_terms "Terms"
+\li \ref syntax_dcg "Definite clause grammars"
+
+*/

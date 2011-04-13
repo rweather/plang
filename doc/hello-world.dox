@@ -1,0 +1,233 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file hello-world.dox
+\page hello_world Hello World
+
+\section hello_intro Introduction
+
+Plang uses a C-style syntax for statements, and a Prolog-style
+syntax for expressions (usually called "terms").  The simplest
+application is the traditional "Hello World".  We will use the
+\ref class_stdout "stdout" module to print strings:
+
+\include hello1.lp
+
+We can run this with the \c plang front-end to get the expected
+result (\c $ indicates a command that is typed at the operating
+system's command-line):
+
+\code
+$ plang hello1.lp
+Hello World!
+\endcode
+
+The ".lp" file extension is recommended for Plang source files.
+It stands for "Logic Program".
+
+\section hello_cmdline Processing command-line arguments
+
+A more complex example uses an \ref if_stmt "if" statement to
+perform different actions depending upon an argument:
+
+\include hello2.lp
+
+Running our second version, we get the following:
+
+\code
+$ plang hello2.lp
+Hello World!
+$ plang hello2.lp --bye
+Bye World!
+\endcode
+
+As can be seen, the command-line arguments are passed to the
+Plang application.  Let's dump them to see what we get:
+
+\include hello3.lp
+
+\code
+$ plang hello3.lp --bye
+Args: ["hello3.lp", "--bye"]
+Bye World!
+\endcode
+
+\section hello_search Searching for solutions
+
+The real power of a logic programming language comes with
+back-tracking, or the ability to search for multiple solutions
+amongst many alternatives.  Let's start by establishing some
+simple facts about the people that exist in our world:
+
+\dontinclude hello4.lp
+\skip import
+\until Amy
+
+We can dump a list of all people by finding all solutions to the
+query "Is P a person?":
+
+\skip main
+\until }
+
+\code
+$ plang hello4.lp
+People: ["Frank", "Mary", "George", "Amy"]
+\endcode
+
+The \ref findall_3 "findall/3" predicate finds all solutions to
+the query in the order in which they are listed in the fact database.
+Let's now add some more rules for the relationship "A is a parent
+of B":
+
+\dontinclude hello5.lp
+\skip parent
+\until Amy
+
+We can then ask for a list of all Frank's children as follows:
+
+\skip main
+\until }
+
+\code
+$ plang hello5.lp
+Frank's children: ["Mary", "George"]
+\endcode
+
+So far all we have done is assert basic facts into the database.
+We now want to do some inferencing and ask "Is A a descendent of B?".
+This time we define a predicate that represents the rule:
+
+\dontinclude hello6.lp
+\skip descendent
+\until }
+\skip descendent
+\until }
+
+The first clause indicates that we can satisfy the \c descendent
+relation if the second person is a parent of the first.  The
+second clause indicates that the relation is also satisfied if
+we can find an intermediate child of the second person that the
+first person is a descendent of.  In Prolog we would have written
+this as:
+
+\code
+descendent(C, P) :- parent(P, C).
+descendent(GC, P) :- parent(P, C), descendent(GC, C).
+\endcode
+
+In Plang, as in Prolog, variables are identifiers that start with
+an upper case letter.  The engine will search for any variable
+binding that satisfies the rules.  Any binding that does not
+satisfy the rules is discarded and another rule is tried.
+
+To complete our example, we query for Frank's descendents:
+
+\skip main
+\until }
+
+\code
+$ plang hello6.lp
+Frank's descendents: ["Mary", "George", "Amy"]
+\endcode
+
+The full source code for the example to date is:
+
+\include hello7.lp
+
+\code
+$ plang hello7.lp
+People: ["Frank", "Mary", "George", "Amy"]
+Frank's children: ["Mary", "George"]
+Frank's descendents: ["Mary", "George", "Amy"]
+\endcode
+
+\section hello_shell Using the Plang shell
+
+We can use the \c plang front-end in manual mode to directly
+query the database.  First we will load our "hello7" example into
+the shell:
+
+\code
+Plang version 0.0.1
+Copyright (c) 2011 Southern Storm Software, Pty Ltd.
+Type 'help.' for help
+
+| ?- consult("hello7.lp").
+
+yes
+\endcode
+
+All of the predicates that we defined previously are now available.
+However, the \c main predicate is not run automatically.  Let's
+query for members of the \c parent relationship:
+
+\code
+| ?- parent(A, B).
+
+A = "Frank"
+B = "Mary" ?
+\endcode
+
+The shell has returned the first solution that it found.  The "?"
+prompt is asking us if we want to find another solution or stop.
+If we type ';', it will find another solution:
+
+\code
+| ?- parent(A, B).
+
+A = "Frank"
+B = "Mary" ? ;
+
+A = "Frank"
+B = "George" ?
+\endcode
+
+We can continue typing ';' until the shell says "no" (meaning that
+there are no more solutions), or hit Enter to abort the search.
+Let's ask a question that the database doesn't know the answer to:
+
+\code
+| ?- descendent(D, "Amy").
+
+no
+\endcode
+
+We can even run the \c main predicate directly:
+
+\code
+| ?- main(_).
+People: ["Frank", "Mary", "George", "Amy"]
+Frank's children: ["Mary", "George"]
+Frank's descendents: ["Mary", "George", "Amy"]
+
+yes
+\endcode
+
+The "_" variable is special - it indicates an anonymous variable
+with no specific name or value.  Since our \c main predicate does
+not process arguments, "_" is good enough for our purposes.
+
+Finally, we exit the shell:
+
+\code
+| ?- exit.
+\endcode
+
+*/
