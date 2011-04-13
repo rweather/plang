@@ -1272,9 +1272,7 @@ static p_goal_result p_builtin_retract
  * to the system state will be in the form of side-effects.
  *
  * Directives may also be called as regular builtin predicates
- * during normal program execution.  The exception is
- * \ref import_1 "import/1", which must be used within an
- * immediate directive.
+ * during normal program execution.
  *
  * \ref directive_1 "(:-)/1",
  * \ref dynamic_1 "dynamic/1",
@@ -1399,6 +1397,9 @@ static p_goal_result p_builtin_dynamic
     return P_RESULT_TRUE;
 }
 
+/* Defined in parser.y */
+int p_context_builtin_import(p_context *context, const char *name);
+
 /**
  * \addtogroup directives
  * <hr>
@@ -1425,18 +1426,32 @@ static p_goal_result p_builtin_dynamic
  * If \em Name includes system-specific directory separator
  * characters (e.g. /), then the specified file will be loaded
  * directly without searching the import search path.
+ * \par
+ * The behavior of <b>import/1</b> is slightly different when
+ * used in a \ref directive_1 "(:-)/1" directive than when
+ * used in other contexts.  Within a directive, the search
+ * starts in the same directory as the including source file.
+ * Elsewhere, the search starts with the current directory.
+ * This is because the name of the including source file is
+ * not available outside of a directive context.
+ * \par
+ * Fails if \em Name could be loaded due to an error.
  *
  * \par Errors
  *
- * \li <tt>system_error</tt> - <b>import/1</b> was not used
- *     within a \ref directive_1 "(:-)/1" directive.
+ * \li <tt>instantiation_error</tt> - \em Name is a variable.
+ * \li <tt>type_error(atom_or_string, \em Name)</tt> - \em Name
+ *     is not an atom or string.
+ * \li <tt>existence_error(import, \em Name)</tt> - \em Name
+ *     could not be located on the import search path.
  *
  * \par Examples
  * \code
  * :- import(stdout).
  * :- import("stdout.lp").
- * :- import(1.5).              error message: not an atom or string
- * :- import("not_found.lp").   error message: non-existent file
+ * :- import(X).                instantiation_error
+ * :- import(1.5).              type_error(atom_or_string, 1.5)
+ * :- import("not_found.lp").   existence_error(import, "not_found.lp")
  * :- import("../dir/file.lp").
  * \endcode
  *
@@ -1445,6 +1460,9 @@ static p_goal_result p_builtin_dynamic
  * <b>ensure_loaded/1</b> and <b>include/1</b> that perform a
  * similar function to <b>import/1</b>.  Those Standard Prolog
  * directives are not supported by Plang.
+ * \par
+ * The modules extension to Standard Prolog does have an
+ * <b>import/1</b> directive.  Plang's version is not compatible.
  *
  * \par See Also
  * \ref directive_1 "(:-)/1",
@@ -1453,11 +1471,25 @@ static p_goal_result p_builtin_dynamic
 static p_goal_result p_builtin_import
     (p_context *context, p_term **args, p_term **error)
 {
-    /* Importing is only allowed when parsing a source file
-     * because it isn't possible to know the filename of the
-     * parent when executed from within a normal predicate */
-    *error = p_create_system_error(context);
-    return P_RESULT_ERROR;
+    p_term *name = p_term_deref_member(context, args[0]);
+    int result;
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    } else if (name->header.type != P_TERM_ATOM &&
+               name->header.type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "atom_or_string", name);
+        return P_RESULT_ERROR;
+    }
+    result = p_context_builtin_import(context, p_term_name(name));
+    if (!result) {
+        return P_RESULT_FAIL;
+    } else if (result < 0) {
+        *error = p_create_existence_error(context, "import", name);
+        return P_RESULT_ERROR;
+    } else {
+        return P_RESULT_TRUE;
+    }
 }
 
 /**

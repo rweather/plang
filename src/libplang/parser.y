@@ -49,18 +49,18 @@ static void yyerror(YYLTYPE *loc, p_context *context, yyscan_t yyscanner, const 
     ++(stream->error_count);
 }
 
-static void yyerror_printf(YYLTYPE *loc, p_context *context, yyscan_t yyscanner, const char *format, ...)
+static void yyerror_printf(YYLTYPE *loc, p_context *context, p_input_stream *stream, const char *format, ...)
 {
     va_list va;
     va_start(va, format);
-    p_input_stream *stream = p_term_get_extra(yyscanner);
-    if (stream->filename)
+    if (stream && stream->filename)
         fprintf(stderr, "%s:%d: ", stream->filename, loc->first_line);
-    else
+    else if (stream)
         fprintf(stderr, "%d: ", loc->first_line);
     vfprintf(stderr, format, va);
     putc('\n', stderr);
-    ++(stream->error_count);
+    if (stream)
+        ++(stream->error_count);
     va_end(va);
 }
 
@@ -237,7 +237,7 @@ static char *p_concat_strings
 
 static int p_context_consult_file_in_path
     (p_context *context, const char *pathname, const char *name,
-     int has_extn, yyscan_t yyscanner)
+     int has_extn, p_input_stream *stream)
 {
     int error;
     char *path;
@@ -271,25 +271,27 @@ static int p_context_consult_file_in_path
         return 1;
     } else if (error == EINVAL) {
         /* File exists but contained an error during loading */
-        ++(p_term_get_extra(yyscanner)->error_count);
+        if (stream)
+            ++(stream->error_count);
         free(path);
-        return 1;
+        return 0;
     }
     free(path);
-    return 0;
+    return -1;
 }
 
-static void p_context_import
-    (YYLTYPE *loc, p_context *context, yyscan_t yyscanner,
+static int p_context_import
+    (YYLTYPE *loc, p_context *context, p_input_stream *stream,
      const char *name)
 {
     const char *parent_filename;
     size_t len, len2;
     int has_extn, has_dir, is_root, error;
     char *path;
+    int result;
 
     /* Find the directory that contains the parent source file */
-    parent_filename = p_term_get_extra(yyscanner)->filename;
+    parent_filename = (stream ? stream->filename : 0);
     len = parent_filename ? strlen(parent_filename) : 0;
     while (len > 0) {
 #if defined(P_WIN32)
@@ -315,8 +317,8 @@ static void p_context_import
      * Also determine if this is a real filename or abbreviated */
     len2 = strlen(name);
     if (!len2) {
-        yyerror_printf(loc, context, yyscanner, "empty import name");
-        return;
+        yyerror_printf(loc, context, stream, "empty import name");
+        return 0;
     }
     has_extn = 0;
     while (len2 > 0) {
@@ -342,7 +344,7 @@ static void p_context_import
         is_root = 1;
     } else if (((name[0] >= 'a' && name[0] <= 'z') ||
                 (name[0] >= 'A' && name[0] <= 'Z'))) {
-        if (name[1] == '/' || name[1] == '\\')
+        if (name[1] == ':' && (name[2] == '/' || name[2] == '\\'))
             is_root = 1;
 #endif
     }
@@ -366,12 +368,13 @@ static void p_context_import
     if (error == 0) {
         /* File has been loaded successfully */
         free(path);
-        return;
+        return 1;
     } else if (error == EINVAL) {
         /* File exists but contained an error during loading */
-        ++(p_term_get_extra(yyscanner)->error_count);
+        if (stream)
+            ++(stream->error_count);
         free(path);
-        return;
+        return 0;
     }
     free(path);
 
@@ -379,22 +382,28 @@ static void p_context_import
     if (!has_dir) {
         size_t index;
         for (index = 0; index < context->user_imports.num_paths; ++index) {
-            if (p_context_consult_file_in_path
-                    (context, context->user_imports.paths[index],
-                     name, has_extn, yyscanner))
-                return;
+            result = p_context_consult_file_in_path
+                (context, context->user_imports.paths[index],
+                 name, has_extn, stream);
+            if (result >= 0)
+                return result;
         }
         for (index = 0; index < context->system_imports.num_paths; ++index) {
-            if (p_context_consult_file_in_path
-                    (context, context->system_imports.paths[index],
-                     name, has_extn, yyscanner))
-                return;
+            result = p_context_consult_file_in_path
+                (context, context->system_imports.paths[index],
+                 name, has_extn, stream);
+            if (result >= 0)
+                return result;
         }
     }
 
     /* Cannot find the file to be imported */
-    yyerror_printf(loc, context, yyscanner,
-                   "cannot locate import `%s'", name);
+    return -1;
+}
+
+int p_context_builtin_import(p_context *context, const char *name)
+{
+    return p_context_import(0, context, 0, name);
 }
 
 /* Create the head part of a class member clause */
@@ -655,11 +664,17 @@ directive
                 if (!name || (name->header.type != P_TERM_ATOM &&
                               name->header.type != P_TERM_STRING)) {
                     yyerror_printf
-                        (&(@2), context, yyscanner,
+                        (&(@2), context, input_stream,
                          "import name is not an atom or string");
                 } else {
-                    p_context_import
-                        (&(@2), context, yyscanner, p_term_name(name));
+                    int result = p_context_import
+                        (&(@2), context, input_stream,
+                         p_term_name(name));
+                    if (result < 0) {
+                        yyerror_printf
+                            (&(@2), context, input_stream,
+                             "cannot locate import `%s'", name);
+                    }
                 }
                 $$ = unary_term(":-", $2);
             } else {
@@ -705,7 +720,7 @@ callable_term
     | atom '(' arguments ')'        {
             if ($1 == context->dot_atom && $3.num_args == 2) {
                 yyerror_printf
-                    (&(@1), context, yyscanner,
+                    (&(@1), context, input_stream,
                      "(.)/2 cannot be used as a predicate name");
             }
             $$ = p_term_create_functor_with_args
@@ -1103,7 +1118,7 @@ loop_statement
                 /* The loop variable cannot appear previously
                  * in the clause; it must be a new variable */
                 yyerror_printf
-                    (&(@4), context, yyscanner,
+                    (&(@4), context, input_stream,
                      "for loop variable `%s' has been referenced previously",
                      p_term_name($4));
             }
@@ -1177,7 +1192,7 @@ switch_cases
                     $$.is_default = 2;
                 } else if ($1.is_default && $2.is_default) {
                     yyerror_printf
-                        (&(@2), context, yyscanner,
+                        (&(@2), context, input_stream,
                          "multiple `default' cases in `switch'");
                     $$.is_default = 2;
                 } else {
@@ -1222,7 +1237,7 @@ case_labels
                     append_lists($$, $1, $2);
                     if ($1.is_default) {
                         yyerror_printf
-                            (&(@2), context, yyscanner,
+                            (&(@2), context, input_stream,
                              "multiple `default' cases in `switch'");
                         $$.is_default = 2;
                     } else {
@@ -1457,7 +1472,7 @@ member_name
             if ($1 == context->class_name_atom ||
                     $1 == context->prototype_atom) {
                 yyerror_printf
-                    (&(@1), context, yyscanner,
+                    (&(@1), context, input_stream,
                      "`%s' is not allowed as a member name",
                      p_term_name($1));
             }
