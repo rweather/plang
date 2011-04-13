@@ -100,7 +100,8 @@ int main(int argc, char *argv[])
         filename = "shell.lp";
     } else {
         filename = argv[1];
-        error = p_context_consult_file(context, argv[1]);
+        error = p_context_consult_file
+            (context, argv[1], P_CONSULT_DEFAULT);
     }
     if (error == EINVAL) {
         /* Syntax error that should have already been reported */

@@ -299,6 +299,28 @@ static int p_stdio_read_func
 }
 
 /**
+ * \enum p_consult_option
+ * \ingroup context
+ * This enum defines options for p_context_consult_file().
+ */
+
+/**
+ * \var P_CONSULT_DEFAULT
+ * \ingroup context
+ * Default options.  The file will be loaded again every time
+ * it is consulted.  This is used by the \ref consult_1 "consult/1"
+ * directive.
+ */
+
+/**
+ * \var P_CONSULT_ONCE
+ * \ingroup context
+ * The file will only be consulted once.  Subsequent attempts to
+ * consult the file will quietly succeed.  This is used by
+ * the \ref import_1 "import/1" directive.
+ */
+
+/**
  * \brief Loads and consults the contents of \a filename as
  * predicates and directives to be executed within \a context.
  *
@@ -310,13 +332,15 @@ static int p_stdio_read_func
  * The special \a filename \c - can be used to read from
  * standard input.
  *
- * If \a filename has already been loaded into \a context
- * previously, then this function does nothing and returns zero.
+ * If \a option is P_CONSULT_ONCE and \a filename has already been
+ * loaded into \a context previously, then this function does
+ * nothing and returns zero.
  *
  * \ingroup context
  * \sa p_context_consult_string(), p_context_add_import_path()
  */
-int p_context_consult_file(p_context *context, const char *filename)
+int p_context_consult_file
+    (p_context *context, const char *filename, p_consult_option option)
 {
     p_input_stream stream;
     memset(&stream, 0, sizeof(stream));
@@ -327,10 +351,12 @@ int p_context_consult_file(p_context *context, const char *filename)
         stream.filename = "(standard-input)";
         stream.close_stream = 0;
     } else {
-        size_t index;
-        for (index = 0; index < context->loaded_files.num_paths; ++index) {
-            if (!strcmp(filename, context->loaded_files.paths[index]))
-                return 0;
+        if (option == P_CONSULT_ONCE) {
+            size_t index;
+            for (index = 0; index < context->loaded_files.num_paths; ++index) {
+                if (!strcmp(filename, context->loaded_files.paths[index]))
+                    return 0;
+            }
         }
         stream.stream = fopen(filename, "r");
         if (!stream.stream)

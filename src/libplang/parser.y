@@ -264,7 +264,7 @@ static int p_context_consult_file_in_path
             (pathname, strlen(pathname), sep, sep_len,
              name, strlen(name), ".lp", 3);
     }
-    error = p_context_consult_file(context, path);
+    error = p_context_consult_file(context, path, P_CONSULT_ONCE);
     if (error == 0) {
         /* File has been loaded successfully */
         free(path);
@@ -364,7 +364,7 @@ static int p_context_import
                 (parent_filename, len, name, strlen(name), ".lp", 3, 0, 0);
         }
     }
-    error = p_context_consult_file(context, path);
+    error = p_context_consult_file(context, path, P_CONSULT_ONCE);
     if (error == 0) {
         /* File has been loaded successfully */
         free(path);

@@ -33,7 +33,13 @@ void p_context_free(p_context *context);
 void *p_context_mark_trail(p_context *context);
 void p_context_backtrack_trail(p_context *context, void *marker);
 
-int p_context_consult_file(p_context *context, const char *filename);
+typedef enum {
+    P_CONSULT_DEFAULT   = 0,
+    P_CONSULT_ONCE      = 1
+} p_consult_option;
+
+int p_context_consult_file
+    (p_context *context, const char *filename, p_consult_option option);
 int p_context_consult_string(p_context *context, const char *str);
 
 typedef enum {

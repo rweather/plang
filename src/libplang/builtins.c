@@ -19,6 +19,7 @@
 
 #include <plang/database.h>
 #include <plang/errors.h>
+#include <errno.h>
 #include "term-priv.h"
 #include "database-priv.h"
 #include "context-priv.h"
@@ -53,9 +54,10 @@
  *
  * \par Directives
  * \ref directive_1 "(:-)/1",
+ * \ref initialization_1 "(?-)/1",
+ * \ref consult_1 "consult/1",
  * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
- * \ref initialization_1 "(?-)/1",
  * \ref initialization_1 "initialization/1",
  * \ref load_library_1 "load_library/1"
  *
@@ -1275,9 +1277,10 @@ static p_goal_result p_builtin_retract
  * during normal program execution.
  *
  * \ref directive_1 "(:-)/1",
+ * \ref initialization_1 "(?-)/1",
+ * \ref consult_1 "consult/1",
  * \ref dynamic_1 "dynamic/1",
  * \ref import_1 "import/1",
- * \ref initialization_1 "(?-)/1",
  * \ref initialization_1 "initialization/1",
  * \ref load_library_1 "load_library/1"
  */
@@ -1323,6 +1326,77 @@ static p_goal_result p_builtin_retract
  * \ref call_1 "call/1",
  * \ref import_1 "import/1"
  */
+
+/**
+ * \addtogroup directives
+ * <hr>
+ * \anchor consult_1
+ * <b>consult/1</b> - consults the contents of a source file.
+ *
+ * \par Usage
+ * <b>:-</b> \b consult(\em Filename).
+ *
+ * \par Description
+ * The \em Filename must be an atom or string, whose name refers to a
+ * Plang source file.  If the file exists, it will be parsed and
+ * loaded into the current execution context.  Fails if \em Filename
+ * could be loaded due to an error.
+ * \par
+ * The <b>consult/1</b> directive differs from \ref import_1 "import/1"
+ * in that it will load the file again even if it has been loaded
+ * previously.  It also does not search the import search path for
+ * \em Filename.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Filename is a variable.
+ * \li <tt>type_error(atom_or_string, \em Filename)</tt> - \em Filename
+ *     is not an atom or string.
+ * \li <tt>existence_error(file, \em Filename)</tt> - \em Filename
+ *     could not be opened.
+ *
+ * \par Examples
+ * \code
+ * :- consult("myapp.lp").
+ * :- consult(X).               instantiation_error
+ * :- consult(1.5).             type_error(atom_or_string, 1.5)
+ * :- consult("not_found.lp").  existence_error(file, "not_found.lp")
+ * :- consult("../dir/file.lp").
+ * \endcode
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog" has a directive called
+ * <b>include/1</b> that performs a similar function
+ * to <b>consult/1</b>.
+ *
+ * \par See Also
+ * \ref directive_1 "(:-)/1",
+ * \ref import_1 "import/1"
+ */
+static p_goal_result p_builtin_consult
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *name = p_term_deref_member(context, args[0]);
+    int result;
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    } else if (name->header.type != P_TERM_ATOM &&
+               name->header.type != P_TERM_STRING) {
+        *error = p_create_type_error(context, "atom_or_string", name);
+        return P_RESULT_ERROR;
+    }
+    result = p_context_consult_file
+        (context, p_term_name(name), P_CONSULT_DEFAULT);
+    if (!result) {
+        return P_RESULT_TRUE;
+    } else if (result != EINVAL) {
+        *error = p_create_existence_error(context, "file", name);
+        return P_RESULT_ERROR;
+    } else {
+        return P_RESULT_TRUE;
+    }
+}
 
 /**
  * \addtogroup directives
@@ -1466,6 +1540,7 @@ int p_context_builtin_import(p_context *context, const char *name);
  *
  * \par See Also
  * \ref directive_1 "(:-)/1",
+ * \ref consult_1 "consult/1",
  * \ref load_library_1 "load_library/1"
  */
 static p_goal_result p_builtin_import
@@ -4749,6 +4824,7 @@ void _p_db_init_builtins(p_context *context)
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
         {"compound", 1, p_builtin_compound},
+        {"consult", 1, p_builtin_consult},
         {"copy_term", 2, p_builtin_copy_term},
         {"dynamic", 1, p_builtin_dynamic},
         {"fail", 0, p_builtin_fail},

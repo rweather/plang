@@ -82,6 +82,7 @@ shell::call(help, _, _)
     stdout::writeln("    no");
     stdout::writeln();
     stdout::writeln("consult(\"filename.lp\") - Load a source file.");
+    stdout::writeln("import(modulename)     - Imports a system module.");
     stdout::writeln("exit or quit           - Exit the shell.");
     stdout::writeln();
 }
