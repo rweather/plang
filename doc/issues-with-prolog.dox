@@ -146,7 +146,7 @@ main_loop()
         case 'quit': Quit = yes;
         default:     stdout::writeln('Invalid command');
         }
-    } while (Quit != yes);
+    } while (Quit !== yes);
 }
 \endcode
 
@@ -155,7 +155,7 @@ Prolog instead forces the code to be unwound into multiple predicates:
 \code
 main_loop :-
     read_command(Cmd),
-    (Cmd != quit ->
+    (Cmd !== quit ->
         execute_command(Cmd),
         main_loop
     ; true).

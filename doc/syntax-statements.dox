@@ -1,0 +1,324 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file syntax-statements.dox
+\page syntax_statements Language syntax - Statements
+
+\li \ref syntax_term_stmt "Term statements"
+\li \ref syntax_compound_stmt "Compound statements"
+\li \ref syntax_if_stmt "If statements"
+\li \ref syntax_loop_stmt "Loop statements"
+\li \ref syntax_try_stmt "Try statements"
+\li \ref syntax_switch_stmt "Switch statements"
+
+\code
+statement --> term_statement.
+statement --> compound_statement.
+statement --> if_statement.
+statement --> loop_statement.
+statement --> try_statement.
+statement --> switch_statement.
+\endcode
+
+\section syntax_term_stmt Term statements
+
+Almost any Plang \ref syntax_terms "term" can be used as a statement,
+as long as the outermost operator has a priority less than
+<b>(,)/2</b>, or is bracketed.  This is typically referred to as
+an "argument term" because such terms normally appear as the
+arguments to predicate calls.
+
+\code
+term_statement --> argument_term, ";".
+\endcode
+
+The following are some examples of term statements:
+
+\code
+X = f(Y);
+stdout::writeln("Hello World!");
+parent(P, C);
+(V = 1, W = a || V = 2, W = b);
+\endcode
+
+At runtime, the term is evaluated as a predicate call, which will
+either succeed, fail, or throw an error.  If the term succeeds,
+then execution continues with the next statement.  If the term
+fails, then Plang will backtrack and find an alternative solution.
+If the term throws an error, then control passes to the
+\ref syntax_try_stmt "try" statement that has a
+\ref syntax_try_stmt "catch" clause matching the error.
+
+There is a special term statement, consisting of only a semi-colon,
+that is equivalent to \ref true_0 "true/0":
+
+\code
+term_statement --> ";".
+\endcode
+
+\section syntax_compound_stmt Compound statements
+
+Compound statements are surrounded with curly braces, as in C:
+
+\code
+compound_statement --> "{", statements, "}".
+compound_statement --> "{", "}".
+
+statements --> statement.
+statements --> statements, statement.
+\endcode
+
+\section syntax_if_stmt If statements
+
+Conditional statements can be expressed with the
+\ref if_stmt "if" statement:
+
+\par
+\b if (\em Goal1) \em Goal2
+\par
+\b if (\em Goal1) \em Goal2 \b else \em Goal3
+
+\em Goal1 is executed, and if it succeeds then \em Goal2 is
+executed.  If \em Goal1 fails, then \em Goal3 is executed.
+If \em Goal3 is omitted, then the statement succeeds if
+\em Goal1 fails.
+
+\em Goal1 is only executed once.  An implicit cut, \ref cut_0 "(!)/0",
+is performed if \em Goal1 succeeds.  \em Goal2 and \em Goal3 may
+involve alternatives.
+
+The formal syntax is as follows:
+
+\code
+if_statement --> "if", "(", term, ")", statement.
+if_statement --> "if", "(", term, ")", statement, "else", statement.
+\endcode
+
+Conditional statements can also be written using the
+\ref if_stmt "(-&gt;)/2" and \ref logical_or_2 "(||)/2" predicates:
+
+\par
+\b (\em Goal1 <b>-&gt;</b> \em Goal2 <b>||</b> \b true)
+\par
+\b (\em Goal1 <b>-&gt;</b> \em Goal2 <b>||</b> \em Goal3)
+
+The <b>if</b> statement form is recommended unless the conditional
+appears within an argument to \ref call_1 "call/1".
+
+\anchor syntax_do_stmt
+\anchor syntax_for_stmt
+\anchor syntax_while_stmt
+\section syntax_loop_stmt Loop statements
+
+Loops are expressed using the \ref do_stmt "do", \ref for_stmt "for",
+and \ref while_stmt "while" keywords.
+
+\par
+\b do { \em Statements } (\em Condition);
+\par
+\b for (\em Variable \b in \em List) \em Statement
+\par
+\b while (\em Condition) \em Statement
+
+The semantics is similar to the corresponding loop constructs in C.
+The <b>do</b> statement executes \em Statements until \em Condition
+succeeds.  The <b>for</b> statement executes \em Statement for
+each element of \em List, binding \em Variable to each in turn.
+The <b>while</b> statement executes \em Statement while
+\em Condition succeeds.  The following code prints the first
+five powers of 2:
+
+\code
+for (X in [2, 4, 8, 16, 32]) {
+    stdout::writeln(X);
+}
+\endcode
+
+We may instead want to express this loop as:
+
+\code
+for (X in [1, 2, 3, 4, 5]) {
+    Y is 2 ** X;
+    stdout::writeln(Y);
+}
+\endcode
+
+However, there is a problem.  After the first loop iteration,
+Y will be bound to 2.  In the second loop iteration, 2 will not
+unify with 4 (the new value of Y) and the loop fails.  The solution
+is to list the local variables in the loop that must be unbound
+each time around the loop:
+
+\code
+for [Y] (X in [1, 2, 3, 4, 5]) {
+    Y is 2 ** X;
+    stdout::writeln(Y);
+}
+\endcode
+
+The \c X variable in the <b>for</b> loop is implicitly added to
+the list of variables to unbind.
+
+All of the loop statements can take a list of variables to unbind
+each time around the loop:
+
+\par
+\b do [\em UnbindVars] { \em Statements } (\em Condition);
+\par
+\b for [\em UnbindVars] (\em Variable \b in \em List) \em Statement
+\par
+\b while [\em UnbindVars] (\em Condition) \em Statement
+
+The formal syntax for loop statements is as follows:
+
+\code
+loop_statement --> "do", unbind_vars, compound_statement,
+                        "while" "(", term, ")", ";".
+loop_statement --> "for", unbind_vars, "(", variable, "in", term, ")",
+                        statement.
+loop_statement --> "while", unbind_vars, "(", term, ")", statement.
+
+unbind_vars --> [].
+unbind_vars --> "[", "]".
+unbind_vars --> "[", unbind_var_list, "]".
+
+unbind_var_list --> variable.
+unbind_var_list --> unbind_var_list, ",", variable.
+\endcode
+
+\section syntax_try_stmt Try statements
+
+Try/catch statements are used to catch errors that were thrown
+by the \ref throw_1 "throw/1" predicate.
+
+\par
+\b try { \em Statements } \b catch (\em Pattern1) { \em Recovery1 } \b catch (\em Pattern2) { \em Recovery2 } ...
+
+The \ref catch_3 "try" statement executes \em Statements and succeeds
+or fails accordingly.  If one of the \em Statements throws an error
+with \ref throw_1 "throw/1", and the error can be unified with
+\em PatternN, then \em RecoveryN will be executed.  If the error
+does not unify with any of the patterns, then the error will
+continue to be thrown further up the call chain.
+
+It is possible for \em Statements to succeed and then for
+execution to backtrack into the body of \em Statements
+seeking another solution.  When that happens, a thrown error
+the second time may be caught by the <b>catch</b> clauses.
+
+\code
+try_statement --> "try", compound_statement, catch_clauses.
+
+catch_clauses --> catch_clause.
+catch_clauses --> catch_clauses, ",", catch_clause.
+
+catch_clause --> "catch", "(", argument_term, ")", compound_statement.
+\endcode
+
+\section syntax_switch_stmt Switch statements
+
+The \ref switch_stmt "switch" statement is used to choose between a
+number of labels, seeking the first that unifies with a term.
+
+\par
+\b switch (\em Term) { \b case \em Label1: \em Statement1; ...; \b case \em LabelN: \em StatementN; \b default: \em DefaultStatement; }
+
+Finds the first \em LabelM term in the \b case list that unifies
+with \em Term, and executes the associated \em StatementM.
+If none of the \b case labels match, then executes the
+\em DefaultStatement associated with the \b default label.
+If there is no \b default label, then the \b switch statement fails.
+
+Multiple case labels can be specified for the same statement with
+\b case \em Label1: \b case \em Label2: ... \b case \em LabelN: \em Statement.
+The \b default label can be mixed with regular \b case labels.
+
+Unlike C, execution does not fall through from \em StatementM to
+the following \em StatementM+1.
+
+Once a \em LabelM is found that unifies with \em Term, the \b switch
+statement does an implicit cut, \ref cut_0 "(!)/0", to commit the
+clause to that choice.  Backtracking does not select later
+\b case labels even if they may have otherwise unified
+with \em Term.
+
+The following is an example of an expression evaluator using
+\b switch:
+
+\code
+eval(Term, Answer) {
+    switch (Term) {
+        case X + Y: {
+            eval(X, XAnswer);
+            eval(Y, YAnswer);
+            Answer is XAnswer + YAnswer;
+        }
+        case X - Y: {
+            eval(X, XAnswer);
+            eval(Y, YAnswer);
+            Answer is XAnswer - YAnswer;
+        }
+        case X * Y: {
+            eval(X, XAnswer);
+            eval(Y, YAnswer);
+            Answer is XAnswer * YAnswer;
+        }
+        case X / Y: {
+            eval(X, XAnswer);
+            eval(Y, YAnswer);
+            Answer is XAnswer / YAnswer;
+        }
+        case -X: {
+            eval(X, XAnswer);
+            Answer is -XAnswer;
+        }
+        default: {
+            if (number(Term))
+                Answer = Term;
+            else
+                lookup_variable(Term, Answer);
+        }
+    }
+}
+
+eval(2 * x + y, Answer)
+\endcode
+
+The formal syntax for \b switch statements is as follows:
+
+\code
+switch_statement --> "switch", "(", argument_term, ")", switch_body.
+
+switch_body --> "{", switch_cases, "}".
+switch_body --> "{", "}".
+
+switch_cases --> switch_case.
+switch_cases --> switch_cases, ",", switch_case.
+
+switch_case --> case_labels, statement.
+
+case_labels --> case_label.
+case_labels --> case_labels, case_label.
+
+case_label --> "case", argument_term, ":".
+case_label --> "default", ":".
+\endcode
+
+*/

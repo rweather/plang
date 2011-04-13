@@ -21,9 +21,10 @@
 \file syntax.dox
 \page syntax Language syntax
 
-Plang uses a C-style syntax for statements, and a Prolog-style
-syntax for expressions (usually called "terms").  The simplest
-application is the traditional "Hello World":
+Plang uses a C-style syntax for \ref syntax_statements "statements",
+and a Prolog-style syntax for expressions (usually called
+\ref syntax_terms "terms").  The simplest application is the
+traditional "Hello World":
 
 \code
 :- import(stdout).
@@ -41,6 +42,7 @@ The following sections describe the various aspects of the
 Plang syntax:
 
 \li \ref syntax_terms "Terms"
+\li \ref syntax_statements "Statements"
 \li \ref syntax_dcg "Definite clause grammars"
 
 */

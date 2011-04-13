@@ -7,4 +7,5 @@ EXTRA_DIST = \
 	mainpage.dox \
 	syntax.dox \
 	syntax-dcg.dox \
+	syntax-statements.dox \
 	syntax-terms.dox

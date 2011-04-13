@@ -1929,7 +1929,8 @@ static p_goal_result p_builtin_call
  *
  * \par See Also
  * \ref throw_1 "throw/1",
- * \ref call_1 "call/1"
+ * \ref call_1 "call/1",
+ * \ref syntax_try_stmt "Formal syntax of try statements"
  */
 int p_builtin_handle_catch(p_context *context, p_term *error)
 {
@@ -2058,7 +2059,8 @@ static p_goal_result p_builtin_cut
  *
  * \par See Also
  * \ref for_stmt "for",
- * \ref while_stmt "while"
+ * \ref while_stmt "while",
+ * \ref syntax_do_stmt "Formal syntax of do statements"
  */
 static char const p_builtin_do[] =
     "'$$do'(Vars, Body, Cond)\n"
@@ -2200,7 +2202,8 @@ static p_goal_result p_builtin_fail
  * \par See Also
  * \ref do_stmt "do",
  * \ref in_2 "in/2",
- * \ref while_stmt "while"
+ * \ref while_stmt "while",
+ * \ref syntax_for_stmt "Formal syntax of for statements"
  */
 static p_goal_result p_builtin_set_loop_var
     (p_context *context, p_term **args, p_term **error)
@@ -2340,7 +2343,7 @@ static p_goal_result p_builtin_halt_1
  * (\em Goal1 -> \em Goal2 || \em Goal3)
  *
  * \par Description
- * The \em Goal1 is executed, and if it succeeds then \em Goal2 is
+ * \em Goal1 is executed, and if it succeeds then \em Goal2 is
  * executed.  If \em Goal1 fails, then \em Goal3 is executed.
  * If \em Goal3 is omitted, then the statement succeeds if
  * \em Goal1 fails.
@@ -2368,7 +2371,8 @@ static p_goal_result p_builtin_halt_1
  *
  * \par See Also
  * \ref logical_or_2 "(||)/2",
- * \ref switch_stmt "switch"
+ * \ref switch_stmt "switch",
+ * \ref syntax_if_stmt "Formal syntax of if statements"
  */
 static p_goal_result p_builtin_if
     (p_context *context, p_term **args, p_term **error)
@@ -2592,7 +2596,8 @@ static char const p_builtin_repeat[] =
  * \endcode
  *
  * \par See Also
- * \ref if_stmt "if"
+ * \ref if_stmt "if",
+ * \ref syntax_switch_stmt "Formal syntax of switch statements"
  */
 static char const p_builtin_switch[] =
     "'$$switch'(Value, [], Default)\n"
@@ -2711,7 +2716,8 @@ static p_goal_result p_builtin_true
  *
  * \par See Also
  * \ref do_stmt "do",
- * \ref for_stmt "for"
+ * \ref for_stmt "for",
+ * \ref syntax_while_stmt "Formal syntax of while statements"
  */
 static char const p_builtin_while[] =
     "'$$while'(Vars, Cond, Body)\n"
