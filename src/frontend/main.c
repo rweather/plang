@@ -27,7 +27,7 @@
 static const char shell_main[] =
     ":- import(shell).\n"
     ":- import(stdout).\n"
-    "main(_)\n"
+    "shell::frontend_main(_)\n"
     "{\n"
     "    stdout::writeln(\"Plang version " VERSION "\");\n"
     "    stdout::writeln(\"Copyright (c) 2011 Southern Storm Software, Pty Ltd.\");\n"
@@ -47,6 +47,7 @@ int main(int argc, char *argv[])
     p_goal_result result;
     int exitval;
     const char *filename;
+    const char *main_pred = "main";
 
     /* Process leading options for the plang engine itself */
     context = p_context_create();
@@ -79,6 +80,20 @@ int main(int argc, char *argv[])
             p_context_add_library_path(context, argv[1] + 2);
         } else if (!strncmp(argv[1], "--import-lib=", 13)) {
             p_context_add_library_path(context, argv[1] + 9);
+        } else if (!strcmp(argv[1], "-m") || !strcmp(argv[1], "--main")) {
+            ++argv;
+            --argc;
+            if (argc <= 1) {
+                fprintf(stderr, "%s: missing main predicate name\n",
+                        progname);
+                p_context_free(context);
+                return 1;
+            }
+            main_pred = argv[1];
+        } else if (!strncmp(argv[1], "-m", 2)) {
+            main_pred = argv[1] + 2;
+        } else if (!strncmp(argv[1], "--main=", 7)) {
+            main_pred = argv[1] + 7;
         } else if (!strcmp(argv[1], "--")) {
             ++argv;
             --argc;
@@ -98,6 +113,7 @@ int main(int argc, char *argv[])
     if (argc < 2) {
         error = p_context_consult_string(context, shell_main);
         filename = "shell.lp";
+        main_pred = "shell::frontend_main";
     } else {
         filename = argv[1];
         error = p_context_consult_file
@@ -123,7 +139,7 @@ int main(int argc, char *argv[])
 
     /* Create and execute the main(Args) goal */
     goal = p_term_create_functor
-        (context, p_term_create_atom(context, "main"), 1);
+        (context, p_term_create_atom(context, main_pred), 1);
     p_term_bind_functor_arg(goal, 0, args);
     error_term = 0;
     result = p_context_execute_goal(context, goal, &error_term);
@@ -136,7 +152,8 @@ int main(int argc, char *argv[])
         if (exitval < 0 || exitval > 127)
             exitval = 127;
     } else {
-        fprintf(stderr, "%s: main/1 threw uncaught error: ", filename);
+        fprintf(stderr, "%s: %s/1 threw uncaught error: ",
+                filename, main_pred);
         p_term_print(context, error_term, p_term_stdio_print_func, stderr);
         putc('\n', stderr);
         exitval = 1;
