@@ -13,6 +13,8 @@ libplang_la_SOURCES = \
 	lexer.l \
 	parser.y \
 	parser-priv.h \
+	rbtree.c \
+	rbtree-priv.h \
 	term.c \
 	term-priv.h
 
