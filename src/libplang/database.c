@@ -520,7 +520,7 @@ static p_term *p_db_predicate_name
 /* Convert a clause from (:-)/2 form into P_TERM_CLAUSE form */
 P_INLINE p_term *p_db_convert_clause(p_context *context, p_term *clause)
 {
-    return p_term_create_clause
+    return p_term_create_dynamic_clause
         (context, p_term_arg(clause, 0), p_term_arg(clause, 1));
 }
 

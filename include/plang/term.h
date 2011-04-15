@@ -103,7 +103,7 @@ int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2
 int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2);
 
 p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count);
-p_term *p_term_create_clause(p_context *context, p_term *head, p_term *body);
+p_term *p_term_create_dynamic_clause(p_context *context, p_term *head, p_term *body);
 void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause);
 void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause);
 

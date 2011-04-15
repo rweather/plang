@@ -165,4 +165,62 @@ variable clause list to produce the list of clauses to be
 tried in order.  If the incoming argument value is a variable,
 then all clauses in the predicate are tried in order.
 
+\section execution_model_compile Compilation of clauses
+
+Plang compiles clauses into a modified form of the
+<a href="http://en.wikipedia.org/wiki/Warren_abstract_machine">Warren
+Abstract Machine</a> (or "WAM").  We will only skim over the details
+in this page.  The best reference on the WAM is the following book:
+
+\par
+Hassan Aït-Kaci, <a href="http://wambook.sourceforge.net/">"Warren's
+Abstract Machine: A Tutorial Reconstruction"</a>, 1999.
+
+The following modifications to the traditional WAM are noteworthy:
+
+\li Plang's term representation uses structure sharing instead of
+    structure copying, which requires some modifications to how
+    the read/write mode flag is implemented.
+\li Clause Indexing is performed with red-black trees as described
+    in the previous section; WAM instructions such as
+    \c switch_on_term and \c switch_on_constant are not used.
+\li Both static and dynamic predicates are compiled, with slight
+    differences in the compiled forms.
+
+To illustrate the differences between static and dynamic compiled
+forms, consider the following example clause:
+
+\code
+a(5, f(Y, b))
+{
+    c(X);
+    d(X, Y);
+}
+\endcode
+
+The dynamic version of the clause is compiled into the following code,
+which performs \c get instructions on each of the arguments, and a
+\c put instruction for the clause body:
+
+\code
+get_constant 5, X0
+get_functor f/2, X1
+unify_variable X2
+unify_atom b
+put_functor ','/2, X3
+set_functor c/1, X4
+set_variable X5
+reset_argument X3, 1
+set_functor d/2, X4
+set_value X5
+set_value X2
+return X3
+\endcode
+
+Dynamic clauses are executed by p_term_unify_clause() and return
+the body as a callable term to be executed by the engine.
+Dynamic clauses complete deterministically with either success
+or failure.  Non-determinism is provided by the caller when it
+executes the body term.
+
 */

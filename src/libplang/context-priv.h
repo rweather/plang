@@ -36,6 +36,9 @@ extern "C" {
  * has modified the search tree */
 #define P_RESULT_TREE_CHANGE    ((p_goal_result)(P_RESULT_HALT + 5))
 
+/* Internal result code for dynamic clause body returns */
+#define P_RESULT_RETURN_BODY    ((p_goal_result)(P_RESULT_HALT + 6))
+
 typedef struct p_trail p_trail;
 
 struct p_path_list
@@ -151,6 +154,9 @@ struct p_context
     p_library *libraries;
 
     unsigned int random_seed;
+
+    p_term **xregs;
+    int num_xregs;
 };
 
 #define P_TRACE_SIZE 1020

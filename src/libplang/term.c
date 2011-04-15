@@ -22,6 +22,7 @@
 #include "term-priv.h"
 #include "context-priv.h"
 #include "rbtree-priv.h"
+#include "inst-priv.h"
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -146,7 +147,7 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  * \var P_TERM_CLAUSE
  * \ingroup term
  * The term is a reference to a single clause from a predicate.
- * \sa p_term_create_clause()
+ * \sa p_term_create_dynamic_clause()
  */
 
 /**
@@ -1462,7 +1463,7 @@ int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term 
  *
  * \ingroup term
  * \sa p_term_create_class_object(), p_term_add_clause_first()
- * \sa p_term_add_clause_last(), p_term_create_clause()
+ * \sa p_term_add_clause_last(), p_term_create_dynamic_clause()
  * \sa p_term_clauses_begin()
  */
 p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
@@ -1495,15 +1496,16 @@ p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
  * \ingroup term
  * \sa p_term_create_predicate(), p_term_add_clause_first()
  */
-p_term *p_term_create_clause(p_context *context, p_term *head, p_term *body)
+p_term *p_term_create_dynamic_clause(p_context *context, p_term *head, p_term *body)
 {
     struct p_term_clause *term =
         p_term_new(context, struct p_term_clause);
-    if (!term)
+    p_code *code = _p_code_new();
+    if (!term || !code)
         return 0;
     term->header.type = P_TERM_CLAUSE;
-    term->head = head;
-    term->body = body;
+    _p_code_generate_dynamic_clause(context, head, body, code);
+    _p_code_finish(code, &(term->clause_code));
     return (p_term *)term;
 }
 
@@ -1545,20 +1547,6 @@ P_INLINE void p_term_add_regular_clause
     }
 }
 
-/* Convert a functor argument into an indexable value */
-P_INLINE p_term *p_term_index_arg
-    (p_context *context, p_term *head, unsigned int arg_num)
-{
-    p_term *index_arg = p_term_deref(p_term_arg(head, arg_num));
-    if (index_arg && index_arg->header.type == P_TERM_FUNCTOR &&
-            index_arg->header.size == 1 &&
-            index_arg->functor.functor_name == context->in_atom) {
-        /* Remove the "in/1" declaration because it isn't relevant */
-        index_arg = p_term_arg(index_arg, 0);
-    }
-    return index_arg;
-}
-
 /* Initialize a key, but disallow list-of keys (FIXME) */
 P_INLINE int _p_rbkey_init_no_listof(p_rbkey *key, const p_term *term)
 {
@@ -1577,20 +1565,14 @@ static void p_term_index_clause
     (p_context *context, p_term *predicate,
      struct p_term_clause *clause, int first)
 {
-    p_term *index_arg;
     p_rbkey key;
     p_rbnode *node;
-
-    /* Fetch the head argument to be indexed */
-    index_arg = p_term_index_arg
-        (context, clause->head, predicate->predicate.index_arg);
-    if (!index_arg)
-        return;
 
     /* Turn the index argument into a key.  If that isn't possible
      * (usually because the argument is a variable), then add it
      * to the list of "variable clauses" */
-    if (!_p_rbkey_init_no_listof(&key, index_arg)) {
+    if (!_p_code_argument_key(&key, &(clause->clause_code),
+                              predicate->predicate.index_arg)) {
         p_term_add_indexed_clause
             (context, &(predicate->predicate.var_clauses),
              clause, first);
@@ -1609,7 +1591,6 @@ static void p_term_index_all_clauses
     (p_context *context, p_term *predicate)
 {
     struct p_term_clause *clause;
-    p_term *head;
     p_rbkey key;
     p_rbkey keys[4];
     unsigned int counts[4];
@@ -1626,10 +1607,9 @@ static void p_term_index_all_clauses
      * the number of key changes in each argument.  The argument
      * with the most key changes is used for indexing */
     clause = predicate->predicate.clauses.head;
-    head = clause->head;
     for (arg = 0; arg < 4 && arg < predicate->header.size; ++arg) {
-        if (!_p_rbkey_init_no_listof
-                (&(keys[arg]), p_term_index_arg(context, head, arg))) {
+        if (!_p_code_argument_key
+                (&(keys[arg]), &(clause->clause_code), arg)) {
             keys[arg].type = P_TERM_VARIABLE;
             keys[arg].size = 0;
             keys[arg].name = 0;
@@ -1637,10 +1617,9 @@ static void p_term_index_all_clauses
         counts[arg] = 0;
     }
     while ((clause = clause->next_clause) != 0) {
-        head = clause->head;
         for (arg = 0; arg < 4 && arg < predicate->header.size; ++arg) {
-            if (!_p_rbkey_init_no_listof
-                    (&key, p_term_index_arg(context, head, arg))) {
+            if (!_p_code_argument_key
+                    (&key, &(clause->clause_code), arg)) {
                 key.type = P_TERM_VARIABLE;
                 key.size = 0;
                 key.name = 0;
@@ -1773,16 +1752,17 @@ int _p_term_retract_clause
 {
     p_rbkey key;
     p_rbnode *node;
+    p_term *body;
     void *marker;
     struct p_term_clause_list *list;
     struct p_term_clause *current;
     struct p_term_clause *prev;
 
-    /* Compute the indexing key before we unify the clause */
+    /* Compute the key for the index argument */
     if (!predicate->predicate.is_indexed ||
-            !_p_rbkey_init_no_listof
-                (&key, p_term_arg(clause->head,
-                                  predicate->predicate.index_arg))) {
+            !_p_code_argument_key
+                (&key, &(clause->clause_code),
+                 predicate->predicate.index_arg)) {
         key.type = P_TERM_VARIABLE;
         key.size = 0;
         key.name = 0;
@@ -1790,10 +1770,11 @@ int _p_term_retract_clause
 
     /* Unify against the clause to see if this is the one we wanted */
     marker = p_context_mark_trail(context);
-    if (!p_term_unify(context, clause->head,
-                      p_term_arg(clause2, 0), P_BIND_DEFAULT))
+    body = p_term_unify_clause
+        (context, p_term_arg(clause2, 0), (p_term *)clause);
+    if (!body)
         return 0;
-    if (!p_term_unify(context, clause->body,
+    if (!p_term_unify(context, body,
                       p_term_arg(clause2, 1), P_BIND_DEFAULT)) {
         p_context_backtrack_trail(context, marker);
         return 0;
@@ -1806,7 +1787,10 @@ int _p_term_retract_clause
     /* Remove the clause from the index list it is a member of */
     if (key.type != P_TERM_VARIABLE) {
         node = _p_rbtree_lookup(&(predicate->predicate.index), &key);
-        list = &(node->clauses);
+        if (node)
+            list = &(node->clauses);
+        else
+            list = &(predicate->predicate.var_clauses); /* Just in case */
     } else {
         list = &(predicate->predicate.var_clauses);
     }
@@ -3020,20 +3004,6 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
     case P_TERM_DATABASE:
         /* Constant and object terms are cloned as themselves */
         break;
-    case P_TERM_CLAUSE: {
-        /* Clone a clause into (:-)/2 form */
-        clone = p_term_create_functor(context, context->clause_atom, 2);
-        if (!clone)
-            return 0;
-        p_term *arg = p_term_clone_inner(context, term->clause.head);
-        if (!arg)
-            return 0;
-        p_term_bind_functor_arg(clone, 0, arg);
-        arg = p_term_clone_inner(context, term->clause.body);
-        if (!arg)
-            return 0;
-        p_term_bind_functor_arg(clone, 1, arg);
-        return clone; }
     case P_TERM_VARIABLE:
         /* Create a new variable and bind the current one
          * to a rename term so that future references can
@@ -3100,56 +3070,6 @@ p_term *p_term_clone(p_context *context, p_term *term)
     return clone;
 }
 
-/* Unifies only the arguments of a functor term, ignoring the name */
-static int p_term_unify_args_only
-    (p_context *context, p_term *term1, p_term *term2, int flags)
-{
-    void *marker;
-    unsigned int index;
-    p_term *arg;
-    if (!term1 || !term2)
-        return 0;
-    term1 = p_term_deref_non_null(term1);
-    term2 = p_term_deref_non_null(term2);
-    if (term1->header.type == P_TERM_FUNCTOR) {
-        if (term2->header.type == P_TERM_FUNCTOR &&
-                term1->header.size == term2->header.size) {
-            marker = p_context_mark_trail(context);
-            for (index = 0; index < term1->header.size; ++index) {
-                arg = term1->functor.arg[index];
-                if (!arg) {
-                    p_context_backtrack_trail(context, marker);
-                    return 0;
-                }
-                arg = p_term_deref_non_null(arg);
-                if (arg->header.type == P_TERM_FUNCTOR &&
-                        arg->header.size == 1 &&
-                        arg->functor.functor_name == context->in_atom) {
-                    /* This is an input-only argument for which we need
-                       to perform one-way unification */
-                    if (!p_term_unify(context, arg->functor.arg[0],
-                                      term2->functor.arg[index],
-                                      flags | P_BIND_ONE_WAY)) {
-                        p_context_backtrack_trail(context, marker);
-                        return 0;
-                    }
-                } else {
-                    if (!p_term_unify(context, arg,
-                                      term2->functor.arg[index], flags)) {
-                        p_context_backtrack_trail(context, marker);
-                        return 0;
-                    }
-                }
-            }
-            return 1;
-        }
-    } else if (term1->header.type == P_TERM_ATOM) {
-        if (term2->header.type == P_TERM_ATOM)
-            return term1 == term2;
-    }
-    return 0;
-}
-
 /**
  * \brief Unifies \a term with the renamed head of \a clause.
  *
@@ -3168,24 +3088,30 @@ static int p_term_unify_args_only
  */
 p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
 {
-    /* This implementation is currently inefficient.  We should change
-     * this to an alternative that only clones the body if the head
-     * could be successfully unified with the term */
-    p_term *clone = p_term_clone(context, clause);
-    if (!clone)
+    unsigned int index;
+    p_goal_result result;
+    p_term *body = 0;
+
+    /* Copy the arguments to the head term into X registers */
+    term = p_term_deref(term);
+    if (!term)
         return 0;
-    if (clone->header.type == P_TERM_FUNCTOR &&
-            clone->header.size == 2 &&
-            clone->functor.functor_name == context->clause_atom) {
-        if (p_term_unify_args_only
-                (context, clone->functor.arg[0], term, P_BIND_DEFAULT))
-            return clone->functor.arg[1];
-    } else {
-        if (p_term_unify_args_only
-                (context, clone, term, P_BIND_DEFAULT))
-            return context->true_atom;
+    if (term->header.type == P_TERM_FUNCTOR) {
+        for (index = 0; index < term->header.size; ++index) {
+            _p_code_set_xreg
+                (context, (int)index, term->functor.arg[index]);
+        }
     }
-    return 0;
+
+    /* Run the clause using the interpreter to obtain the body.
+     * For dynamic clauses, only true, fail, or return are possible */
+    result = _p_code_run(context, &(clause->clause.clause_code), &body);
+    if (result == P_RESULT_RETURN_BODY)
+        return body;
+    else if (result == P_RESULT_TRUE)
+        return context->true_atom;
+    else
+        return 0;
 }
 
 /**

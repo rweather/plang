@@ -1,11 +1,15 @@
 check_PROGRAMS = \
 	test-builtins \
+	test-compiler \
 	test-database \
 	test-rbtree \
 	test-term
 
 test_builtins_SOURCES = test-builtins.c testcase.h
 test_builtins_LDADD   = $(top_builddir)/src/libplang/libplang.la
+
+test_compiler_SOURCES = test-compiler.c testcase.h
+test_compiler_LDADD   = $(top_builddir)/src/libplang/libplang.la
 
 test_database_SOURCES = test-database.c testcase.h
 test_database_LDADD   = $(top_builddir)/src/libplang/libplang.la

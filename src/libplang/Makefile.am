@@ -3,13 +3,17 @@ lib_LTLIBRARIES = libplang.la
 libplang_la_SOURCES = \
 	arith.c \
 	builtins.c \
+	compiler.c \
 	context.c \
 	context-priv.h \
 	dcg.c \
 	database.c \
 	database-priv.h \
+	disassembler.c \
 	errors.c \
 	fuzzy.c \
+	inst-priv.h \
+	interpreter.c \
 	io.c \
 	lexer.l \
 	parser.y \

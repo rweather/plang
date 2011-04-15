@@ -1,4 +1,5 @@
 test-builtins
+test-compiler
 test-term
 test-database
 test-rbtree

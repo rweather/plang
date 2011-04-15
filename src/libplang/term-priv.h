@@ -50,7 +50,7 @@ extern "C" {
 /** @cond */
 
 enum {
-    P_TERM_RENAME       = P_TERM_INVALID
+    P_TERM_RENAME       = P_TERM_INVALID,
 };
 
 /* Forward declarations for rbtree-priv.h */
@@ -160,12 +160,21 @@ struct p_term_predicate {
 #define P_TERM_DEFAULT_CLAUSE_NUM   (((unsigned int)1) << 23)
 #endif
 
+typedef union p_inst p_inst;
+typedef struct p_code_clause p_code_clause;
+struct p_code_clause
+{
+    int num_xregs;
+    int num_yregs;
+    struct p_code_block *code;
+};
+
+
 struct p_term_clause {
     struct p_term_header header;
     struct p_term_clause *next_clause;
     struct p_term_clause *next_index;
-    p_term *head;
-    p_term *body;
+    p_code_clause clause_code;
 };
 
 struct p_term_database {
@@ -176,6 +185,13 @@ struct p_term_database {
 struct p_term_rename {
     struct p_term_header header;
     p_term *var;
+};
+
+struct p_term_register {
+    struct p_term_header header;
+    unsigned int usage_count;
+    unsigned int goal_number : 31;
+    unsigned int allocated : 1;
 };
 
 union p_term {
@@ -193,6 +209,7 @@ union p_term {
     struct p_term_clause        clause;
     struct p_term_database      database;
     struct p_term_rename        rename;
+    struct p_term_register      reg;
 };
 
 #define p_term_malloc(context, type, size)  ((type *)GC_MALLOC((size)))
