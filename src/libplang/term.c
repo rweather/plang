@@ -1695,6 +1695,15 @@ int p_term_occurs_in(const p_term *var, const p_term *value)
  */
 
 /**
+ * \var P_BIND_ONE_WAY
+ * \ingroup term
+ * Variables in the first term can bind to terms in the second,
+ * but variables in the second term cannot bind to terms in the first.
+ * Attempts to bind variables in the second term will fail.
+ * The second term is essentially "frozen".
+ */
+
+/**
  * \brief Binds the variable \a var to \a value.
  *
  * Returns non-zero if the bind was successful, or zero if \a var
@@ -1811,6 +1820,8 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
     if (term1->header.type & P_TERM_VARIABLE)
         return p_term_unify_variable(context, term1, term2, flags);
     if (term2->header.type & P_TERM_VARIABLE) {
+        if (flags & P_BIND_ONE_WAY)
+            return 0;
         return p_term_unify_variable
             (context, term2, term1, flags & ~P_BIND_RECORD_ONE_WAY);
     }
@@ -2649,6 +2660,7 @@ static int p_term_unify_args_only
 {
     void *marker;
     unsigned int index;
+    p_term *arg;
     if (!term1 || !term2)
         return 0;
     term1 = p_term_deref_non_null(term1);
@@ -2658,10 +2670,29 @@ static int p_term_unify_args_only
                 term1->header.size == term2->header.size) {
             marker = p_context_mark_trail(context);
             for (index = 0; index < term1->header.size; ++index) {
-                if (!p_term_unify(context, term1->functor.arg[index],
-                                  term2->functor.arg[index], flags)) {
+                arg = term1->functor.arg[index];
+                if (!arg) {
                     p_context_backtrack_trail(context, marker);
                     return 0;
+                }
+                arg = p_term_deref_non_null(arg);
+                if (arg->header.type == P_TERM_FUNCTOR &&
+                        arg->header.size == 1 &&
+                        arg->functor.functor_name == context->in_atom) {
+                    /* This is an input-only argument for which we need
+                       to perform one-way unification */
+                    if (!p_term_unify(context, arg->functor.arg[0],
+                                      term2->functor.arg[index],
+                                      flags | P_BIND_ONE_WAY)) {
+                        p_context_backtrack_trail(context, marker);
+                        return 0;
+                    }
+                } else {
+                    if (!p_term_unify(context, arg,
+                                      term2->functor.arg[index], flags)) {
+                        p_context_backtrack_trail(context, marker);
+                        return 0;
+                    }
                 }
             }
             return 1;
@@ -2701,11 +2732,11 @@ p_term *p_term_unify_clause(p_context *context, p_term *term, p_term *clause)
             clone->header.size == 2 &&
             clone->functor.functor_name == context->clause_atom) {
         if (p_term_unify_args_only
-                (context, term, clone->functor.arg[0], P_BIND_DEFAULT))
+                (context, clone->functor.arg[0], term, P_BIND_DEFAULT))
             return clone->functor.arg[1];
     } else {
         if (p_term_unify_args_only
-                (context, term, clone, P_BIND_DEFAULT))
+                (context, clone, term, P_BIND_DEFAULT))
             return context->true_atom;
     }
     return 0;

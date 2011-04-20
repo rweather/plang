@@ -48,7 +48,8 @@ enum {
     P_BIND_NO_OCCURS_CHECK  = 0x0001,
     P_BIND_NO_RECORD        = 0x0002,
     P_BIND_RECORD_ONE_WAY   = 0x0004,
-    P_BIND_EQUALITY         = 0x0008
+    P_BIND_EQUALITY         = 0x0008,
+    P_BIND_ONE_WAY          = 0x0010
 };
 
 p_term *p_term_create_functor(p_context *context, p_term *name, int arg_count);

@@ -1,0 +1,71 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\file syntax-input-only.dox
+\page syntax_input_only Language Syntax - Input-only arguments
+
+Arguments to a predicate can be prefixed with the \b in keyword
+to declare them as "input-only".  When a value is passed to an
+input-only argument, variables in the argument can be bound to
+sub-terms within the value, but variables within the value cannot
+be bound to sub-terms within the argument.
+
+An example should help explain why input-only arguments are needed.
+The following predicate expands expressions in its first argument
+using the normal rules of arithmetic:
+
+\code
+expand(A * (B + C), A * B + A * C).
+expand((A + B) * C, A * C + B * C).
+\endcode
+
+If we were to call <tt>expand((X + Y) * Z, Solution)</tt>, then the
+predicate will respond with the following solutions:
+
+\code
+(X + Y) * B + (X + Y) * C   where Z = B + C
+X * Z + Y * Z
+\endcode
+
+Clearly, only the second of these is what we intended with the
+predicate.  The issue is that we want variables in the clause arguments
+(A, B, and C) to be bound, but not variables in the value we passed in
+(X, Y, and Z).  We can solve this problem using input-only arguments:
+
+\code
+expand(in A * (B + C), A * B + A * C).
+expand(in (A + B) * C, A * C + B * C).
+\endcode
+
+By introducing the \b in keyword in the clause definitions,
+we can force the clause to fail if variables in the incoming
+value would need to be bound for the unification to succeed.
+A similar effect can be achieved in a clause body using
+\ref unify_one_way_2 "unify_one_way/2".
+
+Traditional Prolog implementations often have a predicate that
+can freeze or lock a term to prevent unification of its variables.
+The drawback with that approach is that it requires the caller to
+know the internal details of the callee and then take steps to protect
+its terms from unexpected unification.  This breaks encapsulation.
+With Plang's approach, the callee declares the input-only constraints,
+preserving encapsulation.
+
+*/

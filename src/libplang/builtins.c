@@ -106,6 +106,7 @@
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
  * \ref unifiable_2 "unifiable/2",
+ * \ref unify_one_way_2 "unify_one_way/2"
  * \ref unify_2 "unify_with_occurs_check/2"
  *
  * \par Type testing
@@ -3594,6 +3595,7 @@ static p_goal_result p_builtin_functor
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
  * \ref unifiable_2 "unifiable/2",
+ * \ref unify_one_way_2 "unify_one_way/2"
  * \ref unify_2 "unify_with_occurs_check/2"
  */
 /*\@{*/
@@ -3631,6 +3633,7 @@ static p_goal_result p_builtin_functor
  * \par See Also
  * \ref not_unifiable_2 "(!=)/2",
  * \ref unifiable_2 "unifiable/2",
+ * \ref unify_one_way_2 "unify_one_way/2",
  * \ref assign_2 "(:=)/2"
  */
 static p_goal_result p_builtin_unify
@@ -3670,7 +3673,8 @@ static p_goal_result p_builtin_unify
  *
  * \par See Also
  * \ref unify_2 "(=)/2",
- * \ref unifiable_2 "unifiable/2"
+ * \ref unifiable_2 "unifiable/2",
+ * \ref unify_one_way_2 "unify_one_way/2"
  */
 static p_goal_result p_builtin_not_unifiable
     (p_context *context, p_term **args, p_term **error)
@@ -3706,7 +3710,8 @@ static p_goal_result p_builtin_not_unifiable
  *
  * \par See Also
  * \ref unify_2 "(=)/2",
- * \ref not_unifiable_2 "(!=)/2"
+ * \ref not_unifiable_2 "(!=)/2",
+ * \ref unify_one_way_2 "unify_one_way/2"
  */
 static p_goal_result p_builtin_unifiable
     (p_context *context, p_term **args, p_term **error)
@@ -3718,6 +3723,42 @@ static p_goal_result p_builtin_unifiable
     } else {
         return P_RESULT_FAIL;
     }
+}
+
+/**
+ * \addtogroup unification
+ * <hr>
+ * \anchor unify_one_way_2
+ * <b>unify_one_way/2</b> - unifies two terms, but only bind variables
+ * in the first term.
+ *
+ * \par Usage
+ * \b unify_one_way(\em Term1, \em Term2)
+ *
+ * \par Description
+ * If \em Term1 and \em Term2 can be unified without modifying
+ * \em Term2, then succeed.  Fails otherwise.
+ *
+ * \par Examples
+ * \code
+ * unify_one_way(X, Y + Z)      succeeds, binding X to Y + Z
+ * unify_one_way(Y + Z, X)      fails, would cause X to be modified
+ * unify_one_way(X, Y)          succeeds, binding X to Y
+ * \endcode
+ *
+ * \par See Also
+ * \ref unify_2 "(=)/2",
+ * \ref not_unifiable_2 "(!=)/2",
+ * \ref unifiable_2 "unifiable/2",
+ * \ref syntax_input_only "Input-only arguments"
+ */
+static p_goal_result p_builtin_unify_one_way
+    (p_context *context, p_term **args, p_term **error)
+{
+    if (p_term_unify(context, args[0], args[1], P_BIND_ONE_WAY))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
 }
 
 /*\@}*/
@@ -4861,6 +4902,7 @@ void _p_db_init_builtins(p_context *context)
         {"$$try", 2, p_builtin_catch},
         {"$$unbind", 1, p_builtin_unbind},
         {"unifiable", 2, p_builtin_unifiable},
+        {"unify_one_way", 2, p_builtin_unify_one_way},
         {"unify_with_occurs_check", 2, p_builtin_unify},
         {"$$unique", 1, p_builtin_unique},
         {"var", 1, p_builtin_var},

@@ -44,5 +44,6 @@ Plang syntax:
 \li \ref syntax_terms "Terms"
 \li \ref syntax_statements "Statements"
 \li \ref syntax_dcg "Definite clause grammars"
+\li \ref syntax_input_only "Input-only arguments"
 
 */

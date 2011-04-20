@@ -6,6 +6,7 @@ PLANG_TESTS = \
 	test-compose.lp \
 	test-dcg.lp \
 	test-findall.lp \
+        test-one-way.lp \
 	test-type.lp \
 	@WORDS_TESTCASE@
 

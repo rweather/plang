@@ -60,6 +60,7 @@ p_context *p_context_create(void)
     context->comma_atom = p_term_create_atom(context, ",");
     context->line_atom = p_term_create_atom(context, "$$line");
     context->if_atom = p_term_create_atom(context, "->");
+    context->in_atom = p_term_create_atom(context, "in");
     context->slash_atom = p_term_create_atom(context, "/");
     context->true_atom = p_term_create_atom(context, "true");
     context->fail_atom = p_term_create_atom(context, "fail");

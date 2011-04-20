@@ -27,6 +27,7 @@ systems which have motivated Plang's design:
 \li \ref prolog_cryptic "Cryptic syntax"
 \li \ref prolog_sugar "Syntactic sugar is not harmful!"
 \li \ref prolog_procedural "Procedural code happens"
+\li \ref prolog_freeze "Unwanted unification"
 
 \section prolog_cryptic Cryptic syntax
 
@@ -189,5 +190,38 @@ solve it.  The second does not - it is implicitly procedural.
 It is possible (and encouraged!) to write declarative Horn clauses
 in Plang, but the language doesn't make it unnecessarily difficult
 to do other things as well.
+
+\section prolog_freeze Unwanted unification
+
+It is very easy in Prolog to write a predicate that "over-unifies"
+its arguments, making it difficult to write certain kinds of
+matching algorithms.  For example, the following predicate expands
+expressions in its first argument using the normal rules of arithmetic:
+
+\code
+expand(A * (B + C), A * B + A * C).
+expand((A + B) * C, A * C + B * C).
+\endcode
+
+If we were to call <tt>expand((X + Y) * Z, Solution)</tt>, then the
+predicate will respond with the following solutions:
+
+\code
+(X + Y) * B + (X + Y) * C   where Z = B + C
+X * Z + Y * Z
+\endcode
+
+Clearly, only the second of these is what we intended with the
+predicate.  The issue is that we want variables in the clause arguments
+(A, B, and C) to be bound, but not variables in the value we passed in
+(X, Y, and Z).
+
+Traditional Prolog implementations often have a predicate that can
+freeze or lock a term to prevent unification of its variables.
+The drawback with that approach is that it requires the caller to
+know the internal details of the callee and then take steps to protect
+its terms from unexpected unification.  This breaks encapsulation.
+Plang's solution is \ref syntax_input_only "input-only arguments" and
+\ref unify_one_way_2 "one-way unification".
 
 */

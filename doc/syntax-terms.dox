@@ -760,8 +760,14 @@ predicate --> predicate_head, ".".
 predicate --> predicate_head, compound_statement.
 
 predicate_head --> atom.
-predicate_head --> atom, "(", arguments, ")".
+predicate_head --> atom, "(", head_arguments, ")".
 predicate_head --> atom, "(", ")".
+
+head_arguments --> head_argument.
+head_arguments --> head_arguments, ",", head_argument.
+
+head_argument --> term.
+head_argument --> "in", term.
 \endcode
 
 Member predicates within a class can also be declared as \c static,
@@ -775,7 +781,7 @@ member_predicate --> constructor_head, ".".
 member_predicate --> constructor_head, compound_statement.
 
 constructor_head --> "new".
-constructor_head --> "new", "(", arguments, ")".
+constructor_head --> "new", "(", head_arguments, ")".
 constructor_head --> "new", "(", ")".
 \endcode
 
@@ -788,5 +794,7 @@ to redefine it as abstract.
 
 Predicates can be converted into first-class terms using
 \ref predicate_2 "predicate/2".
+
+See also: \ref syntax_input_only "Input-only arguments".
 
 */

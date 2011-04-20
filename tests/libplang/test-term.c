@@ -884,6 +884,10 @@ static void test_unify()
 
         {"real_real_1", "42.5", "42.5", P_BIND_DEFAULT, "42.5"},
         {"real_real_2", "42.5", "41.5", P_BIND_DEFAULT | P_BIND_FAIL, 0},
+
+        {"one_way_1", "X", "foo(Y, Z)", P_BIND_DEFAULT | P_BIND_ONE_WAY, "foo(Y, Z)"},
+        {"one_way_2", "foo(Y, Z)", "X", P_BIND_DEFAULT | P_BIND_ONE_WAY | P_BIND_FAIL, 0},
+        {"one_way_3", "Y", "X", P_BIND_DEFAULT | P_BIND_ONE_WAY, "X"},
     };
     #define unify_data_len (sizeof(unify_data) / sizeof(struct unify_type))
 

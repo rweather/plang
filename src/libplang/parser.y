@@ -577,7 +577,7 @@ static p_term *create_clause_head
 %type <term>        term not_term compare_term additive_term
 %type <term>        multiplicative_term power_term unary_term
 %type <term>        primary_term condition if_term argument_term
-%type <term>        new_term member_var bracketed_term
+%type <term>        new_term member_var bracketed_term head_argument_term
 
 %type <term>        statement if_statement compound_statement
 %type <term>        loop_statement unbind_vars try_statement
@@ -593,7 +593,7 @@ static p_term *create_clause_head
 %type <list>        list_members declaration_list
 %type <list>        member_vars unbind_var_list catch_clauses
 
-%type <arg_list>    arguments
+%type <arg_list>    arguments head_arguments
 %type <r_list>      statements and_term argument_and_term dcg_term
 %type <class_body>  class_body
 %type <member_list> class_members class_member
@@ -717,7 +717,7 @@ clause
 callable_term
     : atom                          { $$ = $1; }
     | atom '(' ')'                  { $$ = $1; }
-    | atom '(' arguments ')'        {
+    | atom '(' head_arguments ')'   {
             if ($1 == context->dot_atom && $3.num_args == 2) {
                 yyerror_printf
                     (&(@1), context, input_stream,
@@ -754,6 +754,28 @@ arguments
             $$.num_args = 1;
             $$.max_args = 4;
         }
+    ;
+
+head_arguments
+    : head_arguments ',' head_argument_term   {
+            $$ = $1;
+            if ($$.num_args > $$.max_args) {
+                $$.max_args *= 2;
+                $$.args = GC_REALLOC($$.args, sizeof(p_term *) * $$.max_args);
+            }
+            $$.args[($$.num_args)++] = $3;
+        }
+    | head_argument_term {
+            $$.args = GC_MALLOC(sizeof(p_term *) * 4);
+            $$.args[0] = $1;
+            $$.num_args = 1;
+            $$.max_args = 4;
+        }
+    ;
+
+head_argument_term
+    : K_IN argument_term        { $$ = unary_term("in", $2); }
+    | argument_term             { $$ = $1; }
     ;
 
 bracketed_term
@@ -1393,7 +1415,7 @@ member_clause_head
             $$.body = 0;
             $$.has_constructor = 0;
         }
-    | K_STATIC member_name '(' arguments ')'    {
+    | K_STATIC member_name '(' head_arguments ')'    {
             $$.name = $2;
             $$.kind = p_term_create_atom(context, "static");
             $$.head = create_clause_head
@@ -1419,7 +1441,7 @@ member_clause_head
             $$.body = 0;
             $$.has_constructor = 1;
         }
-    | K_NEW '(' arguments ')'                   {
+    | K_NEW '(' head_arguments ')'                   {
             $$.name = p_term_create_atom(context, "new");
             $$.kind = p_term_create_atom(context, "constructor");
             $$.head = create_clause_head
@@ -1448,7 +1470,7 @@ regular_member_clause_head
             $$.body = 0;
             $$.has_constructor = 0;
         }
-    | member_name '(' arguments ')'             {
+    | member_name '(' head_arguments ')'             {
             $$.name = $1;
             $$.kind = p_term_create_atom(context, "member");
             $$.head = create_clause_head

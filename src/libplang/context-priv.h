@@ -75,6 +75,7 @@ struct p_context
     p_term *comma_atom;
     p_term *line_atom;
     p_term *if_atom;
+    p_term *in_atom;
     p_term *slash_atom;
     p_term *true_atom;
     p_term *fail_atom;
