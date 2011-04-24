@@ -39,6 +39,7 @@ logic programming languages:
 \li Context-free BNF grammar for the core language.
 \li Bootstraps from C - no need for a pre-existing third party
     Prolog system to "compile the compiler".
+\li Built-in support for reasoning with fuzzy logic.
 
 The following pages describe the various aspects of the Plang system:
 
@@ -47,6 +48,7 @@ The following pages describe the various aspects of the Plang system:
 \li \ref predicates "Builtin predicates"
 \li \ref modules "Modules and classes"
 \li \ref plang_manpage "Manual page for the plang command"
+\li \ref fuzzy_logic "Fuzzy logic"
 
 The \ref issues_with_prolog "Issues With Prolog" page discusses a
 number of issues with traditional Prolog implementations that have

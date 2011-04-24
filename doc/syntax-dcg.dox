@@ -232,10 +232,25 @@ does for recognizing nouns, verbs, adjectives, and adverbs
 from WordNet.  The module provides custom predicates that
 look and act like DCG rules.
 
+\section dcg_fuzzy Fuzzy DCG rules
+
+DCG rules can be annotated with \ref fuzzy_logic "fuzzy logic" to
+express the degree of confidence that the rule has in a particular
+sentence parse:
+
+\code
+verb_phrase --> verb <<0.7>>.
+verb_phrase --> verb, noun_phrase <<0.3>>.
+\endcode
+
+When a grammar is ambiguous, this can help determine which of
+several parses for a sentence is the most likely.
+
 \section dcg_formal Formal syntax of DCG rules
 
 \code
 dcg_rule --> dcg_head, "-->", dcg_body, ".".
+dcg_rule --> dcg_head, "-->", dcg_body, dcg_confidence, ".".
 
 dcg_head --> atom.
 dcg_head --> atom, "(", arguments, ")".
@@ -257,6 +272,9 @@ dcg_prim --> "[", arguments, "]".
 dcg_prim --> string.
 dcg_prim --> "(", dcg_body, ")".
 dcg_prim --> "!".
+
+dcg_confidence --> "<<", integer, ">>".
+dcg_confidence --> "<<", float, ">>".
 \endcode
 
 */

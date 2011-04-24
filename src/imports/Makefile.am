@@ -1,6 +1,7 @@
 importsdir = $(datadir)/plang/imports
 imports_DATA = \
 	findall.lp \
+	fuzzy.lp \
 	iostream.lp \
 	shell.lp \
 	stderr.lp \
@@ -8,7 +9,8 @@ imports_DATA = \
 	stdout.lp
 
 EXTRA_DOCS = \
-	findall.lp \
+	findall.dox \
+	fuzzy.dox \
 	iostream.dox \
 	modules.dox \
 	shell.dox \

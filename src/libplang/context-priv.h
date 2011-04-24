@@ -63,6 +63,7 @@ struct p_exec_fail_node
 {
     p_exec_node parent;
     void *fail_marker;
+    double confidence;
     p_exec_catch_node *catch_node;
 };
 struct p_exec_clause_node
@@ -117,6 +118,7 @@ struct p_context
     p_exec_fail_node *fail_node;
     p_exec_catch_node *catch_node;
     void *fail_marker;
+    double confidence;
 
     int allow_test_goals;
     p_term *test_goal;

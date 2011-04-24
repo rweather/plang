@@ -39,9 +39,15 @@ shell::write_vars([Name = Var|Tail], Vars)
 shell::call_until_fail(Term, Vars, Stdin)
 {
     call(Term);
+    '$$fuzzy'(Confidence);
     stdout::writeln();
     shell::write_vars(Vars, Vars);
-    stdout::write(" ? ");
+    if (Confidence == 1.0) {
+        stdout::write(" ? ");
+    } else {
+        stdout::writeln();
+        stdout::write("confidence = " + Confidence + " ? ");
+    }
     stdout::flush();
     Stdin.readLine(Line);
     if (Line == ";")
@@ -89,10 +95,15 @@ shell::call(help, _, _)
 shell::call(Term, [], _)
 {
     !;
-    if (call(Term))
-        stdout::writeln("\nyes\n");
-    else
+    if (call(Term)) {
+        '$$fuzzy'(Confidence);
+        if (Confidence == 1.0)
+            stdout::writeln("\nyes\n");
+        else
+            stdout::writeln("\nyes, confidence = " + Confidence + "\n");
+    } else {
         stdout::writeln("\nno\n");
+    }
 }
 shell::call(Term, Vars, Stdin)
 {
@@ -113,6 +124,7 @@ shell::main(Prompt)
         try {
             (Stdin.readTerm(Term, Vars)
                 || Term = exit, stdout::writeln("exit."));
+            '$$set_fuzzy'(1);
             shell::call(Term, Vars, Stdin);
         } catch (error(syntax_error(_), _)) {
             true;

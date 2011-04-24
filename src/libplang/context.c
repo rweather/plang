@@ -69,10 +69,12 @@ p_context *p_context_create(void)
     context->call_args_atom = p_term_create_atom(context, "$$");
     context->unify_atom = p_term_create_atom(context, "=");
     context->trail_top = P_TRACE_SIZE;
+    context->confidence = 1.0;
     _p_db_init(context);
     _p_db_init_builtins(context);
     _p_db_init_arith(context);
     _p_db_init_io(context);
+    _p_db_init_fuzzy(context);
     p_context_find_system_imports(context);
     return context;
 }
@@ -452,6 +454,7 @@ void _p_context_basic_fail_func
     (p_context *context, p_exec_fail_node *node)
 {
     p_context_backtrack_trail(context, node->fail_marker);
+    context->confidence = node->confidence;
     context->catch_node = node->catch_node;
 }
 
@@ -517,6 +520,7 @@ void _p_context_init_fail_node
 {
     node->parent.fail_func = fail_func;
     node->fail_marker = context->fail_marker;
+    node->confidence = context->confidence;
     node->catch_node = context->catch_node;
 }
 
@@ -772,6 +776,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
  *
  * \ingroup context
  * \sa p_context_reexecute_goal(), p_context_abandon_goal(),
+ * p_context_fuzzy, confidence(),
  * \ref execution_model "Plang execution model"
  */
 p_goal_result p_context_execute_goal
@@ -791,6 +796,7 @@ p_goal_result p_context_execute_goal
     context->current_node->goal = goal;
     context->fail_node = 0;
     context->catch_node = 0;
+    context->confidence = 1.0;
     context->goal_active = 1;
     context->goal_marker = p_context_mark_trail(context);
     result = p_goal_execute(context, &error_term);
@@ -799,6 +805,7 @@ p_goal_result p_context_execute_goal
     if (result != P_RESULT_TRUE) {
         context->current_node = 0;
         context->fail_node = 0;
+        context->confidence = 0.0;
     }
     return result;
 }
@@ -820,6 +827,7 @@ p_goal_result p_context_execute_goal
  *
  * \ingroup context
  * \sa p_context_execute_goal(), p_context_abandon_goal(),
+ * p_context_fuzzy_confidence(),
  * \ref execution_model "Plang execution model"
  */
 p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
@@ -836,6 +844,7 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
     if (result != P_RESULT_TRUE) {
         context->current_node = 0;
         context->fail_node = 0;
+        context->confidence = 0.0;
     }
     return result;
 }
@@ -859,7 +868,55 @@ void p_context_abandon_goal(p_context *context)
         context->current_node = 0;
         context->fail_node = 0;
         context->catch_node = 0;
+        context->confidence = 1.0;
     }
+}
+
+/**
+ * \brief Returns the fuzzy confidence factor for the last top-level
+ * solution that was returned on \a context.
+ *
+ * The confidence factor is between 0 and 1 and indicates how
+ * confident the application is of the solution when it involves
+ * \ref fuzzy_logic "fuzzy reasoning".  For example, 0.8 indicates
+ * that the application is 80% confident about the returned solution.
+ *
+ * The value will be 0 if a top-level failure or thrown error has
+ * occurred.  The value will be 1 if a top-level success has
+ * occurred with normal confidence.  The values will be between
+ * 0 and 1 if a top-level success has occurred but the confidence
+ * is less than total
+ *
+ * \ingroup context
+ * \sa p_context_execute_goal(), p_context_reexecute_goal(),
+ * p_context_set_fuzzy_confidence(), \ref fuzzy_logic "Fuzzy logic".
+ */
+double p_context_fuzzy_confidence(p_context *context)
+{
+    return context->confidence;
+}
+
+/**
+ * \brief Sets the fuzzy confidence factor for \a context to \a value.
+ *
+ * The confidence factor is between 0 and 1 and indicates how
+ * confident the application is of the solution when it involves
+ * \ref fuzzy_logic "fuzzy reasoning".
+ *
+ * The \a value will be clamped to between 0.00001 and 1.  It is
+ * not possible to set \a value to 0, as that value should be
+ * indicated by P_RESULT_FAIL instead.
+ *
+ * \ingroup context
+ * \sa p_context_fuzzy_confidence(), \ref fuzzy_logic "Fuzzy logic".
+ */
+void p_context_set_fuzzy_confidence(p_context *context, double value)
+{
+    if (value < 0.00001)
+        value = 0.00001;
+    else if (value > 1.0)
+        value = 1.0;
+    context->confidence = value;
 }
 
 /**
@@ -871,7 +928,7 @@ void p_context_abandon_goal(p_context *context)
  * the top level of \a goal is not supported.
  *
  * \ingroup context
- * \sa p_context_execute_goal()
+ * \sa p_context_execute_goal(), p_context_fuzzy_confidence()
  */
 p_goal_result p_context_call_once
     (p_context *context, p_term *goal, p_term **error)
@@ -880,6 +937,7 @@ p_goal_result p_context_call_once
     p_exec_node *current = context->current_node;
     p_exec_fail_node *fail = context->fail_node;
     p_exec_catch_node *catch_node = context->catch_node;
+    double confidence = context->confidence;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     p_term *error_node = 0;
     if (goal_node) {
@@ -887,10 +945,17 @@ p_goal_result p_context_call_once
         context->current_node = goal_node;
         context->fail_node = 0;
         context->catch_node = 0;
+        context->confidence = 1.0;
         result = p_goal_execute(context, &error_node);
+        if (result == P_RESULT_TRUE && context->confidence != 1.0) {
+            // Propagate the goal's fuzzy confidence to the parent.
+            if (context->confidence < confidence)
+                confidence = context->confidence;
+        }
         context->current_node = current;
         context->fail_node = fail;
         context->catch_node = catch_node;
+        context->confidence = confidence;
     } else {
         result = P_RESULT_FAIL;
     }
@@ -909,16 +974,19 @@ p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal)
     p_exec_node *current = context->current_node;
     p_exec_fail_node *fail = context->fail_node;
     p_exec_catch_node *catch_node = context->catch_node;
+    double confidence = context->confidence;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     if (goal_node) {
         goal_node->goal = goal;
         context->current_node = goal_node;
         context->fail_node = 0;
         context->catch_node = 0;
+        context->confidence = 1.0;
         result = p_goal_execute(context, &error);
         context->current_node = current;
         context->fail_node = fail;
         context->catch_node = catch_node;
+        context->confidence = confidence;
     } else {
         result = P_RESULT_FAIL;
     }

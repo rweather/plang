@@ -581,7 +581,8 @@ static p_term *create_clause_head
 
 %type <term>        statement if_statement compound_statement
 %type <term>        loop_statement unbind_vars try_statement
-%type <term>        catch_clause switch_statement
+%type <term>        catch_clause switch_statement clause_body
+%type <term>        confidence
 
 %type <term>        dcg_clause dcg_body dcg_unary_term
 %type <term>        dcg_primitive_term
@@ -706,12 +707,23 @@ goal
     ;
 
 clause
-    : callable_term K_DOT_TERMINATOR    {
-            $$ = binary_term(":-", $1, context->true_atom);
+    : callable_term clause_body     { $$ = binary_term(":-", $1, $2); }
+    ;
+
+clause_body
+    : K_DOT_TERMINATOR              { $$ = context->true_atom; }
+    | compound_statement            { $$ = $1; }
+    | K_SHIFT_LEFT confidence K_SHIFT_RIGHT K_DOT_TERMINATOR {
+            $$ = unary_term("$$fuzzy", $2);
         }
-    | callable_term compound_statement  {
-            $$ = binary_term(":-", $1, $2);
+    | K_SHIFT_LEFT confidence K_SHIFT_RIGHT compound_statement {
+            $$ = binary_term(",", unary_term("$$fuzzy", $2), $4);
         }
+    ;
+
+confidence
+    : K_INTEGER                     { $$ = $1; }
+    | K_REAL                        { $$ = $1; }
     ;
 
 callable_term
@@ -1369,11 +1381,7 @@ class_member
     ;
 
 member_clause
-    : member_clause_head K_DOT_TERMINATOR   {
-            $$ = $1;
-            $$.body = context->true_atom;
-        }
-    | member_clause_head compound_statement {
+    : member_clause_head clause_body    {
             $$ = $1;
             $$.body = $2;
         }
@@ -1505,6 +1513,14 @@ member_name
 dcg_clause
     : callable_term K_DARROW dcg_body K_DOT_TERMINATOR {
             $$ = p_term_expand_dcg(context, binary_term("-->", $1, $3));
+        }
+    | callable_term K_DARROW dcg_body K_SHIFT_LEFT confidence
+        K_SHIFT_RIGHT K_DOT_TERMINATOR {
+            p_term *body = unary_term
+                ("$$compound", unary_term("$$fuzzy", $5));
+            body = binary_term(",", $3, body);
+            $$ = p_term_expand_dcg
+                (context, binary_term("-->", $1, body));
         }
     ;
 

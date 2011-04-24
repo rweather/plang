@@ -1,0 +1,551 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\addtogroup fuzzy_logic
+
+\section fuzzy_intro Introduction
+
+When reasoning about natural systems, it is rarely the case
+that results are precisely true or precisely false.  For example,
+we might agree that 3 degrees celcius is "cold", but what
+about 10 degrees celcius?  Where is the cut-off point between
+"cold" and "not cold"?  In reality, 10 degrees is still
+"somewhat cold".
+
+As another example, a person who is 10 years old may be
+considered "young".  But what about a person who is 30 years old?
+Compared to an 80 year old person, 30 is still "relatively young".
+Once again, the cut-off point is not exact.
+
+<i>Fuzzy logic</i> allows us to express relationships like
+"somewhat cold" and "relatively young" by using a range of values
+between 0 and 1.  We might assign the value 1 to the statement
+"3 degrees celcius is cold", 0.7 to the statement "10 degrees
+celcius is cold", and 0.2 to the statement "30 years old is young".
+
+Note: all of the predicates defined below require an explicit import
+of the \c fuzzy module:
+
+\code
+:- import(fuzzy).
+\endcode
+
+\section fuzzy_confidence Confidence values
+
+Statements and expressions in Plang have an associated fuzzy value
+that ranges between 0 and 1 and indicates the degree of
+\em confidence that the application has in the result.
+If a statement does not involve fuzzy operations, then its
+confidence value will be set to 1 if it succeeds or 0 if it fails.
+Most \ref predicates "built-in predicates" and
+\ref syntax_statements "statements" in Plang fall into
+this category.
+
+Confidence values for facts can be expressed directly on
+the clause for the fact:
+
+\code
+cold(3)  <<1.0>>.    // 3 degrees is cold with confidence 1
+cold(10) <<0.7>>.    // 10 degrees is cold with confidence 0.7
+cold(27) <<0.0>>.    // 27 degrees is cold with confidence 0 (fail)
+\endcode
+
+This works well for discrete facts, but not as well for continuous
+values like temperature.  A better way to define "cold" is to
+compute the fuzzy confidence value based on the incoming temperature:
+
+\code
+cold(Temperature)
+{
+    fuzzy(1.0 - (Temperature - 3.0) / 24.0);
+}
+\endcode
+
+The \ref fuzzy_1 "fuzzy/1" predicate evaluates its argument,
+clamps it to the range 0 to 1, and then alters the application's
+\em current_confidence value according to the following formula:
+
+\par
+\em new_confidence = min(\em current_confidence, \b confidence(\em Statement))
+
+where \b confidence(\em Statement) is the fuzzy confidence value
+produced by executing \em Statement.  Multiple executions of a
+\ref fuzzy_1 "fuzzy/1" statement will accumulate a final
+fuzzy confidence value that is the minimum of all intermediate
+values.  For example, if the initial fuzzy confidence value is 1,
+then the following predicate will reduce it to 0.5 (the minimum of
+1, 0.6, 0.5, and 0.8):
+
+\code
+foo()
+{
+    fuzzy(0.6);
+    fuzzy(0.5);
+    fuzzy(0.8);
+}
+\endcode
+
+If the current fuzzy confidence value reduces to zero, then a
+fail and backtrack will occur.
+
+\section fuzzy_operators Combining confidence values
+
+In the previous section, we used the default AND rule for
+combining confidence values.  Confidence values can also be
+combined explicitly using the Zadeh operators for AND, OR, and NOT:
+
+\par
+\b confidence(\ref fuzzy_and_2 "fuzzy_and"(\em A, \em B)) = min(\b confidence(\em A), \b confidence(\em B))
+\par
+\b confidence(\ref fuzzy_or_2 "fuzzy_or"(\em A, \em B)) = max(\b confidence(\em A), \b confidence(\em B))
+\par
+\b confidence(\ref fuzzy_not_1 "fuzzy_not"(\em A)) = 1 - \b confidence(\em A)
+
+The \ref fuzzy_and_2 "fuzzy_and/2" operator is a convenience
+predicate: \ref fuzzy_and_2 "fuzzy_and"(\em A, \em B) is equivalent
+to the statement sequence \em A ; \em B.  That is, the following
+two statement sequences are equivalent:
+
+\code
+cold(Temperature);
+low_pressure(Pressure);
+
+fuzzy_and(cold(Temperature), low_pressure(Pressure));
+\endcode
+
+Plang also provides two "product" operators that can be used as
+alternatives for AND and OR ("product NOT" is the same as Zadeh NOT):
+
+\par
+\b confidence(\ref fuzzy_prod_2 "fuzzy_prod"(\em A, \em B)) = \b confidence(\em A) * \b confidence(\em B)
+\par
+\b confidence(\ref fuzzy_prod_or_2 "fuzzy_prod_or"(\em A, \em B)) = \b confidence(\em A) + \b confidence(\em B) - \b confidence(\em A) * \b confidence(\em B)
+
+Both the Zadeh operators and the product operators obey
+<a href="http://en.wikipedia.org/wiki/De_Morgan's_laws">De Morgan's laws</a>:
+
+\par
+\b confidence(\ref fuzzy_not_1 "fuzzy_not"(\ref fuzzy_and_2 "fuzzy_and"(\em A, \em B))) = \b confidence(\ref fuzzy_or_2 "fuzzy_or"(\ref fuzzy_not_1 "fuzzy_not"(\em A), \ref fuzzy_not_1 "fuzzy_not"(\em B)))
+\par
+\b confidence(\ref fuzzy_not_1 "fuzzy_not"(\ref fuzzy_or_2 "fuzzy_or"(\em A, \em B))) = \b confidence(\ref fuzzy_and_2 "fuzzy_and"(\ref fuzzy_not_1 "fuzzy_not"(\em A), \ref fuzzy_not_1 "fuzzy_not"(\em B)))
+\par
+\b confidence(\ref fuzzy_not_1 "fuzzy_not"(\ref fuzzy_prod_2 "fuzzy_prod"(\em A, \em B))) = \b confidence(\ref fuzzy_prod_or_2 "fuzzy_prod_or"(\ref fuzzy_not_1 "fuzzy_not"(\em A), \ref fuzzy_not_1 "fuzzy_not"(\em B)))
+\par
+\b confidence(\ref fuzzy_not_1 "fuzzy_not"(\ref fuzzy_prod_or_2 "fuzzy_prod_or"(\em A, \em B))) = \b confidence(\ref fuzzy_prod_2 "fuzzy_prod"(\ref fuzzy_not_1 "fuzzy_not"(\em A), \ref fuzzy_not_1 "fuzzy_not"(\em B)))
+
+\section fuzzy_dcg Fuzzy logic and DCG's
+
+\ref syntax_dcg "Definite clause grammar" rules can be annotated
+to express the degree of confidence that the rule has in a
+particular sentence parse:
+
+\code
+verb_phrase --> verb <<0.7>>.
+verb_phrase --> verb, noun_phrase <<0.3>>.
+\endcode
+
+When a grammar is ambiguous, this can help determine which of
+several parses for a sentence is the most likely.
+
+\section fuzzy_predicates Fuzzy control predicates
+
+\ref fuzzy_1 "(&lt;&lt;...&gt;&gt;)/1",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_2 "fuzzy/2",
+\ref fuzzy_and_2 "fuzzy_and/2",
+\ref fuzzy_findall_3 "fuzzy_findall/3",
+\ref fuzzy_findall_sorted_3 "fuzzy_findall_sorted/3",
+\ref fuzzy_not_1 "fuzzy_not/1",
+\ref fuzzy_or_2 "fuzzy_or/2",
+\ref fuzzy_prod_2 "fuzzy_prod/2",
+\ref fuzzy_prod_or_2 "fuzzy_prod_or/2",
+\ref set_fuzzy_1 "set_fuzzy/1"
+
+<hr>
+\anchor fuzzy_1
+<b>fuzzy/1</b>, <b>(&lt;&lt;...&gt;&gt;)/1</b> - adjusts the
+current fuzzy confidence value.
+
+\par Usage
+\b fuzzy(\em Expr)
+\par
+\em head(...) <b>&lt;&lt;</b> \em Expr <b>&gt;&gt;</b> { \em Body }
+
+\par Description
+If \em Expr is a variable, then unifies \em Expr with the
+current fuzzy confidence value.
+\par
+If \em Expr is not a variable, then the rules of \ref is_2 "is/2"
+are used to evaluate \em Expr to a number.  If \em Expr is
+less than or equal to zero, then fail.  Otherwise set the
+current fuzzy confidence value to the minimum of \em Expr
+and the current fuzzy confidence value.
+\par
+The current fuzzy confidence value can only be adjusted downwards by
+this predicate.  The current fuzzy confidence value is initialized
+by the system to 1, so values of \em Expr greater than 1 will
+be ignored.
+\par
+The <b>(&lt;&lt;...&gt;&gt;)/1</b> form can only be used in
+the head of a clause, just before the \em Body, and \em Expr
+must be a constant floating-point or integer value.
+
+\par Errors
+
+\li <tt>type_error(number, \em Expr)</tt> - \em Expr is not a
+    variable and it did not evaluate to a number.
+
+\par Examples
+\code
+cold(3)  <<1.0>>.    // 3 degrees is cold with confidence 1
+cold(10) <<0.7>>.    // 10 degrees is cold with confidence 0.7
+cold(27) <<0.0>>.    // 27 degrees is cold with confidence 0 (fail)
+
+cold(Temperature)
+{
+    fuzzy(1.0 - (Temperature - 3.0) / 24.0);
+}
+\endcode
+
+\par See Also
+\ref fuzzy_2 "fuzzy/2",
+\ref is_2 "is/2",
+\ref set_fuzzy_1 "set_fuzzy/1"
+
+<hr>
+\anchor fuzzy_2
+<b>fuzzy/2</b> - adjusts the current fuzzy confidence value
+according to an interval list.
+
+\par Usage
+\b fuzzy(\em Expr, \em List)
+
+\par Description
+Evaluates \em Expr according to the rules of \ref is_2 "is/2".
+\par
+\em List must have the form [(\em Value1, \em Fuzzy1),
+(\em Value2, \em Fuzzy2), ..., (\em ValueN, \em FuzzyN)],
+where the \em Valuei members are in ascending order.
+The predicate searches \em List for \em Expr to determine a
+fuzzy adjustment value.
+\par
+If \em Expr is less than \em Value1, then the fuzzy adjustment
+value is set to \em Fuzzy1.  If \em Expr is greater than
+\em ValueN, then the fuzzy adjustment value is set to \em FuzzyN.
+Otherwise a linear interpolation between \em Fuzzyi and
+\em Fuzzyi+1 is performed to determine the fuzzy adjustment
+value, where \em Expr falls between \em Valuei and \em Valuei+1.
+\par
+If the fuzzy adjustment value is less than or equal to zero,
+then fail.  Otherwise set the current fuzzy confidence value
+to the minimum of the fuzzy adjustment value and the
+current fuzzy confidence value.
+
+\par Errors
+
+\li <tt>type_error(number, \em Expr)</tt> - \em Expr did not
+    evaluate to a number.
+\li <tt>instantiation_error</tt> - \em List is a variable.
+\li <tt>type_error(interval_list, \em List)</tt> - \em List is
+    not a valid interval list.
+
+\par Examples
+\code
+cold(Temperature)
+{
+    fuzzy(Temperature, [(1, 3), (27, 0)]);
+}
+\endcode
+
+\par See Also
+\ref fuzzy_1 "fuzzy/1",
+\ref is_2 "is/2"
+
+<hr>
+\anchor fuzzy_and_2
+<b>fuzzy_and/2</b> - Zadeh AND operator for fuzzy logic.
+
+\par Usage
+\b fuzzy_and(\em Goal1, \em Goal2)
+
+\par Description
+Executes \em Goal1 and then \em Goal2.  The new fuzzy confidence
+value is computed from the confidence values for \em Goal1 and
+\em Goal2 as follows:
+\par
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\em new_confidence = min(\em current_confidence, min(\b confidence(\em Goal1), \b confidence(\em Goal2)))
+\par
+The <b>fuzzy_and/2</b> predicate is equivalent to executing
+the statement sequence \em Goal1 <b>;</b> \em Goal2.
+
+\par Examples
+\code
+fuzzy_and(cold(Temperature), low_pressure(Pressure));
+
+cold(Temperature); low_pressure(Pressure);
+\endcode
+
+\par See Also
+\ref logical_and_2 "(&amp;&amp;)/2",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_not_1 "fuzzy_not/1",
+\ref fuzzy_or_2 "fuzzy_or/2",
+\ref fuzzy_prod_2 "fuzzy_prod/2"
+
+<hr>
+\anchor fuzzy_findall_3
+<b>fuzzy_findall/3</b> - find all solutions to a goal and their
+fuzzy confidence values.
+
+\par Usage
+\b fuzzy_findall(\em Term, \em Goal, \em List)
+
+\par Description
+Executes \em Goal multiple times until it fails.  Every time it
+succeeds, record (\em Term, \em Confidence) in \em List where
+\em Confidence is the fuzzy confidence value corresponding to
+that solution.
+
+\par Errors
+
+\li <tt>instantiation_error</tt> - \em Goal is a variable.
+\li <tt>type_error(callable, \em Goal)</tt> - \em Goal or some
+    part of \em Goal is not callable.
+\li <tt>type_error(list, \em List)</tt> - \em List is not a
+    variable, list, or partial list.
+
+\par Examples
+\code
+cold(3)  <<1.0>>.
+cold(10) <<0.7>>.
+cold(27) <<0.0>>.
+
+fuzzy_findall(T, cold(T), List);
+
+results in: List = [(3, 1.0), (10, 0.7)]
+\endcode
+
+\par See Also
+\ref findall_3 "findall/3",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_findall_sorted_3 "fuzzy_findall_sorted/3"
+
+<hr>
+\anchor fuzzy_findall_sorted_3
+<b>fuzzy_findall_sorted/3</b> - find all solutions to a goal and sort
+them on their fuzzy confidence values.
+
+\par Usage
+\b fuzzy_findall_sorted(\em Term, \em Goal, \em List)
+
+\par Description
+Executes \em Goal multiple times until it fails.  Every time it
+succeeds, record (\em Term, \em Confidence) in \em List where
+\em Confidence is the fuzzy confidence value corresponding to
+that solution.
+\par
+The returned \em List will be ordered from the highest fuzzy
+confidence value to the lowest.  If two or more elements have the
+same fuzzy confidence value, then the ordering of the equal
+solutions is undefined.
+
+\par Errors
+
+\li <tt>instantiation_error</tt> - \em Goal is a variable.
+\li <tt>type_error(callable, \em Goal)</tt> - \em Goal or some
+    part of \em Goal is not callable.
+\li <tt>type_error(list, \em List)</tt> - \em List is not a
+    variable, list, or partial list.
+
+\par Examples
+\code
+warm(3)  <<0.0>>.
+warm(10) <<0.3>>.
+warm(27) <<1.0>>.
+
+fuzzy_findall_sorted(T, warm(T), List);
+
+results in: List = [(27, 1.0), (10, 0.3)]
+\endcode
+
+\par See Also
+\ref findall_3 "findall/3",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_findall_3 "fuzzy_findall/3"
+
+<hr>
+\anchor fuzzy_not_1
+<b>fuzzy_not/1</b> - NOT operator for fuzzy logic.
+
+\par Usage
+\b fuzzy_not(\em Goal)
+
+\par Description
+Executes \em Goal.  The new fuzzy confidence value is computed
+from the confidence value for \em Goal as follows:
+\par
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\em new_confidence = min(\em current_confidence, 1 - \b confidence(\em Goal1))
+\par
+If \em Goal fails, then \b confidence(\em Goal) is taken to be 0.
+If \em Goal succeeds but did not involve fuzzy terms,
+then \b confidence(\em Goal) is taken to be 1
+(and then \b fuzzy_not(\em Goal) fails).
+
+\par Examples
+\code
+fuzzy_not(cold(15))
+\endcode
+
+\par See Also
+\ref not_provable_1 "(!)/1",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_and_2 "fuzzy_and/2",
+\ref fuzzy_or_2 "fuzzy_or/2",
+\ref fuzzy_prod_2 "fuzzy_prod/2",
+\ref fuzzy_prod_or_2 "fuzzy_prod_or/2"
+
+<hr>
+\anchor fuzzy_or_2
+<b>fuzzy_or/2</b> - Zadeh OR operator for fuzzy logic.
+
+\par Usage
+\b fuzzy_or(\em Goal1, \em Goal2)
+
+\par Description
+Executes \em Goal1 and then \em Goal2.  The new fuzzy confidence
+value is computed from the confidence values for \em Goal1 and
+\em Goal2 as follows:
+\par
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\em new_confidence = min(\em current_confidence, max(\b confidence(\em Goal1), \b confidence(\em Goal2)))
+\par
+This predicate differs from \ref logical_or_2 "(||)/2" in that
+it will evaluate \em Goal1 and \em Goal2 at the same time rather
+than treating them as alternative execution paths as
+<b>(||)/2</b> does.
+
+\par Examples
+\code
+fuzzy_or(cold(Temperature), low_pressure(Pressure))
+\endcode
+
+\par See Also
+\ref logical_or_2 "(||)/2",
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_and_2 "fuzzy_and/2",
+\ref fuzzy_not_1 "fuzzy_not/1",
+\ref fuzzy_prod_or_2 "fuzzy_prod_or/2"
+
+<hr>
+\anchor fuzzy_prod_2
+<b>fuzzy_prod/2</b> - product AND operator for fuzzy logic.
+
+\par Usage
+\b fuzzy_prod(\em Goal1, \em Goal2)
+
+\par Description
+Executes \em Goal1 and then \em Goal2.  The new fuzzy confidence
+value is computed from the confidence values for \em Goal1 and
+\em Goal2 as follows:
+\par
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\em new_confidence = min(\em current_confidence, \b confidence(\em Goal1) * \b confidence(\em Goal2))
+\par
+This operator is useful for reasoning about probabilities
+where the probability of two independent events occurring in
+combination is their product, not their minimum.
+\par
+The \ref fuzzy_prod_or_2 "fuzzy_prod_or/2" and
+\ref fuzzy_not_1 "fuzzy_not/1" operators provide the
+logical OR and NOT counterparts to <b>fuzzy_prod/2</b>.
+
+\par Examples
+\code
+fuzzy_prod(cold(Temperature), low_pressure(Pressure))
+\endcode
+
+\par See Also
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_and_2 "fuzzy_and/2",
+\ref fuzzy_not_1 "fuzzy_not/1",
+\ref fuzzy_prod_or_2 "fuzzy_prod_or/2"
+
+<hr>
+\anchor fuzzy_prod_or_2
+<b>fuzzy_prod_or/2</b> - product OR operator for fuzzy logic.
+
+\par Usage
+\b fuzzy_prod_or(\em Goal1, \em Goal2)
+
+\par Description
+Executes \em Goal1 and then \em Goal2.  The new fuzzy confidence
+value is computed from the confidence values for \em Goal1 and
+\em Goal2 as follows:
+\par
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\em new_confidence = min(\em current_confidence, \b confidence(\em Goal1) + \b confidence(\em Goal2) - \b confidence(\em Goal1) * \b confidence(\em Goal2))
+\par
+The \ref fuzzy_prod_2 "fuzzy_prod/2" and
+\ref fuzzy_not_1 "fuzzy_not/1" operators provide the
+logical AND and NOT counterparts to <b>fuzzy_prod_or/2</b>.
+
+\par Examples
+\code
+fuzzy_prod_or(cold(Temperature), low_pressure(Pressure))
+\endcode
+
+\par See Also
+\ref fuzzy_1 "fuzzy/1",
+\ref fuzzy_not_1 "fuzzy_not/1",
+\ref fuzzy_or_2 "fuzzy_or/2",
+\ref fuzzy_prod_2 "fuzzy_prod/2"
+
+<hr>
+\anchor set_fuzzy_1
+<b>set_fuzzy/1</b> - sets the current fuzzy confidence value.
+
+\par Usage
+\b set_fuzzy(\em Expr)
+
+\par Description
+Evaluates \em Expr according to the rules of \ref is_2 "is/2".
+If \em Expr is less than or equal to zero, then fail.
+If \em Expr is greater than 1, then set the current fuzzy
+confidence value to 1.  Otherwise set the current fuzzy
+confidence value to \em Expr.
+\par
+Note: this predicate should be used sparingly as it breaks
+logical consistency.  In most circumstances, the
+\ref fuzzy_1 "fuzzy/1" predicate should be used instead.
+The usual scenario for <b>set_fuzzy/1</b> is to set the
+current fuzzy confidence value back to 1 to start a new
+fuzzy computation.
+
+\par Errors
+
+\li <tt>type_error(number, \em Expr)</tt> - \em Expr did not
+    evaluate to a number.
+
+\par Examples
+\code
+set_fuzzy(1)         // reset the current fuzzy confidence value
+set_fuzzy(0)         // fail
+\endcode
+
+\par See Also
+\ref fuzzy_1 "fuzzy/1"
+*/

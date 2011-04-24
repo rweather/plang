@@ -93,6 +93,7 @@ to import the <tt>findall</tt> module to get the definition of
 
 \par See Also
 \ref bagof_3 "bagof/3",
+\ref fuzzy_findall_3 "fuzzy_findall/3",
 \ref setof_3 "setof/3"
 
 <hr>

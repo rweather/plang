@@ -42,6 +42,19 @@
  * \ref findall_3 "findall/3",
  * \ref setof_3 "setof/3"
  *
+ * \par fuzzy module
+ * \ref fuzzy_1 "(&lt;&lt;...&gt;&gt;)/1",
+ * \ref fuzzy_1 "fuzzy/1",
+ * \ref fuzzy_2 "fuzzy/2",
+ * \ref fuzzy_and_2 "fuzzy_and/2",
+ * \ref fuzzy_findall_3 "fuzzy_findall/3",
+ * \ref fuzzy_findall_sorted_3 "fuzzy_findall_sorted/3",
+ * \ref fuzzy_not_1 "fuzzy_not/1",
+ * \ref fuzzy_or_2 "fuzzy_or/2",
+ * \ref fuzzy_prod_2 "fuzzy_prod/2",
+ * \ref fuzzy_prod_or_2 "fuzzy_prod_or/2",
+ * \ref set_fuzzy_1 "set_fuzzy/1"
+ *
  * \par shell module
  * \ref shell_main_1 "shell::main/1"
  *
@@ -88,6 +101,13 @@
  */
 /*\@{*/
 /* Defined in findall.dox */
+/*\@}*/
+
+/**
+ * \defgroup fuzzy_logic Modules - fuzzy
+ */
+/*\@{*/
+/* Defined in fuzzy.dox */
 /*\@}*/
 
 /**

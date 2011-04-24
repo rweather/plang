@@ -756,8 +756,8 @@ create_rules()
 The formal syntax for predicates follows:
 
 \code
-predicate --> predicate_head, ".".
-predicate --> predicate_head, compound_statement.
+predicate --> predicate_head, confidence, ".".
+predicate --> predicate_head, confidence, compound_statement.
 
 predicate_head --> atom.
 predicate_head --> atom, "(", head_arguments, ")".
@@ -768,6 +768,10 @@ head_arguments --> head_arguments, ",", head_argument.
 
 head_argument --> term.
 head_argument --> "in", term.
+
+confidence --> [].
+confidence --> "<<", integer, ">>".
+confidence --> "<<", float, ">>".
 \endcode
 
 Member predicates within a class can also be declared as \c static,
@@ -777,8 +781,8 @@ Member predicates within a class can also be declared as \c static,
 member_predicate --> predicate.
 member_predicate --> "static", predicate.
 member_predicate --> "abstract", predicate_head, ".".
-member_predicate --> constructor_head, ".".
-member_predicate --> constructor_head, compound_statement.
+member_predicate --> constructor_head, confidence, ".".
+member_predicate --> constructor_head, confidence, compound_statement.
 
 constructor_head --> "new".
 constructor_head --> "new", "(", head_arguments, ")".
@@ -795,6 +799,15 @@ to redefine it as abstract.
 Predicates can be converted into first-class terms using
 \ref predicate_2 "predicate/2".
 
-See also: \ref syntax_input_only "Input-only arguments".
+Constant confidence values, for reasoning with
+\ref fuzzy_logic "fuzzy logic", can be specified just after the
+head of a predicate:
+
+\code
+cold(10) <<0.7>>.
+\endcode
+
+See also: \ref syntax_input_only "Input-only arguments",
+\ref fuzzy_logic "fuzzy_logic".
 
 */

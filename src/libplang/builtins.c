@@ -1720,6 +1720,10 @@ static p_goal_result p_builtin_load_library
  * boolean conditions for <b>if</b>, <b>while</b>, and similar
  * statements.  The <b>(,)/2</b> form usually occurs as a result
  * of parsing the statement sequence { \em Goal1 ; \em Goal2 }.
+ * \par
+ * This predicate is equivalent to \ref fuzzy_and_2 "fuzzy_and/2"
+ * when reasoning about terms that involve
+ * \ref fuzzy_logic "fuzzy logic".
  *
  * \par Examples
  * \code
@@ -1735,7 +1739,8 @@ static p_goal_result p_builtin_load_library
  *
  * \par See Also
  * \ref logical_or_2 "(||)/2",
- * \ref not_provable_1 "(!)/1"
+ * \ref not_provable_1 "(!)/1",
+ * \ref fuzzy_and_2 "fuzzy_and/2"
  */
 
 /**
@@ -1750,6 +1755,14 @@ static p_goal_result p_builtin_load_library
  * \par Description
  * Executes \em Goal1 and succeeds if \em Goal1 succeeds.
  * Otherwise executes \em Goal2.
+ * \par
+ * If \em Goal1 or \em Goal2 involves terms that use
+ * \ref fuzzy_logic "fuzzy logic", then the fuzzy confidence
+ * value of \em Goal1 <b>||</b> \em Goal2 is the same as
+ * \em Goal1 while it succeeds, and then the same as
+ * \em Goal2 once \em Goal1 fails.  Use the
+ * \ref fuzzy_or_2 "fuzzy_or/2" operator instead for
+ * calculating the logical fuzzy OR of \em Goal1 and \em Goal2.
  *
  * \par Examples
  * \code
@@ -1766,6 +1779,7 @@ static p_goal_result p_builtin_load_library
  * \par See Also
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref not_provable_1 "(!)/1",
+ * \ref fuzzy_or_2 "fuzzy_or/2",
  * \ref if_stmt "if"
  */
 static p_goal_result p_builtin_logical_or
@@ -2090,6 +2104,11 @@ static char const p_builtin_do[] =
  *
  * \par Description
  * If \b call(\em Term) succeeds, then fail; otherwise succeed.
+ * \par
+ * Note: <b>(!)/1</b> does not take the current fuzzy confidence
+ * value into account, so it is not suitable for use in applications
+ * that involve \ref fuzzy_logic "fuzzy logic".  Use the
+ * \ref fuzzy_not_1 "fuzzy_not/1" predicate instead.
  *
  * \par Examples
  * \code
@@ -2106,7 +2125,8 @@ static char const p_builtin_do[] =
  *
  * \par See Also
  * \ref logical_and_2 "(&amp;&amp;)/2",
- * \ref logical_or_2 "(||)/2"
+ * \ref logical_or_2 "(||)/2",
+ * \ref fuzzy_not_1 "fuzzy_not/1"
  */
 static char const p_builtin_not_provable[] =
     "'!'(Goal)\n"

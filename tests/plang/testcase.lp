@@ -72,6 +72,19 @@ verify_error(Goal, ExpectedError)
         fail(Goal, "expecting an error");
 }
 
+verify_var_error(Goal, ExpectedError)
+{
+    try {
+        call(Goal);
+    } catch (error(Error, _)) {
+        if (Error != ExpectedError)
+            fail(Goal, Error);
+        SawError = true;
+    }
+    if (var(SawError))
+        fail(Goal, "expecting an error");
+}
+
 compare(Actual, Expected)
 {
     if (Actual !== Expected) {
@@ -99,6 +112,7 @@ run(Name)
 {
     abolish(current_test/1);
     assertz(current_test(Name));
+    '$$set_fuzzy'(1);
     try {
         if (!Name)
             fail("did not succeed");
