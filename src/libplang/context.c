@@ -447,6 +447,79 @@ int p_context_consult_string(p_context *context, const char *str)
  * p_context_execute_goal().
  */
 
+/* Basic fail handling function which only unwinds the trail */
+void _p_context_basic_fail_func
+    (p_context *context, p_exec_fail_node *node)
+{
+    p_context_backtrack_trail(context, node->fail_marker);
+    context->catch_node = node->catch_node;
+}
+
+/* Fail handling function for going to the next clause of a
+ * dynamic predicate */
+void _p_context_clause_fail_func
+    (p_context *context, p_exec_fail_node *node)
+{
+    p_exec_clause_node *current = (p_exec_clause_node *)node;
+    p_term *clause_list;
+    p_term *body;
+    p_exec_node *new_current;
+
+    /* Perform the basic backtracking logic */
+    _p_context_basic_fail_func(context, node);
+
+    /* We have backtracked into a new clause of a predicate.
+     * See if the clause, or one of the following clauses
+     * matches the current goal.  If no match, then fail */
+    clause_list = current->next_clause;
+    body = 0;
+    while (clause_list != 0) {
+        body = p_term_unify_clause
+            (context, current->parent.parent.goal, clause_list->list.head);
+        if (body)
+            break;
+        clause_list = clause_list->list.tail;
+    }
+    if (body) {
+        clause_list = clause_list->list.tail;
+        if (clause_list) {
+            p_exec_clause_node *next = GC_NEW(p_exec_clause_node);
+            if (next) {
+                next->parent.parent.goal = current->parent.parent.goal;
+                next->parent.parent.success_node = current->parent.parent.success_node;
+                next->parent.parent.cut_node = current->parent.parent.cut_node;
+                _p_context_init_fail_node
+                    (context, &(next->parent), _p_context_clause_fail_func);
+                next->parent.fail_marker = current->parent.fail_marker;
+                next->next_clause = clause_list;
+                context->fail_node = &(next->parent);
+            } else {
+                body = context->fail_atom;
+            }
+        }
+    } else {
+        body = context->fail_atom;
+    }
+    new_current = GC_NEW(p_exec_node);
+    if (new_current) {
+        new_current->goal = body;
+        new_current->success_node = current->parent.parent.success_node;
+        new_current->cut_node = current->parent.parent.cut_node;
+        context->current_node = new_current;
+    } else {
+        current->parent.parent.goal = context->fail_atom;
+    }
+}
+
+void _p_context_init_fail_node
+    (p_context *context, p_exec_fail_node *node,
+     p_exec_fail_func fail_func)
+{
+    node->parent.fail_func = fail_func;
+    node->fail_marker = context->fail_marker;
+    node->catch_node = context->catch_node;
+}
+
 /* Inner execution of goals - performs an operation deterministically
  * or modifies the search tree according to the control predicate */
 static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_term **error)
@@ -485,11 +558,9 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
             new_current->goal = goal->functor.arg[0];
             new_current->success_node = next;
             new_current->cut_node = current->cut_node;
-            new_current->catch_node = current->catch_node;
             next->goal = goal->functor.arg[1];
             next->success_node = current->success_node;
             next->cut_node = current->cut_node;
-            next->catch_node = current->catch_node;
             context->current_node = new_current;
             return P_RESULT_TREE_CHANGE;
         }
@@ -524,22 +595,21 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                 current = context->current_node;
                 clause_list = clause_list->list.tail;
                 if (clause_list) {
-                    next = GC_NEW(p_exec_node);
+                    p_exec_clause_node *next = GC_NEW(p_exec_clause_node);
                     new_current = GC_NEW(p_exec_node);
                     if (!next || !new_current)
                         return P_RESULT_FAIL;
-                    next->goal = current->goal;
+                    next->parent.parent.goal = current->goal;
+                    next->parent.parent.success_node = current->success_node;
+                    next->parent.parent.cut_node = context->fail_node;
+                    _p_context_init_fail_node
+                        (context, &(next->parent), _p_context_clause_fail_func);
                     next->next_clause = clause_list;
-                    next->success_node = current->success_node;
-                    next->cut_node = context->fail_node;
-                    next->catch_node = current->catch_node;
-                    next->fail_marker = current->fail_marker;
                     new_current->goal = body;
                     new_current->success_node = current->success_node;
                     new_current->cut_node = context->fail_node;
-                    new_current->catch_node = current->catch_node;
                     context->current_node = new_current;
-                    context->fail_node = next;
+                    context->fail_node = &(next->parent);
                 } else {
                     new_current = GC_NEW(p_exec_node);
                     if (!new_current)
@@ -547,7 +617,6 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                     new_current->goal = body;
                     new_current->success_node = current->success_node;
                     new_current->cut_node = context->fail_node;
-                    new_current->catch_node = current->catch_node;
                     context->current_node = new_current;
                 }
                 return P_RESULT_TREE_CHANGE;
@@ -577,54 +646,10 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
     p_term *goal;
     p_goal_result result = P_RESULT_FAIL;
     p_exec_node *current;
-    p_exec_node *new_current;
 
     for (;;) {
         /* Fetch the current goal */
         current = context->current_node;
-        if (current->next_clause) {
-            /* We have backtracked into a new clause of a predicate.
-             * See if the clause, or one of the following clauses
-             * matches the current goal.  If no match, then fail */
-            p_term *clause_list = current->next_clause;
-            p_term *body = 0;
-            while (clause_list != 0) {
-                body = p_term_unify_clause
-                    (context, current->goal, clause_list->list.head);
-                if (body)
-                    break;
-                clause_list = clause_list->list.tail;
-            }
-            if (body) {
-                clause_list = clause_list->list.tail;
-                if (clause_list) {
-                    p_exec_node *next = GC_NEW(p_exec_node);
-                    if (next) {
-                        next->goal = current->goal;
-                        next->next_clause = clause_list;
-                        next->success_node = current->success_node;
-                        next->cut_node = current->cut_node;
-                        next->catch_node = current->catch_node;
-                        next->fail_marker = current->fail_marker;
-                        context->fail_node = next;
-                    } else {
-                        body = context->fail_atom;
-                    }
-                }
-            } else {
-                body = context->fail_atom;
-            }
-            new_current = GC_NEW(p_exec_node);
-            if (new_current) {
-                new_current->goal = body;
-                new_current->success_node = current->success_node;
-                new_current->cut_node = current->cut_node;
-                new_current->catch_node = current->catch_node;
-                current = context->current_node = new_current;
-            } else {
-                current->goal = context->fail_atom;
-            }
-        }
         goal = p_term_deref_member(context, current->goal);
 
         /* Debugging: output the goal details, including next goals */
@@ -660,10 +685,10 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             } else {
                 fputs("\tcut: top-level fail\n", stdout);
             }
-            if (context->current_node->catch_node) {
+            if (context->catch_node) {
                 fputs("\tcatch: ", stdout);
                 p_term_print
-                    (context, context->current_node->catch_node->goal,
+                    (context, context->catch_node->goal,
                      p_term_stdio_print_func, stdout);
                 putc('\n', stdout);
             }
@@ -672,7 +697,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
 
         /* Determine what needs to be done next for this goal */
         *error = 0;
-        current->fail_marker = p_context_mark_trail(context);
+        context->fail_marker = p_context_mark_trail(context);
         result = p_goal_execute_inner(context, goal, error);
         if (result == P_RESULT_TRUE) {
             /* Success of deterministic leaf goal */
@@ -684,7 +709,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             if (!(context->current_node)) {
                 /* Top-level success.  Set the current node to
                  * the fail node for re-executing the goal */
-                context->current_node = context->fail_node;
+                context->current_node = &(context->fail_node->parent);
                 if (context->current_node)
                     context->fail_node = context->current_node->cut_node;
                 else
@@ -696,12 +721,12 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
 #ifdef P_GOAL_DEBUG
             fputs("\tresult: fail\n", stdout);
 #endif
-            context->current_node = context->fail_node;
+            context->current_node = &(context->fail_node->parent);
             if (!(context->current_node))
                 break;      /* Final top-level goal failure */
             context->fail_node = context->current_node->cut_node;
-            p_context_backtrack_trail
-                (context, context->current_node->fail_marker);
+            (*(context->current_node->fail_func))
+                (context, (p_exec_fail_node *)(context->current_node));
         } else if (result == P_RESULT_ERROR) {
             /* Find an enclosing "catch" block to handle the error */
 #ifdef P_GOAL_DEBUG
@@ -765,6 +790,7 @@ p_goal_result p_context_execute_goal
         return P_RESULT_FAIL;
     context->current_node->goal = goal;
     context->fail_node = 0;
+    context->catch_node = 0;
     context->goal_active = 1;
     context->goal_marker = p_context_mark_trail(context);
     result = p_goal_execute(context, &error_term);
@@ -802,8 +828,8 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
     p_goal_result result;
     if (!context->current_node)
         return P_RESULT_FAIL;
-    p_context_backtrack_trail
-        (context, context->current_node->fail_marker);
+    (*(context->current_node->fail_func))
+        (context, (p_exec_fail_node *)(context->current_node));
     result = p_goal_execute(context, &error_term);
     if (error)
         *error = error_term;
@@ -832,6 +858,7 @@ void p_context_abandon_goal(p_context *context)
         context->goal_marker = 0;
         context->current_node = 0;
         context->fail_node = 0;
+        context->catch_node = 0;
     }
 }
 
@@ -851,16 +878,19 @@ p_goal_result p_context_call_once
 {
     p_goal_result result;
     p_exec_node *current = context->current_node;
-    p_exec_node *fail = context->fail_node;
+    p_exec_fail_node *fail = context->fail_node;
+    p_exec_catch_node *catch_node = context->catch_node;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     p_term *error_node = 0;
     if (goal_node) {
         goal_node->goal = goal;
         context->current_node = goal_node;
         context->fail_node = 0;
+        context->catch_node = 0;
         result = p_goal_execute(context, &error_node);
         context->current_node = current;
         context->fail_node = fail;
+        context->catch_node = catch_node;
     } else {
         result = P_RESULT_FAIL;
     }
@@ -877,15 +907,18 @@ p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal)
     void *marker = p_context_mark_trail(context);
     p_goal_result result;
     p_exec_node *current = context->current_node;
-    p_exec_node *fail = context->fail_node;
+    p_exec_fail_node *fail = context->fail_node;
+    p_exec_catch_node *catch_node = context->catch_node;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     if (goal_node) {
         goal_node->goal = goal;
         context->current_node = goal_node;
         context->fail_node = 0;
+        context->catch_node = 0;
         result = p_goal_execute(context, &error);
         context->current_node = current;
         context->fail_node = fail;
+        context->catch_node = catch_node;
     } else {
         result = P_RESULT_FAIL;
     }

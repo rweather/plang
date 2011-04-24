@@ -46,14 +46,34 @@ struct p_path_list
 };
 
 typedef struct p_exec_node p_exec_node;
+typedef struct p_exec_fail_node p_exec_fail_node;
+typedef struct p_exec_clause_node p_exec_clause_node;
+typedef struct p_exec_catch_node p_exec_catch_node;
+typedef void (*p_exec_fail_func)
+    (p_context *context, p_exec_fail_node *node);
+
 struct p_exec_node
 {
     p_term *goal;
-    p_term *next_clause;
     p_exec_node *success_node;
-    p_exec_node *cut_node;
-    p_exec_node *catch_node;
+    p_exec_fail_node *cut_node;
+    p_exec_fail_func fail_func;
+};
+struct p_exec_fail_node
+{
+    p_exec_node parent;
     void *fail_marker;
+    p_exec_catch_node *catch_node;
+};
+struct p_exec_clause_node
+{
+    p_exec_fail_node parent;
+    p_term *next_clause;
+};
+struct p_exec_catch_node
+{
+    p_exec_fail_node parent;
+    p_exec_catch_node *catch_parent;
 };
 
 typedef void (*p_library_entry_func)(p_context *context);
@@ -94,7 +114,9 @@ struct p_context
     int goal_active;
     void *goal_marker;
     p_exec_node *current_node;
-    p_exec_node *fail_node;
+    p_exec_fail_node *fail_node;
+    p_exec_catch_node *catch_node;
+    void *fail_marker;
 
     int allow_test_goals;
     p_term *test_goal;
@@ -120,6 +142,14 @@ struct p_trail
 
 int _p_context_record_in_trail(p_context *context, p_term *var);
 int _p_context_record_contents_in_trail(p_context *context, void **location, void *prev_value);
+
+void _p_context_basic_fail_func
+    (p_context *context, p_exec_fail_node *node);
+void _p_context_clause_fail_func
+    (p_context *context, p_exec_fail_node *node);
+void _p_context_init_fail_node
+    (p_context *context, p_exec_fail_node *node,
+     p_exec_fail_func fail_func);
 
 p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal);
 

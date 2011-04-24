@@ -88,10 +88,10 @@ becomes NULL on a top-level goal.
 The paper above does not describe the handling of
 \ref catch_3 "catch/3" and \ref throw_1 "throw/1" in a Prolog
 environment.  We extend the mechanism by adding a "catch point"
-continuation link to every node.  When a catch/3 goal is executed,
-the "catch point" link is set to point at the catch/3 goal.
-This "catch point" link is copied into the nodes for sub-goals
-as execution proceeds.
+continuation link to the execution state.  When a catch/3 goal
+is executed, the "catch point" link is set to point at the
+catch/3 goal, with the previous "catch point" saved in the
+new catch point node.
 
 When a throw/1 is executed, a backtrack is performed
 to the "cut fail point" of the catch node.  Execution proceeds
@@ -99,5 +99,8 @@ from the catch point with the recovery goal if the catch term
 matches.  If the catch term does not match, the process repeats
 to find the next-outer "catch point" node.  If the "catch point"
 is NULL, then the top-level goal has finished with a thrown error.
+
+The current "catch point" is saved in fail nodes so that it can
+be restored upon backtracking.
 
 */
