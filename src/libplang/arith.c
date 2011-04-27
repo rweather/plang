@@ -21,11 +21,13 @@
 #include <plang/errors.h>
 #include "term-priv.h"
 #include "database-priv.h"
+#include "context-priv.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
+#include <time.h>
 #ifdef HAVE_FENV_H
 #include <fenv.h>
 #endif
@@ -48,7 +50,9 @@
  * \ref atom_name_2 "atom_name/2",
  * \ref fperror_1 "fperror/1",
  * \ref isnan_1 "isnan/1",
- * \ref isinf_1 "isinf/1"
+ * \ref isinf_1 "isinf/1",
+ * \ref randomize_0 "randomize/0",
+ * \ref randomize_1 "randomize/1"
  *
  * Mathematical operators:
  * \ref func_add_2 "(+)/2",
@@ -122,6 +126,9 @@
  * \ref func_mid_bytes_2 "mid_bytes/2",
  * \ref func_mid_bytes_3 "mid_bytes/3",
  * \ref func_right_bytes_2 "right_bytes/2"
+ *
+ * Random number generation:
+ * \ref func_random_0 "random/0"
  */
 
 /* Internal expression evaluator */
@@ -987,6 +994,79 @@ static p_goal_result p_builtin_isinf
         *error = p_create_type_error(context, "number", args[0]);
         return P_RESULT_ERROR;
     }
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
+ * \anchor randomize_0
+ * \anchor randomize_1
+ * <b>randomize/0</b>, <b>randomize/1</b> - seed the random
+ * number generator.
+ *
+ * \par Usage
+ * \b randomize
+ * \par
+ * \b randomize(\em Value)
+ *
+ * \par Description
+ * The <b>randomize/0</b> predicate seeds the random number
+ * generator with indeterminate information from the operating
+ * system environment (e.g. current time of day).  This version
+ * should be used if different results are desired each time
+ * the application is run.
+ * \par
+ * The <b>randomize/1</b> predicate seeds the random number
+ * generator based on the specified integer or floating-point
+ * \em Value.  This version should be used to generate a repeatable
+ * sequence of random numbers each time the application is run.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Value is a variable.
+ * \li <tt>type_error(number, \em Value)</tt> - \em Value is
+ *     not a number.
+ *
+ * \par Examples
+ * \code
+ * randomize
+ * randomize(42)
+ * \endcode
+ *
+ * \par See Also
+ * \ref func_random_0 "random/0"
+ */
+static p_goal_result p_builtin_randomize_0
+    (p_context *context, p_term **args, p_term **error)
+{
+    time_t tm;
+    time(&tm);
+    context->random_seed = (unsigned int)(tm & 0x7FFFFFFF);
+    return P_RESULT_TRUE;
+}
+static p_goal_result p_builtin_randomize_1
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *value = p_term_deref_member(context, args[0]);
+    if (!value || (value->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (value->header.type == P_TERM_INTEGER) {
+        context->random_seed =
+            (unsigned int)(p_term_integer_value(value) & 0x7FFFFFFF);
+    } else if (value->header.type == P_TERM_REAL) {
+        double v = p_term_real_value(value);
+        if (v < 0.0)
+            v = -v;
+        if (v < 1.0)
+            v *= 2147483648.0;
+        context->random_seed = (unsigned int)(((int)v) & 0x7FFFFFFF);
+    } else {
+        *error = p_create_type_error(context, "number", value);
+        return P_RESULT_ERROR;
+    }
+    return P_RESULT_TRUE;
 }
 
 /**
@@ -3971,6 +4051,42 @@ static p_goal_result p_arith_pow
 /**
  * \addtogroup arithmetic
  * <hr>
+ * \anchor func_random_0
+ * <b>random/0</b> - generate a random number between 0 and 1.
+ *
+ * \par Usage
+ * \em Var \b is \b random
+ *
+ * \par Description
+ * Generates a random number between 0 and 1, but not including 1.
+ * \par
+ * Note: the random number generator uses a simple linear
+ * congruential algorithm.  The generated values are not suitable
+ * for use in high security applications.
+ *
+ * \par Examples
+ * \code
+ * X is random                  generates a float between 0.0 and 1.0
+ * X is integer(random * 20)    generates an integer between 0 and 19
+ * \endcode
+ *
+ * \par See Also
+ * \ref randomize_1 "randomize/1"
+ */
+static p_goal_result p_arith_random
+    (p_context *context, p_arith_value *result,
+     const p_arith_value *values, p_term **args, p_term **error)
+{
+    context->random_seed = context->random_seed * 1103515245 + 12345;
+    result->type = P_TERM_REAL;
+    result->real_value =
+        (((int)(context->random_seed)) & 0x7FFFFFFF) / 2147483648.0;
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup arithmetic
+ * <hr>
  * \anchor func_right_2
  * <b>right/2</b> - extract the right portion of a string.
  *
@@ -4606,6 +4722,8 @@ void _p_db_init_arith(p_context *context)
         {"fperror", 1, p_builtin_fperror},
         {"isnan", 1, p_builtin_isnan},
         {"isinf", 1, p_builtin_isinf},
+        {"randomize", 0, p_builtin_randomize_0},
+        {"randomize", 1, p_builtin_randomize_1},
         {0, 0, 0}
     };
     static struct p_arith const ariths[] = {
@@ -4658,6 +4776,7 @@ void _p_db_init_arith(p_context *context)
         {"nan", 0, p_arith_nan},
         {"pi", 0, p_arith_pi},
         {"pow", 2, p_arith_pow},
+        {"random", 0, p_arith_random},
         {"rem", 2, p_arith_rem},
         {"right", 2, p_arith_right},
         {"right_bytes", 2, p_arith_right_bytes},

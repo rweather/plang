@@ -38,7 +38,9 @@
  * \ref atom_name_2 "atom_name/2",
  * \ref fperror_1 "fperror/1",
  * \ref isnan_1 "isnan/1",
- * \ref isinf_1 "isinf/1"
+ * \ref isinf_1 "isinf/1",
+ * \ref randomize_0 "randomize/0",
+ * \ref randomize_1 "randomize/1"
  *
  * \par Classes and objects
  * \ref decl_class "class",

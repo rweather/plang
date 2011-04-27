@@ -132,6 +132,8 @@ struct p_context
     int unique_num;
 
     p_library *libraries;
+
+    unsigned int random_seed;
 };
 
 #define P_TRACE_SIZE 1020
