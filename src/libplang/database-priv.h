@@ -76,6 +76,7 @@ void _p_db_init_builtins(p_context *context);
 void _p_db_init_arith(p_context *context);
 void _p_db_init_io(p_context *context);
 void _p_db_init_fuzzy(p_context *context);
+void _p_db_init_sort(p_context *context);
 
 p_database_info *_p_db_find_arity(const p_term *atom, unsigned int arity);
 p_database_info *_p_db_create_arity(p_term *atom, unsigned int arity);

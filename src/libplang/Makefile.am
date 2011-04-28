@@ -16,6 +16,7 @@ libplang_la_SOURCES = \
 	parser-priv.h \
 	rbtree.c \
 	rbtree-priv.h \
+	sort.c \
 	term.c \
 	term-priv.h
 

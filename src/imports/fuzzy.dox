@@ -364,7 +364,7 @@ that solution.
 The returned \em List will be ordered from the highest fuzzy
 confidence value to the lowest.  If two or more elements have the
 same fuzzy confidence value, then the ordering of the equal
-solutions is undefined.
+solutions is the same as for \ref fuzzy_findall_3 "fuzzy_findall/3".
 
 \par Errors
 

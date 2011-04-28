@@ -93,7 +93,7 @@ fuzzy_findall_sorted(Term, Goal, List)
     assertz('$$fuzzy_findall_list'(Tag, []));
     ('$$fuzzy_findall'(Tag, Term, Goal) || true);
     retract('$$fuzzy_findall_list'(Tag, L));
-    '$$fuzzy_findall_sort'(L, [], List);
+    rkeysortd(L, List);
 }
 
 fuzzy_not(Goal)
@@ -194,21 +194,4 @@ fuzzy_prod_or(Goal1, Goal2)
 '$$fuzzy_findall_reverse'([H|T], L1, L2)
 {
     '$$fuzzy_findall_reverse'(T, [H|L1], L2);
-}
-
-'$$fuzzy_findall_sort'([], L, L).
-'$$fuzzy_findall_sort'([H|T], L1, L2)
-{
-    '$$fuzzy_findall_insert'(H, L1, L);
-    '$$fuzzy_findall_sort'(T, L, L2);
-}
-'$$fuzzy_findall_insert'(H, [], [H]).
-'$$fuzzy_findall_insert'((V1, C1), [(V2, C2)|T], L)
-{
-    if (C1 >= C2) {
-        L = [(V1, C1), (V2, C2)|T];
-    } else {
-        L = [(V2, C2)|T2];
-        '$$fuzzy_findall_insert'((V1, C1), T, T2);
-    }
 }

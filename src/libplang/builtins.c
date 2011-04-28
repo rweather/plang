@@ -89,6 +89,16 @@
  * \ref catch_3 "try",
  * \ref while_stmt "while"
  *
+ * \par Sorting
+ * \ref keysort_2 "keysort/2",
+ * \ref keysortd_2 "keysortd/2",
+ * \ref msort_2 "msort/2",
+ * \ref msortd_2 "msortd/2",
+ * \ref rkeysort_2 "rkeysort/2",
+ * \ref rkeysortd_2 "rkeysortd/2",
+ * \ref sort_2 "sort/2",
+ * \ref sortd_2 "sortd/2"
+ *
  * \par Term comparison
  * \ref term_eq_2 "(==)/2",
  * \ref term_ne_2 "(!==)/2",
@@ -151,6 +161,12 @@
  * Prolog, and the inspiration for Plang's documentation style:
  * P. Debransart, A. Ed-Dbali, L. Cervoni, "Prolog: The Standard;
  * Reference Manual", Springer-Verlag, 1996, ISBN 3-540-59304-7.
+ * \par
+ * \anchor swi_prolog
+ * Where Standard Prolog lacks a particular feature, but
+ * <a href="http://www.swi-prolog.org/">SWI-Prolog</a>
+ * has that feature, we sometimes attempt compatibility with that
+ * version of Prolog instead.
  */
 /*\@{*/
 
@@ -2756,6 +2772,13 @@ static char const p_builtin_while[] =
     "    }\n"
     "}\n";
 
+/*\@}*/
+
+/**
+ * \defgroup sorting Builtin predicates - Sorting
+ */
+/*\@{*/
+/* Defined in sort.c */
 /*\@}*/
 
 /**

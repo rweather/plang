@@ -131,6 +131,16 @@ p_term *p_term_witness(p_context *context, p_term *term, p_term **subgoal);
 
 p_term *p_term_expand_dcg(p_context *context, p_term *term);
 
+enum {
+    P_SORT_ASCENDING        = 0x0000,
+    P_SORT_DESCENDING       = 0x0001,
+    P_SORT_KEYED            = 0x0002,
+    P_SORT_REVERSE_KEYED    = 0x0004,
+    P_SORT_UNIQUE           = 0x0008
+};
+
+p_term *p_term_sort(p_context *context, p_term *list, int flags);
+
 #ifdef __cplusplus
 };
 #endif

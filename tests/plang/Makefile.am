@@ -8,6 +8,7 @@ PLANG_TESTS = \
 	test-findall.lp \
 	test-fuzzy.lp \
         test-one-way.lp \
+	test-sort.lp \
 	test-type.lp \
 	@WORDS_TESTCASE@
 

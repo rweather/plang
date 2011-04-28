@@ -75,6 +75,7 @@ p_context *p_context_create(void)
     _p_db_init_arith(context);
     _p_db_init_io(context);
     _p_db_init_fuzzy(context);
+    _p_db_init_sort(context);
     p_context_find_system_imports(context);
     return context;
 }
