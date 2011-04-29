@@ -52,6 +52,7 @@
  * \ref abolish_1 "abolish/1",
  * \ref asserta_1 "asserta/1",
  * \ref assertz_1 "assertz/1",
+ * \ref clause_2 "clause/2",
  * \ref retract_1 "retract/1"
  *
  * \par Directives
@@ -896,6 +897,7 @@ static p_goal_result p_builtin_call_member
  * \ref abolish_1 "abolish/1",
  * \ref asserta_1 "asserta/1",
  * \ref assertz_1 "assertz/1",
+ * \ref clause_2 "clause/2",
  * \ref retract_1 "retract/1"
  */
 /*\@{*/
@@ -1134,6 +1136,203 @@ static p_goal_result p_builtin_assertz
     (p_context *context, p_term **args, p_term **error)
 {
     return p_builtin_assert(context, args, error, 0);
+}
+
+/** @cond */
+typedef struct p_exec_clause_fetch_node p_exec_clause_fetch_node;
+struct p_exec_clause_fetch_node
+{
+    p_exec_fail_node parent;
+    p_term *head;
+    p_term *body;
+    p_term *next_clause;
+};
+/** @endcond */
+
+/* Find the next matching clause for clause/2 */
+static void _p_context_fetch_clause_fail_func
+    (p_context *context, p_exec_fail_node *node)
+{
+    p_exec_clause_fetch_node *current = (p_exec_clause_fetch_node *)node;
+    p_term *clause = current->next_clause;
+    p_term *body;
+    p_exec_node *next;
+    p_exec_clause_fetch_node *retry;
+    void *marker;
+    _p_context_basic_fail_func(context, node);
+    while (clause != 0) {
+        marker = p_context_mark_trail(context);
+        body = p_term_unify_clause
+            (context, current->head, clause->list.head);
+        if (body && p_term_unify(context, current->body, body, P_BIND_DEFAULT)) {
+            clause = clause->list.tail;
+            if (clause) {
+                next = GC_NEW(p_exec_node);
+                retry = GC_NEW(p_exec_clause_fetch_node);
+                if (!next || !retry) {
+                    current->parent.parent.goal = context->fail_atom;
+                    return;
+                }
+                next->goal = context->true_atom;
+                next->success_node = current->parent.parent.success_node;
+                next->cut_node = current->parent.parent.cut_node;
+                retry->parent.parent.goal = current->parent.parent.goal;
+                retry->parent.parent.success_node =
+                        current->parent.parent.success_node;
+                retry->parent.parent.cut_node =
+                        current->parent.parent.cut_node;
+                retry->head = current->head;
+                retry->body = current->body;
+                retry->next_clause = clause;
+                _p_context_init_fail_node
+                    (context, &(retry->parent),
+                     _p_context_fetch_clause_fail_func);
+                retry->parent.fail_marker = marker;
+                context->current_node = next;
+                context->fail_node = &(retry->parent);
+            } else {
+                next = GC_NEW(p_exec_node);
+                if (next) {
+                    next->goal = context->true_atom;
+                    next->success_node = current->parent.parent.success_node;
+                    next->cut_node = current->parent.parent.cut_node;
+                    context->current_node = next;
+                } else {
+                    current->parent.parent.goal = context->true_atom;
+                }
+            }
+            return;
+        }
+        p_context_backtrack_trail(context, marker);
+        clause = clause->list.tail;
+    }
+    next = GC_NEW(p_exec_node);
+    if (next) {
+        next->goal = context->fail_atom;
+        next->success_node = current->parent.parent.success_node;
+        next->cut_node = current->parent.parent.cut_node;
+                context->current_node = next;
+        context->current_node = next;
+    } else {
+        current->parent.parent.goal = context->fail_atom;
+    }
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor clause_2
+ * <b>clause/2</b> - searches for clauses in the predicate database.
+ *
+ * \par Usage
+ * \b clause(\em Head, \em Body)
+ *
+ * \par Description
+ * Succeeds if \em Head <tt>:-</tt> \em Body unifies with a
+ * clause in the predicate database.  If there are multiple
+ * clauses that unify, then backtrack through the alternatives.
+ * Fails immediately if no clauses unify.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Head is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ * \li <tt>permission_error(access, private_procedure, \em Pred)</tt> -
+ *     the predicate indicator \em Pred of \em Head refers to a
+ *     predicate that is builtin or compiled.
+ *
+ * \par Compatibility
+ * \ref standard "Standard Prolog"
+ *
+ * \par See Also
+ * \ref asserta_1 "asserta/1"
+ */
+static p_goal_result p_builtin_clause
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *head = p_term_deref_member(context, args[0]);
+    p_term *name;
+    unsigned int arity;
+    p_database_info *info;
+    p_term *pred;
+    p_term *clause;
+    p_term *body;
+    void *marker;
+    p_exec_node *current;
+    p_exec_node *next;
+    p_exec_clause_fetch_node *retry;
+
+    /* Validate the head */
+    if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (head->header.type == P_TERM_ATOM) {
+        name = head;
+        arity = 0;
+    } else if (head->header.type == P_TERM_FUNCTOR) {
+        name = head->functor.functor_name;
+        arity = head->header.size;
+    } else {
+        *error = p_create_type_error(context, "callable", head);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find the predicate associated with the head */
+    info = _p_db_find_arity(name, arity);
+    if (!info || !info->predicate)
+        return P_RESULT_FAIL;
+
+    /* If the predicate is builtin or compiled, then throw an error */
+    if (info->flags & (P_PREDICATE_BUILTIN | P_PREDICATE_COMPILED)) {
+        pred = p_term_create_functor(context, context->slash_atom, 2);
+        p_term_bind_functor_arg(pred, 0, name);
+        p_term_bind_functor_arg
+            (pred, 1, p_term_create_integer(context, (int)arity));
+        *error = p_create_permission_error
+            (context, "access", "private_procedure", pred);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find the first clause that matches */
+    clause = info->predicate->predicate.clauses_head;
+    if (!clause)
+        return P_RESULT_FAIL;
+    while (clause != 0) {
+        marker = p_context_mark_trail(context);
+        body = p_term_unify_clause(context, head, clause->list.head);
+        if (body && p_term_unify(context, args[1], body, P_BIND_DEFAULT)) {
+            clause = clause->list.tail;
+            if (clause) {
+                current = context->current_node;
+                next = GC_NEW(p_exec_node);
+                retry = GC_NEW(p_exec_clause_fetch_node);
+                if (!next || !retry)
+                    return P_RESULT_FAIL;
+                next->goal = context->true_atom;
+                next->success_node = current->success_node;
+                next->cut_node = context->fail_node;
+                retry->parent.parent.goal = current->goal;
+                retry->parent.parent.success_node =
+                        current->success_node;
+                retry->parent.parent.cut_node = context->fail_node;
+                retry->head = head;
+                retry->body = args[1];
+                retry->next_clause = clause;
+                _p_context_init_fail_node
+                    (context, &(retry->parent),
+                     _p_context_fetch_clause_fail_func);
+                context->current_node = next;
+                context->fail_node = &(retry->parent);
+                return P_RESULT_TREE_CHANGE;
+            }
+            return P_RESULT_TRUE;
+        }
+        p_context_backtrack_trail(context, marker);
+        clause = clause->list.tail;
+    }
+    return P_RESULT_FAIL;
 }
 
 /**
@@ -4910,6 +5109,7 @@ void _p_db_init_builtins(p_context *context)
         {"catch", 3, p_builtin_catch},
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
+        {"clause", 2, p_builtin_clause},
         {"compound", 1, p_builtin_compound},
         {"consult", 1, p_builtin_consult},
         {"copy_term", 2, p_builtin_copy_term},
