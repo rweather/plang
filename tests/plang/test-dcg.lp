@@ -17,7 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
 // Examples from: http://en.wikipedia.org/wiki/Definite_clause_grammar
 
@@ -41,7 +41,7 @@ s --> symbols(Sem, a), symbols(Sem, b), symbols(Sem, c).
 symbols(end, S) --> [].
 symbols(s(Sem), S) --> [S], symbols(Sem, S).
 
-check_sentences()
+test(check_sentences)
 {
     verify(sentence([the, cat, eats, the, bat], []));
     verify(sentence([a, bat, eats, the, cat], []));
@@ -59,7 +59,7 @@ empty1 --> [].
 empty2 --> empty3, [].
 empty3 --> [a].
 
-empty_rule()
+test(empty_rule)
 {
     verify(empty1([], []));
     verify(empty2([a], []));
@@ -68,7 +68,7 @@ empty_rule()
 or1 --> [a] || [b].
 or2 --> ([a] || [b]), [c].
 
-or_rule()
+test(or_rule)
 {
     verify(or1([a], []));
     verify(or1([b], []));
@@ -78,7 +78,7 @@ or_rule()
 
 not1 --> [a], ![b], [c].
 
-not_rule()
+test(not_rule)
 {
     verify(not1([a, c], []));
     verify(!not1([a, b, c], []));
@@ -87,7 +87,7 @@ not_rule()
 cut1 --> [a], [b], !, [c].
 cut1 --> [a], [b], [d].
 
-cut_rule()
+test(cut_rule)
 {
     verify(cut1([a, b, c], []));
     verify(!cut1([a, b, d], []));
@@ -97,7 +97,7 @@ statement1 --> [X], {integer(X);}, [a].
 statement1 --> [b], [c].
 statement1 --> [c], {}, [d].
 
-statement_rule()
+test(statement_rule)
 {
     verify(statement1([42, a], []));
     verify(statement1([b, c], []));
@@ -108,7 +108,7 @@ statement_rule()
 list1 --> [a], [b].
 list1 --> [a, c, D], [b].
 
-list_rule()
+test(list_rule)
 {
     verify(list1([a, b], []));
     verify(list1([a, c, d, b], []));
@@ -123,7 +123,7 @@ string2 --> "a", "c", [D], "b".
 
 string3 --> string2, "f".
 
-string_rule()
+test(string_rule)
 {
     verify(string1(["a", "b"], []));
     verify(string1(["a", "c", "d", "b"], []));
@@ -136,18 +136,4 @@ string_rule()
     verify(string3(["a", "b", "f"], []));
     verify(string3(["a", "c", "d", "b", "f"], []));
     verify(string3(["a", "c", "e", "b", "f"], []));
-}
-
-main(_)
-{
-    init("test-dcg");
-    run(check_sentences);
-    run(empty_rule);
-    run(or_rule);
-    run(not_rule);
-    run(cut_rule);
-    run(statement_rule);
-    run(list_rule);
-    run(string_rule);
-    report();
 }

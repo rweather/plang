@@ -18,31 +18,25 @@
  */
 
 :- import(stdout).
-:- dynamic(current_suite/1).
-:- dynamic(current_test/1).
-:- dynamic(current_results/2).
+:- dynamic(test::_current_suite/1).
+:- dynamic(test::_current_test/1).
+:- dynamic(test::_current_results/2).
+:- dynamic(test/1).
 
 fail(Message)
 {
-    current_suite(Suite);
-    current_test(Name);
+    test::_current_suite(Suite);
+    test::_current_test(Name);
     stdout::writeln(Suite + ": " + Name + ": " + Message);
     throw(test_case_failed);
 }
 
 fail(Message, Message2)
 {
-    current_suite(Suite);
-    current_test(Name);
+    test::_current_suite(Suite);
+    test::_current_test(Name);
     stdout::writeln(Suite + ": " + Name + ": " + Message + " " + Message2);
     throw(test_case_failed);
-}
-
-warning(Message)
-{
-    current_suite(Suite);
-    current_test(Name);
-    stdout::writeln(Suite + ": " + Name + ": warning: " + Message);
 }
 
 verify(Goal)
@@ -50,8 +44,8 @@ verify(Goal)
     if (call(Goal)) {
         true;
     } else {
-        current_suite(Suite);
-        current_test(Name);
+        test::_current_suite(Suite);
+        test::_current_test(Name);
         stdout::write(Suite + ": " + Name + ": ");
         stdout::writeTerm(Goal);
         stdout::writeln(" failed");
@@ -85,11 +79,18 @@ verify_var_error(Goal, ExpectedError)
         fail(Goal, "expecting an error");
 }
 
+verify_fuzzy(Expected)
+{
+    '$$fuzzy'(Actual);
+    Delta is abs(Actual - Expected);
+    verify(Delta <= 0.0001);
+}
+
 compare(Actual, Expected)
 {
     if (Actual !== Expected) {
-        current_suite(Suite);
-        current_test(Name);
+        test::_current_suite(Suite);
+        test::_current_test(Name);
         stdout::write(Suite + ": " + Name + ": ");
         stdout::writeTerm(Actual);
         stdout::write(" == ");
@@ -99,50 +100,79 @@ compare(Actual, Expected)
     }
 }
 
-init(Suite)
+test::_init(Suite)
 {
-    abolish(current_suite/1);
-    assertz(current_suite(Suite));
+    abolish(test::_current_suite/1);
+    assertz(test::_current_suite(Suite));
 
-    abolish(current_results/2);
-    assertz(current_results(0, 0));
+    abolish(test::_current_results/2);
+    assertz(test::_current_results(0, 0));
 }
 
-run(Name)
+test::_report()
 {
-    abolish(current_test/1);
-    assertz(current_test(Name));
+    test::_current_suite(Suite);
+    test::_current_results(Pass, Fail);
+    stdout::writeln(Suite + ": " + Pass + " passed, " + Fail + " failed");
+    if (Fail !== 0)
+        fail;
+}
+
+test::_run_tests()
+{
+    clause(test(Name), Body);
+    abolish(test::_current_test/1);
+    assertz(test::_current_test(Name));
     '$$set_fuzzy'(1);
     try {
-        if (!Name)
+        if (!once(Body))
             fail("did not succeed");
     } catch (test_case_failed) {
         TestFailed = true;
     } catch (Error) {
-        current_suite(Suite);
+        test::_current_suite(Suite);
         stdout::write(Suite + ": " + Name + ": ");
         stdout::writeTerm(Error);
         stdout::writeln();
         TestFailed = true;
     }
     if (nonvar(TestFailed)) {
-        retract(current_results(Pass, Fail));
+        retract(test::_current_results(Pass, Fail));
         Fail2 is Fail + 1;
-        assertz(current_results(Pass, Fail2));
+        assertz(test::_current_results(Pass, Fail2));
     } else {
-        current_suite(Suite);
+        test::_current_suite(Suite);
         stdout::writeln(Suite + ": " + Name + ": ok");
-        retract(current_results(Pass, Fail));
+        retract(test::_current_results(Pass, Fail));
         Pass2 is Pass + 1;
-        assertz(current_results(Pass2, Fail));
+        assertz(test::_current_results(Pass2, Fail));
     }
+    fail;
+}
+test::_run_tests().
+
+test::_suite_name(File, Suite)
+{
+    Length is length(File);
+    Found = false;
+    while [Char] (Length > 0 && !Found) {
+        Char is char(File, Length - 1);
+        if (Char == 0'/' || Char == 0'\\')
+            Found := true;
+        else
+            Length ::= Length - 1;
+    }
+    Base is mid(File, Length);
+    if (right(Base, 3) =:= ".lp")
+        Suite is left(Base, length(Base) - 3);
+    else
+        Suite = Base;
 }
 
-report()
+test::main([File|_])
 {
-    current_suite(Suite);
-    current_results(Pass, Fail);
-    stdout::writeln(Suite + ": " + Pass + " passed, " + Fail + " failed");
-    if (Fail !== 0)
-        fail;
+    test::_suite_name(File, Suite);
+    test::_init(Suite);
+    test::_run_tests();
+    test::_report();
 }

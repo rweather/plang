@@ -17,7 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
 eval(Expr, Expected)
 {
@@ -47,13 +47,13 @@ eval_error(Expr, Expected)
         fail(Expr, "expecting an eval error");
 }
 
-constants()
+test(constants)
 {
     eval(e, 2.7182818284590452354);
     eval(pi, 3.14159265358979323846);
 }
 
-addition()
+test(addition)
 {
     eval(2 + 2, 4);
     eval(2 + -2, 0);
@@ -74,7 +74,7 @@ addition()
     eval_error("foo" + 1.5, type_error(string, 1.5));
 }
 
-negation()
+test(negation)
 {
     eval(- 2, -2);
     eval(- 1.5, -1.5);
@@ -86,7 +86,7 @@ negation()
     eval_error(-"foo", type_error(number, "foo"));
 }
 
-subtraction()
+test(subtraction)
 {
     eval(2 - 2, 0);
     eval(2 - -2, 4);
@@ -104,7 +104,7 @@ subtraction()
     eval_error("foo" - 1.5, type_error(number, "foo"));
 }
 
-multiplication()
+test(multiplication)
 {
     eval(2 * 2, 4);
     eval(2 * -2, -4);
@@ -122,7 +122,7 @@ multiplication()
     eval_error("foo" * 1.5, type_error(number, "foo"));
 }
 
-division()
+test(division)
 {
     eval(2 / 2, 1);
     eval(2 / -2, -1);
@@ -146,7 +146,7 @@ division()
     eval_error(42 / 0, evaluation_error(zero_divisor));
 }
 
-modulus()
+test(modulus)
 {
     eval(2 % 2, 0);
     eval(3 mod 2, 1);
@@ -169,7 +169,7 @@ modulus()
     eval_error(42 % 0, evaluation_error(zero_divisor));
 }
 
-remainder()
+test(remainder)
 {
     eval(2 rem 2, 0);
     eval(3 rem 2, 1);
@@ -192,7 +192,7 @@ remainder()
     eval_error(42 rem 0, evaluation_error(zero_divisor));
 }
 
-arith_eq()
+test(arith_eq)
 {
     verify(2 + 4 =:= 6);
     verify(1.5 =:= 3.0 / 2);
@@ -211,7 +211,7 @@ arith_eq()
     verify_error("foo" =:= 1.5, type_error(string, 1.5));
 }
 
-arith_ne()
+test(arith_ne)
 {
     verify(2 + 2 =!= 5);
     verify(1.5 =!= 3.0 * 2);
@@ -237,7 +237,7 @@ arith_ne()
     verify(!(2 + 2 =\= 4));
 }
 
-arith_lt()
+test(arith_lt)
 {
     verify(2 + 2 < 5);
     verify(1.5 < 3.0 * 2);
@@ -256,7 +256,7 @@ arith_lt()
     verify_error("foo" < 1.5, type_error(string, 1.5));
 }
 
-arith_le()
+test(arith_le)
 {
     verify(2 + 2 <= 4);
     verify(1.5 <= 3.0 / 2);
@@ -282,7 +282,7 @@ arith_le()
     verify(!(2 + 2 =< 3));
 }
 
-arith_gt()
+test(arith_gt)
 {
     verify(2 + 2 > 3);
     verify(3.0 * 2 > 1.5);
@@ -301,7 +301,7 @@ arith_gt()
     verify_error("foo" > 1.5, type_error(string, 1.5));
 }
 
-arith_ge()
+test(arith_ge)
 {
     verify(2 + 2 >= 4);
     verify(3.0 / 2 >= 1.5);
@@ -320,7 +320,7 @@ arith_ge()
     verify_error("foo" >= 1.5, type_error(string, 1.5));
 }
 
-float_conversion()
+test(float_conversion)
 {
     eval(float(3), 3.0);
     eval(float(3.5), 3.5);
@@ -341,7 +341,7 @@ float_conversion()
     eval_error(float("2.0e400"), type_error(number, "2.0e400"));
 }
 
-integer_conversion()
+test(integer_conversion)
 {
     eval(integer(3), 3);
     eval(integer(3.5), 3);
@@ -366,7 +366,7 @@ integer_conversion()
     eval_error(integer(-2147483649.0), evaluation_error(int_overflow));
 }
 
-string_conversion()
+test(string_conversion)
 {
     eval(string(3), "3");
     eval(string(-3.0), "-3.0");
@@ -394,7 +394,7 @@ string_conversion()
     eval_error(string('3'), type_error(evaluable, '3'));
 }
 
-nan()
+test(nan)
 {
     verify(isnan(nan));
     verify(isnan(float("nan")));
@@ -407,7 +407,7 @@ nan()
     verify_error(isnan("nan"), type_error(number, "nan"));
 }
 
-inf()
+test(inf)
 {
     verify(isinf(inf));
     verify(isinf(-inf));
@@ -426,7 +426,7 @@ inf()
     verify_error(isinf("inf"), type_error(number, "inf"));
 }
 
-bitwise_and()
+test(bitwise_and)
 {
     eval(22 /\ 5, 4);
 
@@ -440,7 +440,7 @@ bitwise_and()
     eval_error(22 /\ 5.0, type_error(integer, 5.0));
 }
 
-bitwise_or()
+test(bitwise_or)
 {
     eval(22 \/ 5, 23);
 
@@ -454,7 +454,7 @@ bitwise_or()
     eval_error(22 \/ 5.0, type_error(integer, 5.0));
 }
 
-bitwise_xor()
+test(bitwise_xor)
 {
     eval(22 ^ 5, 19);
 
@@ -468,7 +468,7 @@ bitwise_xor()
     eval_error(22 ^ 5.0, type_error(integer, 5.0));
 }
 
-bitwise_not()
+test(bitwise_not)
 {
     eval(~22, -23);
     eval(\22, -23);
@@ -479,7 +479,7 @@ bitwise_not()
     eval_error(~22.5, type_error(integer, 22.5));
 }
 
-shift_left()
+test(shift_left)
 {
     eval(22 << 5, 704);
 
@@ -493,7 +493,7 @@ shift_left()
     eval_error(22 << 5.0, type_error(integer, 5.0));
 }
 
-shift_right()
+test(shift_right)
 {
     eval(22 >> 5, 0);
     eval(-22 >> 5, -1);
@@ -508,7 +508,7 @@ shift_right()
     eval_error(22 >> 5.0, type_error(integer, 5.0));
 }
 
-shift_uright()
+test(shift_uright)
 {
     eval(22 >>> 5, 0);
     eval(-22 >>> 5, 0x07ffffff);
@@ -523,7 +523,7 @@ shift_uright()
     eval_error(22 >>> 5.0, type_error(integer, 5.0));
 }
 
-abs()
+test(abs)
 {
     eval(abs(3), 3);
     eval(abs(-35.125), 35.125);
@@ -540,7 +540,7 @@ abs()
     eval_error(abs(-2147483648), evaluation_error(int_overflow));
 }
 
-sign()
+test(sign)
 {
     eval(sign(3), 1);
     eval(sign(0), 0);
@@ -558,7 +558,7 @@ sign()
     eval_error(sign("foo"), type_error(number, "foo"));
 }
 
-truncate()
+test(truncate)
 {
     eval(truncate(3), 3);
     eval(truncate(3.5), 3);
@@ -583,7 +583,7 @@ truncate()
     eval_error(truncate(-2147483649.0), evaluation_error(int_overflow));
 }
 
-round()
+test(round)
 {
     eval(round(3), 3);
     eval(round(-3), -3);
@@ -608,7 +608,7 @@ round()
     eval_error(round('3'), type_error(evaluable, '3'));
 }
 
-ceil()
+test(ceil)
 {
     eval(ceil(3), 3);
     eval(ceil(-3), -3);
@@ -646,7 +646,7 @@ ceil()
     eval_error(ceil('3'), type_error(evaluable, '3'));
 }
 
-floor()
+test(floor)
 {
     eval(floor(3), 3);
     eval(floor(-3), -3);
@@ -671,7 +671,7 @@ floor()
     eval_error(floor('3'), type_error(evaluable, '3'));
 }
 
-float_fractional_part()
+test(float_fractional_part)
 {
     eval(float_fractional_part(3), 0);
     eval(float_fractional_part(-3), 0);
@@ -696,7 +696,7 @@ float_fractional_part()
     eval_error(float_fractional_part('3'), type_error(evaluable, '3'));
 }
 
-float_integer_part()
+test(float_integer_part)
 {
     eval(float_integer_part(3), 3);
     eval(float_integer_part(-3), -3);
@@ -721,7 +721,7 @@ float_integer_part()
     eval_error(float_integer_part('3'), type_error(evaluable, '3'));
 }
 
-exp()
+test(exp)
 {
     eval_close(exp(1), e);
     eval_close(exp(0), 1.0);
@@ -738,7 +738,7 @@ exp()
     eval_error(exp('3'), type_error(evaluable, '3'));
 }
 
-log()
+test(log)
 {
     eval_close(log(e), 1.0);
     eval_close(log(1.0), 0.0);
@@ -756,7 +756,7 @@ log()
     eval_error(log('3'), type_error(evaluable, '3'));
 }
 
-pow()
+test(pow)
 {
     eval(pow(2, 3), 8.0);
     eval(3.5 ** 0, 1.0);
@@ -789,7 +789,7 @@ pow()
     eval_error("foo" ** 1.5, type_error(number, "foo"));
 }
 
-sqrt()
+test(sqrt)
 {
     eval_close(sqrt(1), 1.0);
     eval_close(sqrt(0.0), 0.0);
@@ -807,7 +807,7 @@ sqrt()
     eval_error(sqrt('3'), type_error(evaluable, '3'));
 }
 
-acos()
+test(acos)
 {
     eval_close(acos(1), 0.0);
     eval_close(acos(0.0) * 2, pi);
@@ -822,7 +822,7 @@ acos()
     eval_error(acos('3'), type_error(evaluable, '3'));
 }
 
-asin()
+test(asin)
 {
     eval_close(asin(0), 0.0);
     eval_close(asin(1.0) * 2, pi);
@@ -837,7 +837,7 @@ asin()
     eval_error(asin('3'), type_error(evaluable, '3'));
 }
 
-atan()
+test(atan)
 {
     eval_close(atan(1.0) * 4, pi);
     eval_close(atan(0), 0.0);
@@ -852,7 +852,7 @@ atan()
     eval_error(atan('3'), type_error(evaluable, '3'));
 }
 
-atan2()
+test(atan2)
 {
     eval_close(atan2(1.0, 1.0) * 4, pi);
     eval_close(atan2(0, 1), 0.0);
@@ -872,7 +872,7 @@ atan2()
     eval_error(atan2("foo", 1.5), type_error(number, "foo"));
 }
 
-cos()
+test(cos)
 {
     eval_close(cos(0), 1.0);
     eval_close(cos(pi / 2), 0.0);
@@ -887,7 +887,7 @@ cos()
     eval_error(cos('3'), type_error(evaluable, '3'));
 }
 
-sin()
+test(sin)
 {
     eval_close(sin(0), 0.0);
     eval_close(sin(pi / 2), 1.0);
@@ -902,7 +902,7 @@ sin()
     eval_error(sin('3'), type_error(evaluable, '3'));
 }
 
-tan()
+test(tan)
 {
     eval_close(tan(0), 0.0);
     eval_close(tan(1), 1.55740772465);
@@ -917,7 +917,7 @@ tan()
     eval_error(tan('3'), type_error(evaluable, '3'));
 }
 
-mid()
+test(mid)
 {
     eval(mid("foobar", 1, 4), "ooba");
     eval(mid("foobar", 1, 0), "");
@@ -948,7 +948,7 @@ mid()
     eval_error(mid("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-mid_bytes()
+test(mid_bytes)
 {
     eval(mid_bytes("foobar", 1, 4), "ooba");
     eval(mid_bytes("foobar", 1, 0), "");
@@ -974,7 +974,7 @@ mid_bytes()
     eval_error(mid_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-left()
+test(left)
 {
     eval(left("foobar", 3), "foo");
     eval(left("foobar", 10), "foobar");
@@ -988,7 +988,7 @@ left()
     eval_error(left("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-left_bytes()
+test(left_bytes)
 {
     eval(left_bytes("foobar", 3), "foo");
     eval(left_bytes("foobar", 10), "foobar");
@@ -1001,7 +1001,7 @@ left_bytes()
     eval_error(left_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-right()
+test(right)
 {
     eval(right("foobar", 3), "bar");
     eval(right("foobar", 10), "foobar");
@@ -1015,7 +1015,7 @@ right()
     eval_error(right("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-right_bytes()
+test(right_bytes)
 {
     eval(right_bytes("foobar", 3), "bar");
     eval(right_bytes("foobar", 10), "foobar");
@@ -1027,7 +1027,7 @@ right_bytes()
     eval_error(right_bytes("foobar", -1), domain_error(not_less_than_zero, -1));
 }
 
-length()
+test(length)
 {
     eval(length("foobar"), 6);
     eval(length(""), 0);
@@ -1040,7 +1040,7 @@ length()
     eval_error(length(1.5), type_error(string, 1.5));
 }
 
-length_bytes()
+test(length_bytes)
 {
     eval(length_bytes("foobar"), 6);
     eval(length_bytes(""), 0);
@@ -1053,7 +1053,7 @@ length_bytes()
     eval_error(length_bytes(1.5), type_error(string, 1.5));
 }
 
-char()
+test(char)
 {
     eval(char("foobar", 3), 98);
     eval(char("foobar", 0), 102);
@@ -1069,7 +1069,7 @@ char()
     eval_error(char("foobar", 6), domain_error(string_index, 6));
 }
 
-char_to_string()
+test(char_to_string)
 {
     eval(char_to_string(98), "b");
     eval(char_to_string(0xAF), "\u00AF");
@@ -1081,7 +1081,7 @@ char_to_string()
     eval_error(char_to_string(0x110000), representation_error(character_code));
 }
 
-byte()
+test(byte)
 {
     eval(byte("foobar", 3), 98);
     eval(byte("foobar", 0), 102);
@@ -1097,7 +1097,7 @@ byte()
     eval_error(byte("foobar", 6), domain_error(string_index, 6));
 }
 
-byte_to_string()
+test(byte_to_string)
 {
     eval(byte_to_string(98), "b");
     eval(byte_to_string(0), "\0");
@@ -1109,7 +1109,7 @@ byte_to_string()
     eval_error(byte_to_string(256), type_error(byte, 256));
 }
 
-atom_name()
+test(atom_name)
 {
     verify(atom_name(foobar, S1) && S1 == "foobar");
     verify(atom_name('hi there!', S2) && S2 == "hi there!");
@@ -1122,7 +1122,7 @@ atom_name()
     verify_error(atom_name(A4, foobar), type_error(string, foobar));
 }
 
-other()
+test(other)
 {
     verify(!(2 is 1 + 3));
     verify(!(-2 == - 2));
@@ -1134,69 +1134,4 @@ other()
 
     verify(fperror(clear));
     verify(!fperror(zero_divisor));
-}
-
-main(_)
-{
-    init("test-arith");
-    run(constants);
-    run(addition);
-    run(negation);
-    run(subtraction);
-    run(multiplication);
-    run(division);
-    run(modulus);
-    run(remainder);
-    run(arith_eq);
-    run(arith_ne);
-    run(arith_lt);
-    run(arith_le);
-    run(arith_gt);
-    run(arith_ge);
-    run(float_conversion);
-    run(integer_conversion);
-    run(string_conversion);
-    run(nan);
-    run(inf);
-    run(bitwise_and);
-    run(bitwise_or);
-    run(bitwise_xor);
-    run(bitwise_not);
-    run(shift_left);
-    run(shift_right);
-    run(shift_uright);
-    run(abs);
-    run(sign);
-    run(truncate);
-    run(round);
-    run(ceil);
-    run(floor);
-    run(float_fractional_part);
-    run(float_integer_part);
-    run(exp);
-    run(log);
-    run(pow);
-    run(sqrt);
-    run(acos);
-    run(asin);
-    run(atan);
-    run(atan2);
-    run(cos);
-    run(sin);
-    run(tan);
-    run(mid);
-    run(mid_bytes);
-    run(left);
-    run(left_bytes);
-    run(right);
-    run(right_bytes);
-    run(length);
-    run(length_bytes);
-    run(char);
-    run(char_to_string);
-    run(byte);
-    run(byte_to_string);
-    run(atom_name);
-    run(other);
-    report();
 }

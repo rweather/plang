@@ -17,7 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
 class foo
 {
@@ -48,12 +48,12 @@ class passenger_car : vehicle
     }
 }
 
-new_object()
+test(new_object)
 {
     new foo (F);
 }
 
-decl_errors()
+test(decl_errors)
 {
     verify_error(new_class(Name, [], [], []), instantiation_error);
     verify_error(new_class(1.5, [], [], []), type_error(atom, 1.5));
@@ -72,7 +72,7 @@ solutions(Object)
     fail;
 }
 
-call_method()
+test(call_method)
 {
     new foo(F);
 
@@ -95,7 +95,7 @@ call_method()
     verify_error(F.bay(), existence_error(member_predicate, foo::bay/1));
 }
 
-properties()
+test(properties)
 {
     verify(class(passenger_car, CarClass));
     verify(class(vehicle, VehicleClass));
@@ -126,14 +126,4 @@ properties()
 
     verify(!(X = f(Y), Y = a, Car.make := X, fail));
     verify(Car.make == f(a));
-}
-
-main(_)
-{
-    init("test-class");
-    run(new_object);
-    run(decl_errors);
-    run(call_method);
-    run(properties);
-    report();
 }

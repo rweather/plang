@@ -58,6 +58,16 @@
  * \par shell module
  * \ref shell_main_1 "shell::main/1"
  *
+ * \par test module
+ * \ref compare_2 "compare/2",
+ * \ref fail_1 "fail/1",
+ * \ref fail_2 "fail/2",
+ * \ref verify_1 "verify/1",
+ * \ref verify_error_2 "verify_error/2",
+ * \ref verify_fuzzy_1 "verify_fuzzy/1",
+ * \ref verify_var_error_2 "verify_var_error/2",
+ * \ref test_main_1 "test::main/1"
+ *
  * \par words module
  * \ref words_adjective_1 "words::adjective/1",
  * \ref words_adverb_1 "words::adverb/1",
@@ -115,6 +125,13 @@
  */
 /*\@{*/
 /* Defined in shell.lp */
+/*\@}*/
+
+/**
+ * \defgroup module_test Modules - test
+ */
+/*\@{*/
+/* Defined in test.dox */
 /*\@}*/
 
 /**

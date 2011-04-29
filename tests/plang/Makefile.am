@@ -13,6 +13,6 @@ PLANG_TESTS = \
 	@WORDS_TESTCASE@
 
 TESTS = $(PLANG_TESTS)
-TESTS_ENVIRONMENT = $(top_builddir)/src/frontend/plang -I$(top_srcdir)/src/imports -I$(top_srcdir)/src/words -L$(top_builddir)/src/words/.libs
+TESTS_ENVIRONMENT = $(top_builddir)/src/frontend/plang -I$(top_srcdir)/src/imports -I$(top_srcdir)/src/words -L$(top_builddir)/src/words/.libs -mtest::main
 
-EXTRA_DIST = $(PLANG_TESTS) testcase.lp
+EXTRA_DIST = $(PLANG_TESTS)

@@ -17,7 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
 class foo
 {
@@ -30,7 +30,7 @@ class foobar : foo
 {
 };
 
-assign()
+test(assign)
 {
     verify(X := 42);
     verify(X == 42);
@@ -61,7 +61,7 @@ assign()
     verify_error(a := H, type_error(variable, a));
 }
 
-bt_assign()
+test(bt_assign)
 {
     verify(X :== 42);
     verify(X == 42);
@@ -85,7 +85,7 @@ bt_assign()
     verify_error(a :== H, type_error(variable, a));
 }
 
-num_assign()
+test(num_assign)
 {
     verify(X ::= 42);
     verify(X == 42);
@@ -107,7 +107,7 @@ num_assign()
     verify_error(a ::= H, type_error(variable, a));
 }
 
-bt_num_assign()
+test(bt_num_assign)
 {
     verify(X ::== 42);
     verify(X == 42);
@@ -127,14 +127,4 @@ bt_num_assign()
     verify(F.bar == "foobar");
 
     verify_error(a ::== H, type_error(variable, a));
-}
-
-main(_)
-{
-    init("test-assign");
-    run(assign);
-    run(bt_assign);
-    run(num_assign);
-    run(bt_num_assign);
-    report();
 }

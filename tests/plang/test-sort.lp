@@ -17,9 +17,9 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
-keysort()
+test(keysort)
 {
     verify(keysort([], []));
     verify(keysort([a - 1], [a - 1]));
@@ -36,7 +36,7 @@ keysort()
     verify_error(keysort([a - 1 | b], _), type_error(list, [a - 1 | b]));
 }
 
-keysortd()
+test(keysortd)
 {
     verify(keysortd([], []));
     verify(keysortd([a - 1], [a - 1]));
@@ -53,7 +53,7 @@ keysortd()
     verify_error(keysortd([a - 1 | b], _), type_error(list, [a - 1 | b]));
 }
 
-msort()
+test(msort)
 {
     verify(msort([], []));
     verify(msort([a - 1], [a - 1]));
@@ -65,7 +65,7 @@ msort()
     verify_error(msort([a | b], _), type_error(list, [a | b]));
 }
 
-msortd()
+test(msortd)
 {
     verify(msortd([], []));
     verify(msortd([a - 1], [a - 1]));
@@ -77,7 +77,7 @@ msortd()
     verify_error(msortd([a | b], _), type_error(list, [a | b]));
 }
 
-rkeysort()
+test(rkeysort)
 {
     verify(rkeysort([], []));
     verify(rkeysort([a - 1], [a - 1]));
@@ -94,7 +94,7 @@ rkeysort()
     verify_error(rkeysort([a - 1 | b], _), type_error(list, [a - 1 | b]));
 }
 
-rkeysortd()
+test(rkeysortd)
 {
     verify(rkeysortd([], []));
     verify(rkeysortd([a - 1], [a - 1]));
@@ -111,7 +111,7 @@ rkeysortd()
     verify_error(rkeysortd([a - 1 | b], _), type_error(list, [a - 1 | b]));
 }
 
-sort()
+test(sort)
 {
     verify(sort([], []));
     verify(sort([a - 1], [a - 1]));
@@ -123,7 +123,7 @@ sort()
     verify_error(sort([a | b], _), type_error(list, [a | b]));
 }
 
-sortd()
+test(sortd)
 {
     verify(sortd([], []));
     verify(sortd([a - 1], [a - 1]));
@@ -172,7 +172,7 @@ validate_ascending_list([H|L], N)
     validate_ascending_list(L, H);
 }
 
-large_sort()
+test(large_sort)
 {
     generate_list(L1, 1500);
     sort(L1, OutL1);
@@ -181,19 +181,4 @@ large_sort()
     generate_random_list(L2, 1500, 1500);
     msort(L2, OutL2);
     verify(validate_ascending_list(OutL2, 0));
-}
-
-main(_)
-{
-    init("test-sort");
-    run(keysort);
-    run(keysortd);
-    run(msort);
-    run(msortd);
-    run(rkeysort);
-    run(rkeysortd);
-    run(sort);
-    run(sortd);
-    run(large_sort);
-    report();
 }

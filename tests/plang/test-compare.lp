@@ -17,9 +17,9 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
-term_eq()
+test(term_eq)
 {
     verify(X == X);
     verify(!(X == Y));
@@ -27,7 +27,7 @@ term_eq()
     verify(!(f(X, Y) == f(Y, X)));
 }
 
-term_ne()
+test(term_ne)
 {
     verify(!(X !== X));
     verify(X !== Y);
@@ -45,7 +45,7 @@ term_ne()
     verify('\\=='(f(X, Y), f(Y, X)));
 }
 
-term_lt()
+test(term_lt)
 {
     verify(f(j) @< f(k));
     verify(!(f(k) @< f(j)));
@@ -53,7 +53,7 @@ term_lt()
     verify(2.0 @< 1);
 }
 
-term_le()
+test(term_le)
 {
     verify(f(j) @<= f(k));
     verify(!(f(k) @<= f(j)));
@@ -71,7 +71,7 @@ term_le()
     verify('@=<'(2.0, 1));
 }
 
-term_gt()
+test(term_gt)
 {
     verify(!(f(j) @> f(k)));
     verify(f(k) @> f(j));
@@ -79,22 +79,10 @@ term_gt()
     verify(!(2.0 @> 1));
 }
 
-term_ge()
+test(term_ge)
 {
     verify(!(f(j) @>= f(k)));
     verify(f(k) @>= f(j));
     verify(f(j) @>= f(j));
     verify(!(2.0 @>= 1));
-}
-
-main(_)
-{
-    init("test-compare");
-    run(term_eq);
-    run(term_ne);
-    run(term_lt);
-    run(term_le);
-    run(term_gt);
-    run(term_ge);
-    report();
 }

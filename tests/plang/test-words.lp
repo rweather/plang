@@ -17,10 +17,10 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 :- import(words).
 
-adjective()
+test(adjective)
 {
     verify(words::adjective(animated));
     verify(words::adjective("Animated"));
@@ -29,7 +29,7 @@ adjective()
     verify(!words::adjective(15));
 }
 
-adverb()
+test(adverb)
 {
     verify(words::adverb(fitfully));
     verify(words::adverb("Fitfully"));
@@ -38,7 +38,7 @@ adverb()
     verify(!words::adverb(15));
 }
 
-noun()
+test(noun)
 {
     verify(words::noun(harpsichord));
     verify(words::noun("Harpsichord"));
@@ -48,7 +48,7 @@ noun()
     verify(!words::noun(15));
 }
 
-verb()
+test(verb)
 {
     verify(words::verb(annoy));
     verify(words::verb("Annoy"));
@@ -58,7 +58,7 @@ verb()
     verify(!words::verb(15));
 }
 
-description()
+test(description)
 {
     // walk as a verb has one sense with an antonym.
     verify(words::description(walk, verb, antptr, allsenses, Desc1));
@@ -78,7 +78,7 @@ description()
     verify_error(words::description(walk, verb, antptr, foo, Desc13), type_error(word_sense, foo));
 }
 
-overview()
+test(overview)
 {
     verify(words::overview(hand, Desc1) && Desc1 =!= "");
     verify(words::overview("Bobby Fischer", Desc2) && Desc2 =!= "");
@@ -88,7 +88,7 @@ overview()
     verify_error(words::overview(hand, res), type_error(variable, res));
 }
 
-search()
+test(search)
 {
     verify(words::search("walk", verb, antptr, allsenses, List) && List == ["ride"]);
     verify(words::search("hand", noun, haspartptr, allsenses, List2));
@@ -107,7 +107,7 @@ search()
     verify_error(words::search(walk, verb, antptr, foo, List13), type_error(word_sense, foo));
 }
 
-base_forms()
+test(base_forms)
 {
     verify(words::base_forms("eating", verb, Base1) && Base1 == ["eat"]);
     verify(words::base_forms(eating, verb, ["eat"]));
@@ -134,23 +134,8 @@ verb_phrase --> words::verb, noun_phrase.
 det --> "the".
 det --> "a".
 
-parse()
+test(parse)
 {
     verify(sentence(["the", "cat", "eats", "a", "bat"], []));
     verify(sentence(["the", "car", "killed", "a", "pedestrian"], []));
-}
-
-main(_)
-{
-    init("test-words");
-    run(adjective);
-    run(adverb);
-    run(noun);
-    run(verb);
-    run(description);
-    run(overview);
-    run(search);
-    run(base_forms);
-    run(parse);
-    report();
 }

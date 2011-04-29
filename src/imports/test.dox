@@ -1,0 +1,274 @@
+/*
+ * plang logic programming language
+ * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ *
+ * The plang package is free software: you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public License
+ * as published by the Free Software Foundation, either version 3 of
+ * the License, or (at your option) any later version.
+ *
+ * The plang package is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with the libcompiler library.  If not,
+ * see <http://www.gnu.org/licenses/>.
+ */
+
+/**
+\addtogroup module_test
+
+The \c test module provides convenience predicates for writing
+unit tests in Plang.  The following is a simple example for
+testing the \ref sort_2 "sort/2" and \ref sortd_2 "sortd/2"
+predicates:
+
+\code
+:- import(test).
+
+test(sort)
+{
+    verify(sort([a, y, b, m], [a, b, m, y]));
+    verify_error(sort(L, S), instantiation_error);
+}
+
+test(sortd)
+{
+    verify(sortd([a, y, b, m], [y, m, b, a]));
+    verify_error(sortd(L, S), instantiation_error);
+}
+\endcode
+
+All test predicates should be declared as <tt>test(\em Name)</tt>
+where \em Name is an atom that uniquely identifies the test.
+Multiple test predicates can be declared in the same application,
+which will be executed when \ref test_main_1 "test::main/1"
+is called:
+
+\code
+main(Args)
+{
+    test::main(Args);
+}
+\endcode
+
+As an alternative to providing a declaration for <b>main/1</b>,
+the <b>-m</b> option can be specified on the
+\ref plang_manpage "plang" command-line:
+
+\code
+plang -mtest::main test-sort.lp
+\endcode
+
+The output of running the unit test will look something like this:
+
+\code
+test-sort: sort: ok                                                     
+test-sort: sortd: ok                                                    
+test-sort: 2 passed, 0 failed                                           
+\endcode
+
+\ref compare_2 "compare/2",
+\ref fail_1 "fail/1",
+\ref fail_2 "fail/2",
+\ref verify_1 "verify/1",
+\ref verify_error_2 "verify_error/2",
+\ref verify_fuzzy_1 "verify_fuzzy/1",
+\ref verify_var_error_2 "verify_var_error/2",
+\ref test_main_1 "test::main/1"
+
+<hr>
+\anchor compare_2
+<b>compare/2</b> - compares two values for equality.
+
+\par Usage
+\b compare(\em Actual, \em Expected)
+
+\par Description
+Compares \em Actual with \em Expected using \ref term_eq_2 "(==)/2".
+Aborts the current unit test with an error if the comparison fails.
+
+\par Examples
+\code
+X is 2 + 2;
+compare(X, 4);
+\endcode
+
+\par See Also
+\ref fail_1 "fail/1",
+\ref verify_1 "verify/1"
+
+<hr>
+\anchor fail_1
+<b>fail/1</b> - fails the current unit test with a message.
+
+\par Usage
+\b fail(\em Message)
+
+\par Description
+Fails the current unit test and displays the string \em Message
+in the error log.
+\par
+If the test executes \ref fail_0 "fail/0", then the effect will
+be equivalent to calling <b>fail/1</b> with a generic error message.
+
+\par Examples
+\code
+fail("resource not found");
+\endcode
+
+\par See Also
+\ref fail_0 "fail/0",
+\ref fail_2 "fail/2"
+
+<hr>
+\anchor fail_2
+<b>fail/2</b> - fails the current unit test with two messages.
+
+\par Usage
+\b fail(\em Message1, \em Message2)
+
+\par Description
+Fails the current unit test and displays the strings \em Message
+and \em Message2 in the error log.
+
+\par Examples
+\code
+fail(2 + 2 =:= 4, "arithmetic failure");
+\endcode
+
+\par See Also
+\ref fail_0 "fail/0",
+\ref fail_1 "fail/1"
+
+<hr>
+\anchor verify_1
+<b>verify/1</b> - verifies that a condition is true.
+
+\par Usage
+\b verify(\em Goal)
+
+\par Description
+Executes \em Goal and succeeds if it succeeds.  If \em Goal
+fails or throws an error, then the current unit test will
+be aborted with an error.
+
+\par Examples
+\code
+verify(fail);
+verify(2 + 2 =:= 4);
+verify(abs(1.0 / 3.0 - 0.333333) <= 0.00001);
+\endcode
+
+\par See Also
+\ref compare_2 "compare/2",
+\ref fail_1 "fail/1",
+\ref verify_error_2 "verify_error/2"
+
+<hr>
+\anchor verify_error_2
+<b>verify_error/2</b> - verifies that a goal throws an
+expected error.
+
+\par Usage
+\b verify_error(\em Goal, \em ExpectedError)
+
+\par Description
+Executes \em Goal and succeeds if it throws the term
+<tt>error(\em ExpectedError, _)</tt>.  Otherwise the current
+unit test will be aborted with an error.
+\par
+\em ExpectedError must be a ground term because it is compared to the
+actual error using \ref term_eq_2 "(==)/2".  If \em ExpectedError
+involves variables then the test will fail.  Use
+\ref verify_var_error_2 "verify_var_error/2" instead to check
+for errors that involve variables.
+
+\par Examples
+\code
+verify_error(X is 2 + "3", type_error(number, "3"));
+\endcode
+
+\par See Also
+\ref fail_1 "fail/1",
+\ref verify_1 "verify/1",
+\ref verify_var_error_2 "verify_var_error/2"
+
+<hr>
+\anchor verify_fuzzy_1
+<b>verify_fuzzy/1</b> - verifies that the current fuzzy confidence
+value is as expected.
+
+\par Usage
+\b verify_fuzzy(\em Expected)
+
+\par Description
+Evaluates \em Expected according to the rules of \ref is_2 "is/2"
+and compares it with the current fuzzy confidence value from
+\ref fuzzy_1 "fuzzy/1".  Succeeds if the two values are within
+0.0001 of each other.  Otherwise the current unit test will be
+aborted with an error.
+\par
+This predicate is intended for testing code that involves
+\ref fuzzy_logic "fuzzy logic".
+
+\par Examples
+\code
+verify_fuzzy(0.5);
+\endcode
+
+\par See Also
+\ref verify_1 "verify/1",
+\ref fuzzy_1 "fuzzy/1"
+
+<hr>
+\anchor verify_var_error_2
+<b>verify_var_error/2</b> - verifies that a goal throws an
+expected error that involves variables.
+
+\par Usage
+\b verify_var_error(\em Goal, \em ExpectedError)
+
+\par Description
+Executes \em Goal and succeeds if it throws a term that can
+be unified with <tt>error(\em ExpectedError, _)</tt>.  Otherwise
+the current unit test will be aborted with an error.
+
+\par Examples
+\code
+verify_var_error(fuzzy(1.0, [H]), type_error(interval_list, [H]));
+\endcode
+
+\par See Also
+\ref fail_1 "fail/1",
+\ref verify_1 "verify/1",
+\ref verify_error_2 "verify_error/2"
+
+<hr>
+\anchor test_main_1
+<b>test::main/1</b> - runs all unit tests and reports their results.
+
+\par Usage
+\b test::main(\em Args)
+
+\par Description
+Runs all of the unit tests that have been registered with the
+dynamic <b>test/1</b> predicate.  The \em Args are the command-line
+arguments from the operating system.  The first element of \em Args
+is stripped to its base name and then used as the name of
+the "suite" that is being run.
+\par
+If one or more unit tests produce an error, then <b>test::main/1</b>
+will fail.  If all unit tests pass, then <b>test::main/1</b> succeeds.
+
+\par Examples
+\code
+main(Args)
+{
+    test::main(Args);
+}
+\endcode
+
+*/

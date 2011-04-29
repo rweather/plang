@@ -6,7 +6,8 @@ imports_DATA = \
 	shell.lp \
 	stderr.lp \
 	stdin.lp \
-	stdout.lp
+	stdout.lp \
+	test.lp
 
 EXTRA_DOCS = \
 	findall.dox \
@@ -15,6 +16,7 @@ EXTRA_DOCS = \
 	modules.dox \
 	shell.dox \
 	stdin.dox \
-	stdout.dox
+	stdout.dox \
+	test.dox
 
 EXTRA_DIST = $(imports_DATA) $(EXTRA_DOCS)

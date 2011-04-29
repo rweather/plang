@@ -17,7 +17,7 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 :- import(fuzzy).
 
 cold1(3) <<1.0>>.
@@ -38,14 +38,7 @@ cold3(Temperature)
     fuzzy(Temperature, [(3, 1), (27, 0)]);
 }
 
-verify_fuzzy(Expected)
-{
-    fuzzy(Actual);
-    Delta is abs(Actual - Expected);
-    verify(Delta <= 0.0001);
-}
-
-fuzzy()
+test(fuzzy)
 {
     verify_fuzzy(1.0);
 
@@ -71,7 +64,7 @@ fuzzy()
     verify_fuzzy(0.25);
 }
 
-fuzzy_and()
+test(fuzzy_and)
 {
     verify(fuzzy_and(fuzzy(0.5), fuzzy(0.4)));
     verify_fuzzy(0.4);
@@ -89,7 +82,7 @@ fuzzy_and()
     verify_fuzzy(0.1);
 }
 
-fuzzy_findall()
+test(fuzzy_findall)
 {
     verify(fuzzy_findall(T1, cold1(T1), List1));
     verify(List1 == [(3, 1.0), (10, 0.7)]);
@@ -104,7 +97,7 @@ fuzzy_findall()
     verify(List4 == [(27, 1.0), (10, 0.3)]);
 }
 
-fuzzy_not()
+test(fuzzy_not)
 {
     verify(fuzzy_not(fuzzy(0.4)));
     verify_fuzzy(0.6);
@@ -119,7 +112,7 @@ fuzzy_not()
     verify_fuzzy(0.3);
 }
 
-fuzzy_or()
+test(fuzzy_or)
 {
     verify(fuzzy_or(fuzzy(0.5), fuzzy(0.7)));
     verify_fuzzy(0.7);
@@ -139,7 +132,7 @@ fuzzy_or()
     verify_fuzzy(0.25);
 }
 
-fuzzy_prod()
+test(fuzzy_prod)
 {
     verify(fuzzy_prod(fuzzy(0.5), fuzzy(0.4)));
     verify_fuzzy(0.5 * 0.4);
@@ -157,7 +150,7 @@ fuzzy_prod()
     verify_fuzzy(0.5 * 0.3);
 }
 
-fuzzy_prod_or()
+test(fuzzy_prod_or)
 {
     verify(fuzzy_prod_or(fuzzy(0.5), fuzzy(0.7)));
     verify_fuzzy(0.5 + 0.7 - 0.5 * 0.7);
@@ -177,7 +170,7 @@ fuzzy_prod_or()
     verify_fuzzy(0.25);
 }
 
-interval()
+test(interval)
 {
     verify(fuzzy(3, [(56, 0.5)]));
     verify_fuzzy(0.5);
@@ -211,7 +204,7 @@ interval()
     verify_error(fuzzy(1.0, [(2,1), (3,a)]), type_error(interval_list, [(2,1), (3,a)]));
 }
 
-predicate()
+test(predicate)
 {
     verify(cold1(3));
     verify_fuzzy(1.0);
@@ -250,7 +243,7 @@ predicate()
     verify_fuzzy(0.5);
 }
 
-set_fuzzy()
+test(set_fuzzy)
 {
     verify_fuzzy(1.0);
 
@@ -271,20 +264,4 @@ set_fuzzy()
 
     verify_error(set_fuzzy("0.1"), type_error(number, "0.1"));
     verify_fuzzy(0.25);
-}
-
-main(_)
-{
-    init("test-fuzzy");
-    run(fuzzy);
-    run(fuzzy_and);
-    run(fuzzy_findall);
-    run(fuzzy_not);
-    run(fuzzy_or);
-    run(fuzzy_prod);
-    run(fuzzy_prod_or);
-    run(interval);
-    run(predicate);
-    run(set_fuzzy);
-    report();
 }

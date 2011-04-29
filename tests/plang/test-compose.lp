@@ -17,15 +17,15 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 
-list_cons()
+test(list_cons)
 {
     verify(([H | T] = [a, b], H == a, T == [b]));
     verify([a, b] = '.'(a, '.'(b, [])));
 }
 
-arg()
+test(arg)
 {
     verify((arg(1, foo(a, b), X), X == a));
     verify((arg(2, foo(a, b), Y), Y == b));
@@ -45,7 +45,7 @@ arg()
     verify_error(arg(1, a, L), type_error(compound, a));
 }
 
-copy_term()
+test(copy_term)
 {
     verify((copy_term(f(X, Y), Z), compound(Z)));
     verify((copy_term(X1, a), var(X1)));
@@ -54,7 +54,7 @@ copy_term()
     verify(!copy_term(foo, bar));
 }
 
-functor()
+test(functor)
 {
     verify((functor(a, N1, A1), N1 == a, A1 == 0));
     verify((functor(1.5, N2, A2), N2 == 1.5, A2 == 0));
@@ -82,7 +82,7 @@ functor()
     verify_error(functor(T12, 1.5, 1), type_error(atom, 1.5));
 }
 
-univ()
+test(univ)
 {
     verify(foo =.. [foo]);
     verify(1.5 =.. [1.5]);
@@ -102,15 +102,4 @@ univ()
     verify_error(T9 =.. [f(a, b)], type_error(atomic, f(a, b)));
     verify_error(T10 =.. [1.5, a, b], type_error(atom, 1.5));
     verify_error(f(a, b) =.. g(a), type_error(list, g(a)));
-}
-
-main(_)
-{
-    init("test-compose");
-    run(list_cons);
-    run(arg);
-    run(copy_term);
-    run(functor);
-    run(univ);
-    report();
 }

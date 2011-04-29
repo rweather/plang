@@ -17,13 +17,13 @@
  * see <http://www.gnu.org/licenses/>.
  */
 
-:- import(testcase).
+:- import(test).
 :- import(stdout).
 
 foo(X, Y) {}
 bar(X, Y) {}
 
-atom()
+test(atom)
 {
     verify(atom(a));
     verify(!atom(X));
@@ -38,7 +38,7 @@ atom()
     verify(!atom(Foo));
 }
 
-atomic()
+test(atomic)
 {
     verify(atomic(a));
     verify(!atomic(X));
@@ -53,7 +53,7 @@ atomic()
     verify(!atomic(Foo));
 }
 
-compound()
+test(compound)
 {
     verify(!compound(a));
     verify(!compound([]));
@@ -69,7 +69,7 @@ compound()
     verify(!compound(Foo));
 }
 
-float()
+test(float)
 {
     verify(!float(a));
     verify(!float(X));
@@ -83,7 +83,7 @@ float()
     verify(!float(Foo));
 }
 
-integer()
+test(integer)
 {
     verify(!integer(a));
     verify(!integer(X));
@@ -97,7 +97,7 @@ integer()
     verify(!integer(Foo));
 }
 
-nonvar()
+test(nonvar)
 {
     verify(nonvar(a));
     verify(!nonvar(X));
@@ -111,7 +111,7 @@ nonvar()
     verify(nonvar(Foo));
 }
 
-number()
+test(number)
 {
     verify(!number(a));
     verify(!number(X));
@@ -125,7 +125,7 @@ number()
     verify(!number(Foo));
 }
 
-string()
+test(string)
 {
     verify(!string(a));
     verify(!string(X));
@@ -139,7 +139,7 @@ string()
     verify(!string(Foo));
 }
 
-var()
+test(var)
 {
     verify(!var(a));
     verify(var(X));
@@ -154,7 +154,7 @@ var()
     verify(!var(Foo));
 }
 
-predicate()
+test(predicate)
 {
     verify(predicate(T1, foo/2));
     verify(predicate(T2, bar/2));
@@ -189,20 +189,4 @@ predicate()
     verify(!predicate(1.5));
     verify(!predicate([a]));
     verify(!predicate("foo"));
-}
-
-main(_)
-{
-    init("test-type");
-    run(atom);
-    run(atomic);
-    run(compound);
-    run(float);
-    run(integer);
-    run(nonvar);
-    run(number);
-    run(string);
-    run(var);
-    run(predicate);
-    report();
 }
