@@ -168,6 +168,8 @@ NEG             (-?)
 ".."            { RETURNTOK(K_DOT_DOT); }
 ":="            { RETURNTOK(K_GETS); }
 ":=="           { RETURNTOK(K_BT_GETS); }
+"=>"            { RETURNTOK(K_IMPLIES); }
+"<=>"           { RETURNTOK(K_EQUIV); }
 "abstract"      { RETURNTOK(K_ABSTRACT); }
 "case"          { RETURNTOK(K_CASE); }
 "catch"         { RETURNTOK(K_CATCH); }

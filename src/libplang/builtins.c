@@ -67,6 +67,8 @@
  * \par Logic and control
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref call_1 "call/1",
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
@@ -1893,6 +1895,8 @@ static p_goal_result p_builtin_load_library
  *
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref call_1 "call/1",
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
@@ -1956,6 +1960,8 @@ static p_goal_result p_builtin_load_library
  *
  * \par See Also
  * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref not_provable_1 "(!)/1",
  * \ref fuzzy_and_2 "fuzzy_and/2"
  */
@@ -1995,6 +2001,8 @@ static p_goal_result p_builtin_load_library
  *
  * \par See Also
  * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref not_provable_1 "(!)/1",
  * \ref fuzzy_or_2 "fuzzy_or/2",
  * \ref if_stmt "if"
@@ -2056,6 +2064,91 @@ static p_goal_result p_builtin_logical_or
         return P_RESULT_TREE_CHANGE;
     }
 }
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor logical_implies_2
+ * <b>(=&gt;)/2</b> - logical implication.
+ *
+ * \par Usage
+ * \em Goal1 <b>=&gt;</b> \em Goal2
+ *
+ * \par Description
+ * Executes \em Goal1.  If it succeeds, then execute \em Goal2.
+ * If \em Goal1 fails, then \em Goal1 <b>=&gt;</b> \em Goal2 succeeds.
+ * \par
+ * Implication differs from \ref if_stmt "(-&gt;)/2" in that
+ * <b>(-&gt;)/2</b> will \em fail if \em Goal1 fails, whereas
+ * <b>(=&gt;)/2</b> will succeed.  The implication operator is
+ * intended for use in applications that involve propositional logic.
+ * \par
+ * Essentially, \em Goal1 <b>=&gt;</b> \em Goal2 is the same as
+ * (\em Goal1 <b>-&gt;</b> \em Goal2 <b>||</b> \b true).
+ *
+ * \par Examples
+ * \code
+ * A => B
+ * true => true             succeeds
+ * true => false            fails
+ * false => true            succeeds
+ * false => false           succeeds
+ * \endcode
+ *
+ * \par See Also
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_or_2 "(||)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
+ * \ref not_provable_1 "(!)/1",
+ * \ref if_stmt "(-&gt;)/2"
+ */
+static char const p_builtin_logical_implies[] =
+    "'=>'(A, B)\n"
+    "{\n"
+    "    if (call(A))\n"
+    "        call(B);\n"
+    "}\n";
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor logical_equiv_2
+ * <b>(&lt;=&gt;)/2</b> - logical equivalence.
+ *
+ * \par Usage
+ * \em Goal1 <b>&lt;=&gt;</b> \em Goal2
+ *
+ * \par Description
+ * Executes \em Goal1 and \em Goal2.  Succeeds if they both
+ * succeed or if they both fail.  Fails if one succeeds and the
+ * other fails.
+ * \par
+ * Essentially, \em Goal1 <b>&lt;=&gt;</b> \em Goal2 is the same as
+ * (\em Goal1 <b>-&gt;</b> \b once(\em Goal2) <b>||</b> <b>!</b> \em Goal2).
+ *
+ * \par Examples
+ * \code
+ * A <=> B
+ * true <=> true            succeeds
+ * true <=> false           fails
+ * false <=> true           fails
+ * false <=> false          succeeds
+ * \endcode
+ *
+ * \par See Also
+ * \ref logical_and_2 "(&amp;&amp;)/2",
+ * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref not_provable_1 "(!)/1"
+ */
+static char const p_builtin_logical_equiv[] =
+    "'<=>'(A, B)\n"
+    "{\n"
+    "    if (call(A))\n"
+    "        call((B, !));\n"   // Match once-only call in next line.
+    "    else if (call(B))\n"
+    "        fail;\n"
+    "}\n";
 
 /**
  * \addtogroup logic_and_control
@@ -2343,6 +2436,8 @@ static char const p_builtin_do[] =
  * \par See Also
  * \ref logical_and_2 "(&amp;&amp;)/2",
  * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
+ * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref fuzzy_not_1 "fuzzy_not/1"
  */
 static char const p_builtin_not_provable[] =
@@ -2606,6 +2701,7 @@ static p_goal_result p_builtin_halt_1
  *
  * \par See Also
  * \ref logical_or_2 "(||)/2",
+ * \ref logical_implies_2 "(=&gt;)/2",
  * \ref switch_stmt "switch",
  * \ref syntax_if_stmt "Formal syntax of if statements"
  */
@@ -5150,6 +5246,8 @@ void _p_db_init_builtins(p_context *context)
         {0, 0, 0}
     };
     static const char * const builtin_sources[] = {
+        p_builtin_logical_equiv,
+        p_builtin_logical_implies,
         p_builtin_do,
         p_builtin_for,
         p_builtin_in,

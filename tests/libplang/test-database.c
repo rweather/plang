@@ -36,6 +36,8 @@ static void test_operators()
         {1200, P_OP_XFX, 2, "-->"},
         {1200, P_OP_FX,  1, ":-"},
         {1200, P_OP_FX,  1, "?-"},
+        {1130, P_OP_YFX, 2, "<=>"},
+        {1120, P_OP_YFX, 2, "=>"},
         {1100, P_OP_XFY, 2, ";"},
         {1100, P_OP_XFY, 2, "||"},
         {1050, P_OP_XFY, 2, "->"},

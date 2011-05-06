@@ -150,6 +150,22 @@ static void test_logic_or()
     P_COMPARE(run_goal("!, atom(a) || atom(X)"), P_RESULT_TRUE);
 }
 
+static void test_logic_implies()
+{
+    P_COMPARE(run_goal("atom(a) => atom(b)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(a) => atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(X) => atom(a)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(X) => atom(X)"), P_RESULT_TRUE);
+}
+
+static void test_logic_equiv()
+{
+    P_COMPARE(run_goal("atom(a) <=> atom(b)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("atom(a) <=> atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(X) <=> atom(a)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("atom(X) <=> atom(X)"), P_RESULT_TRUE);
+}
+
 static void test_logic_not()
 {
     P_COMPARE(run_goal("!atom(a)"), P_RESULT_FAIL);
@@ -413,6 +429,8 @@ int main(int argc, char *argv[])
     P_TEST_RUN(logic_values);
     P_TEST_RUN(logic_and);
     P_TEST_RUN(logic_or);
+    P_TEST_RUN(logic_implies);
+    P_TEST_RUN(logic_equiv);
     P_TEST_RUN(logic_not);
     P_TEST_RUN(logic_call);
     P_TEST_RUN(logic_catch);

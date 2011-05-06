@@ -548,6 +548,8 @@ static p_term *create_clause_head
 %token K_DOT_DOT        "`..'"
 %token K_GETS           "`:='"
 %token K_BT_GETS        "`:=='"
+%token K_IMPLIES        "`=>'"
+%token K_EQUIV          "`<=>'"
 %token K_ABSTRACT       "`abstract'"
 %token K_CASE           "`case'"
 %token K_CATCH          "`catch'"
@@ -578,6 +580,8 @@ static p_term *create_clause_head
 %type <term>        multiplicative_term power_term unary_term
 %type <term>        primary_term condition if_term argument_term
 %type <term>        new_term member_var bracketed_term head_argument_term
+%type <term>        implies_term or_term
+%type <term>        argument_implies_term argument_or_term
 
 %type <term>        statement if_statement compound_statement
 %type <term>        loop_statement unbind_vars try_statement
@@ -799,7 +803,19 @@ bracketed_term
     ;
 
 term
-    : term K_OR if_term         { $$ = binary_term("||", $1, $3); }
+    : term K_EQUIV implies_term { $$ = binary_term("<=>", $1, $3); }
+    | implies_term              { $$ = $1; }
+    ;
+
+implies_term
+    : implies_term K_IMPLIES or_term  {
+            $$ = binary_term("=>", $1, $3);
+        }
+    | or_term                   { $$ = $1; }
+    ;
+
+or_term
+    : or_term K_OR if_term      { $$ = binary_term("||", $1, $3); }
     | if_term                   { $$ = $1; }
     ;
 
@@ -817,7 +833,21 @@ and_term
     ;
 
 argument_term
-    : argument_term K_OR argument_and_term {
+    : argument_term K_EQUIV argument_implies_term {
+            $$ = binary_term("<=>", $1, $3);
+        }
+    | argument_implies_term     { $$ = $1; }
+    ;
+
+argument_implies_term
+    : argument_implies_term K_IMPLIES argument_or_term {
+            $$ = binary_term("=>", $1, $3);
+        }
+    | argument_or_term          { $$ = $1; }
+    ;
+
+argument_or_term
+    : argument_or_term K_OR argument_and_term {
             $$ = binary_term("||", $1, finalize_r_list($3));
         }
     | argument_and_term         { $$ = finalize_r_list($1); }
