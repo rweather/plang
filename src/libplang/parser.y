@@ -859,8 +859,8 @@ argument_and_term
     ;
 
 not_term
-    : K_NOT compare_term        { $$ = unary_term("!", $2); }
-    | '!' compare_term          { $$ = unary_term("!", $2); }
+    : K_NOT not_term            { $$ = unary_term("!", $2); }
+    | '!' not_term              { $$ = unary_term("!", $2); }
     | compare_term              { $$ = $1; }
     ;
 
