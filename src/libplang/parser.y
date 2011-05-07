@@ -1580,5 +1580,5 @@ dcg_primitive_term
     | '[' list_members ']'      { $$ = finalize_list($2); }
     | K_STRING                  { $$ = $1; }
     | '(' dcg_body ')'          { $$ = $2; }
-    | '!'                       { $$ = context->cut_atom; }
+    | '!'                       { $$ = context->commit_atom; }
     ;

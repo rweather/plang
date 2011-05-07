@@ -64,7 +64,7 @@ p_context *p_context_create(void)
     context->slash_atom = p_term_create_atom(context, "/");
     context->true_atom = p_term_create_atom(context, "true");
     context->fail_atom = p_term_create_atom(context, "fail");
-    context->cut_atom = p_term_create_atom(context, "!");
+    context->commit_atom = p_term_create_atom(context, "commit");
     context->call_member_atom = p_term_create_atom(context, "$$call_member");
     context->call_args_atom = p_term_create_atom(context, "$$");
     context->unify_atom = p_term_create_atom(context, "=");

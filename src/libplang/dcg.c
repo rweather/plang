@@ -26,6 +26,7 @@ struct p_term_expand_info
     p_term *or_atom;
     p_term *compound_atom;
     p_term *unify_atom;
+    p_term *not_atom;
 };
 /** @endcond */
 
@@ -87,9 +88,9 @@ static p_term *p_term_expand_body
                 return p_term_create_binary
                     (context, info->unify_atom, in_var, out_var);
             }
-        } else if (term == context->cut_atom) {
-            /* Cut operator for commiting to the current rule.
-             * Convert it into (!, In = Out) */
+        } else if (term == context->commit_atom) {
+            /* Commit or cut operator for commiting to the current
+             * rule.  Convert it into (commit, In = Out) */
             *first = 0;
             right = p_term_create_binary
                 (context, info->unify_atom, in_var, out_var);
@@ -129,7 +130,7 @@ static p_term *p_term_expand_body
                 return left;
             return p_term_create_binary
                 (context, context->comma_atom, left, right);
-        } else if (term->functor.functor_name == context->cut_atom &&
+        } else if (term->functor.functor_name == info->not_atom &&
                    term->header.size == 1) {
             /* Logical negation of a DCG term.  Convert it
              * into (!expand(Arg), In = Out) */
@@ -138,8 +139,7 @@ static p_term *p_term_expand_body
             term = p_term_expand_body
                 (context, term->functor.arg[0], in_var,
                  middle_var, info, first);
-            left = p_term_create_functor
-                (context, context->cut_atom, 1);
+            left = p_term_create_functor(context, info->not_atom, 1);
             p_term_bind_functor_arg(left, 0, term);
             right = p_term_create_binary
                 (context, info->unify_atom, in_var, out_var);
@@ -223,6 +223,7 @@ p_term *p_term_expand_dcg(p_context *context, p_term *term)
     info.or_atom = p_term_create_atom(context, "||");
     info.compound_atom = p_term_create_atom(context, "$$compound");
     info.unify_atom = p_term_create_atom(context, "=");
+    info.not_atom = p_term_create_atom(context, "!");
 
     /* Verify that the rule has the form "name(args) --> body" */
     term = p_term_deref(term);

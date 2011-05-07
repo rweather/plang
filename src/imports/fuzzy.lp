@@ -33,17 +33,17 @@ fuzzy(Expr, List)
     fuzzy(Fuzzy);
 }
 
-'$$fuzzy2_valid'(List) { var(List); !; fail; }
-'$$fuzzy2_valid'([]) { !; fail; }
-'$$fuzzy2_valid'([H|T]) { (var(H) || var(T)); !; fail; }
-'$$fuzzy2_valid'([_, H|_]) { var(H); !; fail; }
+'$$fuzzy2_valid'(List) { var(List); commit; fail; }
+'$$fuzzy2_valid'([]) { commit; fail; }
+'$$fuzzy2_valid'([H|T]) { (var(H) || var(T)); commit; fail; }
+'$$fuzzy2_valid'([_, H|_]) { var(H); commit; fail; }
 '$$fuzzy2_valid'([(Value1, Fuzzy1), (Value2, Fuzzy2)|Tail])
 {
     number(Value1);
     number(Fuzzy1);
     number(Value2);
     number(Fuzzy2);
-    !;
+    commit;
     Value1 < Value2;
     '$$fuzzy2_valid'([(Value2, Fuzzy2)|Tail]);
 }
@@ -55,7 +55,7 @@ fuzzy(Expr, List)
 
 '$$fuzzy2'(_, [(_, Fuzzy)], Fuzzy)
 {
-    !;
+    commit;
 }
 '$$fuzzy2'(Value, [(Value1, Fuzzy1), (Value2, Fuzzy2)|Tail], Fuzzy)
 {
@@ -170,11 +170,11 @@ fuzzy_prod_or(Goal1, Goal2)
 '$$fuzzy_findall_is_list'(List)
 {
     var(List);
-    !;
+    commit;
 }
 '$$fuzzy_findall_is_list'([])
 {
-    !;
+    commit;
 }
 '$$fuzzy_findall_is_list'([_|List])
 {

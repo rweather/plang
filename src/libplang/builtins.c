@@ -73,6 +73,7 @@
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
  * \ref cut_0 "(!)/0",
+ * \ref commit_0 "commit/0",
  * \ref do_stmt "do",
  * \ref not_provable_1 "(!)/1",
  * \ref not_provable_1 "(\\+)/1",
@@ -1488,7 +1489,7 @@ static p_goal_result p_builtin_retract
  * \endcode
  *
  * After the directive is executed, the Plang engine will execute a
- * cut, \ref cut_0 "(!)/0", and \ref fail_0 "fail/0" to backtrack
+ * \ref commit_0 "commit/0" and \ref fail_0 "fail/0" to backtrack
  * to the original system state.  The only permanent modifications
  * to the system state will be in the form of side-effects.
  *
@@ -1518,7 +1519,7 @@ static p_goal_result p_builtin_retract
  * \par Description
  * Executes \em Directive immediately when it is encountered
  * in the source file during loading.  After execution of the
- * \em Directive, an implicit cut, \ref cut_0 "(!)/0", and
+ * \em Directive, an implicit \ref commit_0 "commit/0" and
  * \ref fail_0 "fail/0" are performed to return the system
  * to its original state before the call.  The only permanent
  * modifications to the system state will be in the form
@@ -1803,7 +1804,7 @@ static p_goal_result p_builtin_import
  * \par Description
  * Executes \em Goal after the current source file has been
  * completely loaded.  After execution of the \em Goal, an implicit
- * cut, \ref cut_0 "(!)/0", and \ref fail_0 "fail/0" are performed
+ * \ref commit_0 "commit/0" and \ref fail_0 "fail/0" are performed
  * to return the system to its original state before the call.
  * The only permanent modifications to the system state will be
  * in the form of side-effects in \em Goal.
@@ -1902,6 +1903,7 @@ static p_goal_result p_builtin_load_library
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
  * \ref cut_0 "(!)/0",
+ * \ref commit_0 "commit/0",
  * \ref do_stmt "do",
  * \ref not_provable_1 "(!)/1",
  * \ref not_provable_1 "(\\+)/1",
@@ -2014,7 +2016,7 @@ static p_goal_result p_builtin_logical_or
     p_term *term = p_term_deref_member(context, args[0]);
     p_exec_node *current;
     p_exec_fail_node *retry;
-    p_exec_node *cut;
+    p_exec_node *commit;
     p_exec_node *then;
     p_exec_node *if_node;
     if (term->header.type == P_TERM_FUNCTOR &&
@@ -2024,23 +2026,23 @@ static p_goal_result p_builtin_logical_or
         current = context->current_node;
         if_node = GC_NEW(p_exec_node);
         retry = GC_NEW(p_exec_fail_node);
-        cut = GC_NEW(p_exec_node);
+        commit = GC_NEW(p_exec_node);
         then = GC_NEW(p_exec_node);
-        if (!if_node || !retry || !cut || !then)
+        if (!if_node || !retry || !commit || !then)
             return P_RESULT_FAIL;
         retry->parent.goal = args[1];
         retry->parent.success_node = current->success_node;
         retry->parent.cut_node = context->fail_node;
         _p_context_init_fail_node
             (context, retry, _p_context_basic_fail_func);
-        cut->goal = context->cut_atom;
-        cut->success_node = then;
-        cut->cut_node = context->fail_node;
+        commit->goal = context->commit_atom;
+        commit->success_node = then;
+        commit->cut_node = context->fail_node;
         then->goal = p_term_arg(term, 1);
         then->success_node = current->success_node;
         then->cut_node = context->fail_node;
         if_node->goal = p_term_arg(term, 0);
-        if_node->success_node = cut;
+        if_node->success_node = commit;
         if_node->cut_node = context->fail_node;
         context->current_node = if_node;
         context->fail_node = retry;
@@ -2146,7 +2148,7 @@ static char const p_builtin_logical_equiv[] =
     "'<=>'(A, B)\n"
     "{\n"
     "    if (call(A))\n"
-    "        call((B, !));\n"   // Match once-only call in next line.
+    "        call((B, commit));\n" // Match once-only call in next line.
     "    else if (call(B))\n"
     "        fail;\n"
     "}\n";
@@ -2166,7 +2168,7 @@ static char const p_builtin_logical_equiv[] =
  * then throw an error as described below.
  *
  * \par
- * The effect of a \ref cut_0 "(!)/0" inside \em Goal is limited
+ * The effect of a \ref commit_0 "commit/0" inside \em Goal is limited
  * to the goal itself and does not affect control flow outside
  * the <b>call/1</b> term.
  *
@@ -2197,7 +2199,7 @@ static char const p_builtin_logical_equiv[] =
  * layer of \em Goal is checked before execution begins.
  *
  * \par See Also
- * \ref cut_0 "(!)/0",
+ * \ref commit_0 "commit/0",
  * \ref once_1 "once/1"
  */
 static p_goal_result p_builtin_call
@@ -2325,28 +2327,60 @@ static p_goal_result p_builtin_catch
  * \addtogroup logic_and_control
  * <hr>
  * \anchor cut_0
- * <b>(!)/0</b> - prunes alternative solutions by cutting unexplored
- * branches in the solution search tree.
+ * \anchor commit_0
+ * <b>commit/0</b>, <b>(!)/0</b> - commits the program to the
+ * current choice.
  *
  * \par Usage
+ * \b commit
+ * \par
  * \b !
  *
  * \par Description
- * The \b ! predicate always succeeds but also prunes alternative
- * solutions at the next higher goal level.
+ * The <b>commit/0</b> predicate always succeeds but also prunes
+ * alternative solutions at the next higher goal level.  It is most
+ * often used in predicates with multiple clauses that match the
+ * arguments.
+ * \par
+ * The following example implements a list membership testing
+ * predicate:
+ * \code
+ * is_member(X, [X|_]).
+ * is_member(X, [_|T]) { is_member(X, T); }
+ * \endcode
+ * An issue with this predicate is that it will keep searching for
+ * further instances of \c X after finding the first.  This may
+ * not be what was intended.  We can solve this problem by committing
+ * to the solution once \c X is found:
+ * \code
+ * is_member(X, [X|_]) { commit; }
+ * is_member(X, [_|T]) { is_member(X, T); }
+ * \endcode
+ * Another problem with the original version of the predicate is that
+ * if the tail of the list is a variable, it may loop indefinitely.
+ * We can solve this by adding another clause that commits and fails
+ * if the list is a variable:
+ * \code
+ * is_member(X, L) { var(L); commit; fail; }
+ * is_member(X, [X|_]) { commit; }
+ * is_member(X, [_|T]) { is_member(X, T); }
+ * \endcode
  *
  * \par Examples
  * \code
+ * commit           succeeds
  * !                succeeds
  * \endcode
  *
  * \par Compatibility
- * \ref standard "Standard Prolog"
+ * The <b>(!)/0</b> predicate is compatible with
+ * \ref standard "Standard Prolog".  The new name <b>commit</b>
+ * is recommended because it is more obvious as to its function.
  *
  * \par See Also
  * \ref call_1 "call/1"
  */
-static p_goal_result p_builtin_cut
+static p_goal_result p_builtin_commit
     (p_context *context, p_term **args, p_term **error)
 {
     context->fail_node = context->current_node->cut_node;
@@ -2390,14 +2424,14 @@ static char const p_builtin_do[] =
     "{\n"
     "    '$$unbind'(Vars);\n"
     "    call(Body);\n"
-    "    !;\n"
+    "    commit;\n"
     "    if (call(Cond))\n"
     "        '$$do'(Vars, Body, Cond);\n"
     "}\n"
     "'$$do'(Body, Cond)\n"
     "{\n"
     "    call(Body);\n"
-    "    !;\n"
+    "    commit;\n"
     "    if (call(Cond))\n"
     "        '$$do'(Body, Cond);\n"
     "}\n";
@@ -2547,20 +2581,20 @@ static char const p_builtin_for[] =
     "'$$for'(Vars, LoopVar, List, Body)\n"
     "{\n"
     "    var(List);\n"
-    "    !;\n"
+    "    commit;\n"
     "    throw(error(instantiation_error, 'for'/2));\n"
     "}\n"
     "'$$for'(Vars, LoopVar, [], Body)\n"
     "{\n"
-    "    !;\n"
+    "    commit;\n"
     "}\n"
     "'$$for'(Vars, LoopVar, [H|T], Body)\n"
     "{\n"
-    "    !;\n"
+    "    commit;\n"
     "    '$$unbind'(Vars);\n"
     "    '$$set_loop_var'(LoopVar, H);\n"
     "    call(Body);\n"
-    "    !;\n"
+    "    commit;\n"
     "    '$$for'(Vars, LoopVar, T, Body);\n"
     "}\n"
     "'$$for'(Vars, LoopVar, List, Body)\n"
@@ -2710,19 +2744,19 @@ static p_goal_result p_builtin_if
     (p_context *context, p_term **args, p_term **error)
 {
     p_exec_node *current = context->current_node;
-    p_exec_node *cut = GC_NEW(p_exec_node);
+    p_exec_node *commit = GC_NEW(p_exec_node);
     p_exec_node *then = GC_NEW(p_exec_node);
     p_exec_node *if_node = GC_NEW(p_exec_node);
-    if (!cut || !then || !if_node)
+    if (!commit || !then || !if_node)
         return P_RESULT_FAIL;
-    cut->goal = context->cut_atom;
-    cut->success_node = then;
-    cut->cut_node = context->fail_node;
+    commit->goal = context->commit_atom;
+    commit->success_node = then;
+    commit->cut_node = context->fail_node;
     then->goal = args[1];
     then->success_node = current->success_node;
     then->cut_node = context->fail_node;
     if_node->goal = args[0];
-    if_node->success_node = cut;
+    if_node->success_node = commit;
     if_node->cut_node = context->fail_node;
     context->current_node = if_node;
     return P_RESULT_TREE_CHANGE;
@@ -2761,7 +2795,7 @@ static p_goal_result p_builtin_if
  * for a \ref do_stmt "do", \ref if_stmt "if", or
  * \ref while_stmt "while" statement, then it will succeed only
  * once for the first match.  This is because the statement conditions
- * perform a cut, \ref cut_0 "(!)/0", after success is detected.
+ * perform a \ref commit_0 "commit/0" after success is detected.
  * This is useful for detecting simple list membership only:
  * \code
  * if (f(a) in List) {
@@ -2782,7 +2816,7 @@ static char const p_builtin_in[] =
     "'in'(Term, List)\n"
     "{\n"
     "    var(List);\n"
-    "    !;\n"
+    "    commit;\n"
     "    throw(error(instantiation_error, 'in'/2));\n"
     "}\n"
     "'in'(Term, [Term|Tail]).\n"
@@ -2802,9 +2836,10 @@ static char const p_builtin_in[] =
  * \b once(\em Goal)
  *
  * \par Description
- * Executes \b call(\em Goal) and then executes a cut,
- * \ref cut_0 "(!)/0", to prune searches for further solutions.
- * In essence, \b once(\em Goal) behaves like \b call(\em Goal, !).
+ * Executes \b call(\em Goal) and then executes a
+ * \ref commit_0 "commit/0" to prune searches for further solutions.
+ * In essence, \b once(\em Goal) behaves like
+ * \b call(\em Goal, \b commit).
  *
  * \par Examples
  * \code
@@ -2819,7 +2854,7 @@ static char const p_builtin_in[] =
  * \ref call_1 "call/1"
  */
 static char const p_builtin_once[] =
-    "once(Goal) { call((Goal, !)); }";
+    "once(Goal) { call((Goal, commit)); }";
 
 /**
  * \addtogroup logic_and_control
@@ -2832,7 +2867,7 @@ static char const p_builtin_once[] =
  *
  * \par Description
  * Repeats the sequence of statements between \b repeat and
- * \b fail indefinitely until a cut, \ref cut_0 "(!)/0",
+ * \b fail indefinitely until a \ref commit_0 "commit/0"
  * is encountered.
  *
  * \par Examples
@@ -2880,7 +2915,7 @@ static char const p_builtin_repeat[] =
  * \em StatementM to the following \em StatementM+1.
  * \par
  * Once a \em LabelM is found that unifies with \em Term, the \b switch
- * statement does an implicit cut, \ref cut_0 "(!)/0", to commit the
+ * statement does an implicit \ref commit_0 "commit/0" to commit the
  * clause to that choice.  Backtracking does not select later
  * \b case labels even if they may have otherwise unified
  * with \em Term.
@@ -2932,13 +2967,13 @@ static char const p_builtin_repeat[] =
 static char const p_builtin_switch[] =
     "'$$switch'(Value, [], Default)\n"
     "{\n"
-    "    !;\n"
+    "    commit;\n"
     "    call(Default);\n"
     "}\n"
     "'$$switch'(Value, ['$$case'(Cases, Body)|Tail], Default)\n"
     "{\n"
     "    '$$switch_case_match'(Value, Cases);\n"
-    "    !;\n"
+    "    commit;\n"
     "    call(Body);\n"
     "}\n"
     "'$$switch'(Value, [Head|Tail], Default)\n"
@@ -2947,12 +2982,12 @@ static char const p_builtin_switch[] =
     "}\n"
     "'$$switch_case_match'(Value, [])\n"
     "{\n"
-    "    !;\n"
+    "    commit;\n"
     "    fail;\n"
     "}\n"
     "'$$switch_case_match'(Value, [Value|Tail])\n"
     "{\n"
-    "    !;\n"
+    "    commit;\n"
     "}\n"
     "'$$switch_case_match'(Value, [Head|Tail])\n"
     "{\n"
@@ -3055,7 +3090,7 @@ static char const p_builtin_while[] =
     "    '$$unbind'(Vars);\n"
     "    if (call(Cond)) {\n"
     "        call(Body);\n"
-    "        !;\n"
+    "        commit;\n"
     "        '$$while'(Vars, Cond, Body);\n"
     "    }\n"
     "}\n"
@@ -3063,7 +3098,7 @@ static char const p_builtin_while[] =
     "{\n"
     "    if (call(Cond)) {\n"
     "        call(Body);\n"
-    "        !;\n"
+    "        commit;\n"
     "        '$$while'(Cond, Body);\n"
     "    }\n"
     "}\n";
@@ -5227,7 +5262,7 @@ void _p_db_init_builtins(p_context *context)
         {"@=<", 2, p_builtin_term_le},
         {"@>", 2, p_builtin_term_gt},
         {"@>=", 2, p_builtin_term_ge},
-        {"!", 0, p_builtin_cut},
+        {"!", 0, p_builtin_commit},
         {"||", 2, p_builtin_logical_or},
         {"->", 2, p_builtin_if},
         {"?-", 1, p_builtin_call},
@@ -5249,6 +5284,7 @@ void _p_db_init_builtins(p_context *context)
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
         {"clause", 2, p_builtin_clause},
+        {"commit", 0, p_builtin_commit},
         {"compound", 1, p_builtin_compound},
         {"consult", 1, p_builtin_consult},
         {"copy_term", 2, p_builtin_copy_term},

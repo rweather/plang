@@ -44,11 +44,11 @@ setof(Term, Goal, List)
 '$$findall_is_list'(List)
 {
     var(List);
-    !;
+    commit;
 }
 '$$findall_is_list'([])
 {
-    !;
+    commit;
 }
 '$$findall_is_list'([_|List])
 {

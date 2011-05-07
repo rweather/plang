@@ -85,6 +85,18 @@ this instead to capture the user's actual intent:
 (X < Y) -> A ; true
 \endcode
 
+In Plang, \ref commit_0 "commit" can be used in place of <b>!</b>,
+because that is what the traditional Prolog "cut" does - commits the
+program to the current clause choice.  For example, the following
+predicate is a safe version of list membership checking that does
+not loop infinitely if the list tail is a variable:
+
+\code
+is_member(X, L) { var(L); commit; fail; }
+is_member(X, [X|_]) { commit; }
+is_member(X, [_|T]) { is_member(X, T); }
+\endcode
+
 \section prolog_sugar Syntactic sugar is not harmful!
 
 The <tt>-></tt> operator in the previous section is an example of

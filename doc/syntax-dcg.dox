@@ -162,12 +162,19 @@ have a certain form.  This can be expressed using the
 foo --> bar, !baz.
 \endcode
 
-Rule commitment can be expressed using the cut, <b>(!)/0</b>,
-operator.  In the following example, if b is followed by c,
-then the DCG rule set will commit to using the first rule
-and try to match against d.  If the text after c does not
-match d, then the parse fails rather than retry with e
-instead of c.
+Rule commitment can be expressed using the \ref commit_0 "commit/0"
+or \ref cut_0 "!/0" operators.  In the following example, if b is
+followed by c, then the DCG rule set will commit to using
+the first rule and try to match against d.  If the text
+after c does not match d, then the parse fails rather than
+retry with e instead of c.
+
+\code
+a --> b, c, commit, d.
+a --> b, e.
+\endcode
+
+The above rules can also be written as:
 
 \code
 a --> b, c, !, d.
@@ -272,6 +279,7 @@ dcg_prim --> "[", arguments, "]".
 dcg_prim --> string.
 dcg_prim --> "(", dcg_body, ")".
 dcg_prim --> "!".
+dcg_prim --> "commit".
 
 dcg_confidence --> "<<", integer, ">>".
 dcg_confidence --> "<<", float, ">>".

@@ -138,7 +138,7 @@ test(sortd)
 generate_list(L, 0)
 {
     L = [];
-    !;
+    commit;
 }
 generate_list([N|L], N)
 {
@@ -149,7 +149,7 @@ generate_list([N|L], N)
 generate_random_list(L, 0, _)
 {
     L = [];
-    !;
+    commit;
 }
 generate_random_list([H|L], N, R)
 {

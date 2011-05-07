@@ -46,19 +46,19 @@ class stdout : iostream
     static write(Term)
     {
         var(Term);
-        !;
+        commit;
         '$$print'(1, Term);
     }
     static write(A + B)
     {
-        !;
+        commit;
         stdout::write(A);
         stdout::write(B);
     }
     static write(Term)
     {
         string(Term);
-        !;
+        commit;
         '$$print_string'(1, Term);
     }
     static write(Term)

@@ -78,19 +78,19 @@ class iostream
     write(Term)
     {
         var(Term);
-        !;
+        commit;
         Self.writeTerm(Term);
     }
     write(A + B)
     {
-        !;
+        commit;
         Self.write(A);
         Self.write(B);
     }
     write(Term)
     {
         string(Term);
-        !;
+        commit;
         Self.writeString(Term);
     }
     write(Term)

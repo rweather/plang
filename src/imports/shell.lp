@@ -23,13 +23,13 @@
 shell::write_vars([], _) {}
 shell::write_vars([Name = Var], Vars)
 {
-    !;
+    commit;
     stdout::write(Name + " = ");
     stdout::writeTerm(Var, Vars);
 }
 shell::write_vars([Name = Var|Tail], Vars)
 {
-    !;
+    commit;
     stdout::write(Name + " = ");
     stdout::writeTerm(Var, Vars);
     stdout::writeln();
@@ -59,7 +59,7 @@ shell::call_until_fail(Term, Vars, Stdin)
 shell::call(Term, _, _)
 {
     var(Term);
-    !;
+    commit;
     throw(error(instantiation_error, call/1));
 }
 shell::call(quit, _, _)
@@ -72,7 +72,7 @@ shell::call(exit, _, _)
 }
 shell::call(help, _, _)
 {
-    !;
+    commit;
     stdout::writeln();
     stdout::writeln("At the '| ?-' prompt, type expressions to evaluate, followed by '.':");
     stdout::writeln();
@@ -94,7 +94,7 @@ shell::call(help, _, _)
 }
 shell::call(Term, [], _)
 {
-    !;
+    commit;
     if (call(Term)) {
         '$$fuzzy'(Confidence);
         if (Confidence == 1.0)

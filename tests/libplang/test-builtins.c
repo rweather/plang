@@ -137,7 +137,7 @@ static void test_logic_and()
     P_COMPARE(run_goal("atom(a) && atom(a)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atom(X) && atom(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("!, atom(X) && atom(a)"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("!, atom(a) && atom(X)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("commit, atom(a) && atom(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("!, atom(a) && atom(b)"), P_RESULT_TRUE);
 }
 
@@ -147,7 +147,7 @@ static void test_logic_or()
     P_COMPARE(run_goal("atom(X) || atom(a)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atom(X) || atom(X)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("!, atom(X) || atom(a)"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("!, atom(a) || atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("commit, atom(a) || atom(X)"), P_RESULT_TRUE);
 }
 
 static void test_logic_implies()
@@ -188,7 +188,7 @@ static void test_logic_call()
     P_COMPARE(run_goal_error("call(1.5)", "type_error(callable, 1.5)"), P_RESULT_ERROR);
     P_COMPARE(run_goal_error("call((atom(a), 1.5))", "type_error(callable, 1.5)"), P_RESULT_ERROR);
     P_COMPARE(run_goal("call((!, atom(a)))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("call((!, fail))"), P_RESULT_FAIL);
+    P_COMPARE(run_goal("call((commit, fail))"), P_RESULT_FAIL);
 }
 
 static void test_logic_catch()
@@ -260,14 +260,14 @@ static void test_logic_if_expr()
     P_COMPARE(run_goal("atom(a) -> atom(X) || atom(c)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("atom(X) -> atom(X) || atom(c)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("!, atom(X) -> atom(a) || atom(c)"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("!, atom(a) -> atom(a) || atom(X)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("commit, atom(a) -> atom(a) || atom(X)"), P_RESULT_TRUE);
     P_COMPARE(run_goal_error("call(X) || atom(X)", "instantiation_error"), P_RESULT_ERROR);
     P_COMPARE(run_goal_error("call(X) -> atom(a) || atom(X)", "instantiation_error"), P_RESULT_ERROR);
 
     P_COMPARE(run_goal("atom(a) -> atom(b)"), P_RESULT_TRUE);
     P_COMPARE(run_goal("atom(X) -> atom(b)"), P_RESULT_FAIL);
     P_COMPARE(run_goal("!, atom(X) -> atom(b)"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("!, atom(a) -> atom(b)"), P_RESULT_TRUE);
+    P_COMPARE(run_goal("commit, atom(a) -> atom(b)"), P_RESULT_TRUE);
 }
 
 static void test_logic_if_stmt()
@@ -276,14 +276,14 @@ static void test_logic_if_stmt()
     P_COMPARE(run_stmt("if (atom(a)) atom(X); else atom(c);"), P_RESULT_FAIL);
     P_COMPARE(run_stmt("if (atom(X)) atom(X); else atom(c);"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("if (!, atom(X)) atom(a); else atom(c);"), P_RESULT_FAIL);
-    P_COMPARE(run_stmt("if (!, atom(a)) atom(a); else atom(X);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (commit, atom(a)) atom(a); else atom(X);"), P_RESULT_TRUE);
     P_COMPARE(run_stmt_error("if (call(X)) atom(a); else atom(X);", "instantiation_error"), P_RESULT_ERROR);
     P_COMPARE(run_stmt_error("if (X) atom(a); else atom(X);", "instantiation_error"), P_RESULT_ERROR);
 
     P_COMPARE(run_stmt("if (atom(a)) atom(b);"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("if (atom(X)) atom(Y);"), P_RESULT_TRUE);
     P_COMPARE(run_stmt("if (!, atom(X)) atom(b);"), P_RESULT_FAIL);
-    P_COMPARE(run_stmt("if (!, atom(a)) atom(b);"), P_RESULT_TRUE);
+    P_COMPARE(run_stmt("if (commit, atom(a)) atom(b);"), P_RESULT_TRUE);
 }
 
 static void test_logic_in()

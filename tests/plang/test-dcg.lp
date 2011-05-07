@@ -84,13 +84,19 @@ test(not_rule)
     verify(!not1([a, b, c], []));
 }
 
-cut1 --> [a], [b], !, [c].
-cut1 --> [a], [b], [d].
+commit1 --> [a], [b], !, [c].
+commit1 --> [a], [b], [d].
 
-test(cut_rule)
+commit2 --> [a], [b], commit, [c].
+commit2 --> [a], [b], [d].
+
+test(commit_rule)
 {
-    verify(cut1([a, b, c], []));
-    verify(!cut1([a, b, d], []));
+    verify(commit1([a, b, c], []));
+    verify(!commit1([a, b, d], []));
+
+    verify(commit2([a, b, c], []));
+    verify(!commit2([a, b, d], []));
 }
 
 statement1 --> [X], {integer(X);}, [a].

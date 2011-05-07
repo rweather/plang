@@ -46,19 +46,19 @@ class stderr : iostream
     static write(Term)
     {
         var(Term);
-        !;
+        commit;
         '$$print'(2, Term);
     }
     static write(A + B)
     {
-        !;
+        commit;
         stderr::write(A);
         stderr::write(B);
     }
     static write(Term)
     {
         string(Term);
-        !;
+        commit;
         '$$print_string'(2, Term);
     }
     static write(Term)

@@ -100,7 +100,7 @@ executed.  If \em Goal1 fails, then \em Goal3 is executed.
 If \em Goal3 is omitted, then the statement succeeds if
 \em Goal1 fails.
 
-\em Goal1 is only executed once.  An implicit cut, \ref cut_0 "(!)/0",
+\em Goal1 is only executed once.  An implicit \ref commit_0 "commit/0"
 is performed if \em Goal1 succeeds.  \em Goal2 and \em Goal3 may
 involve alternatives.
 
@@ -254,7 +254,7 @@ Unlike C, execution does not fall through from \em StatementM to
 the following \em StatementM+1.
 
 Once a \em LabelM is found that unifies with \em Term, the \b switch
-statement does an implicit cut, \ref cut_0 "(!)/0", to commit the
+statement does an implicit \ref commit_0 "commit/0" to commit the
 clause to that choice.  Backtracking does not select later
 \b case labels even if they may have otherwise unified
 with \em Term.

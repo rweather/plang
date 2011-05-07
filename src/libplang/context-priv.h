@@ -100,7 +100,7 @@ struct p_context
     p_term *slash_atom;
     p_term *true_atom;
     p_term *fail_atom;
-    p_term *cut_atom;
+    p_term *commit_atom;
     p_term *call_member_atom;
     p_term *call_args_atom;
     p_term *unify_atom;
