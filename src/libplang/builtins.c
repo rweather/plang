@@ -121,6 +121,7 @@
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
  * \ref unifiable_2 "unifiable/2",
+ * \ref unifiable_one_way_2 "unifiable_one_way/2",
  * \ref unify_one_way_2 "unify_one_way/2"
  * \ref unify_2 "unify_with_occurs_check/2"
  *
@@ -3930,6 +3931,7 @@ static p_goal_result p_builtin_functor
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
  * \ref unifiable_2 "unifiable/2",
+ * \ref unifiable_one_way_2 "unifiable_one_way/2",
  * \ref unify_one_way_2 "unify_one_way/2"
  * \ref unify_2 "unify_with_occurs_check/2"
  */
@@ -4046,13 +4048,54 @@ static p_goal_result p_builtin_not_unifiable
  * \par See Also
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
- * \ref unify_one_way_2 "unify_one_way/2"
+ * \ref unifiable_one_way_2 "unifiable_one_way/2"
  */
 static p_goal_result p_builtin_unifiable
     (p_context *context, p_term **args, p_term **error)
 {
     void *marker = p_context_mark_trail(context);
     if (p_term_unify(context, args[0], args[1], P_BIND_DEFAULT)) {
+        p_context_backtrack_trail(context, marker);
+        return P_RESULT_TRUE;
+    } else {
+        return P_RESULT_FAIL;
+    }
+}
+
+/**
+ * \addtogroup unification
+ * <hr>
+ * \anchor unifiable_one_way_2
+ * <b>unifiable_one_way/2</b> - tests if two terms are unifiable
+ * by only binding variables in the first term.
+ *
+ * \par Usage
+ * \b unifiable_one_way(\em Term1, \em Term2)
+ *
+ * \par Description
+ * If \em Term1 and \em Term2 can be unified without modifying
+ * \em Term2, then succeed without modifying \em Term1 or \em Term2.
+ * Fails otherwise.
+ *
+ * \par Examples
+ * \code
+ * unifiable_one_way(X, Y + Z)  succeeds
+ * unifiable_one_way(Y + Z, X)  fails
+ * unifiable_one_way(X, Y)      succeeds
+ * \endcode
+ *
+ * \par See Also
+ * \ref unify_2 "(=)/2",
+ * \ref not_unifiable_2 "(!=)/2",
+ * \ref unifiable_2 "unifiable/2",
+ * \ref unify_one_way_2 "unify_one_way/2",
+ * \ref syntax_input_only "Input-only arguments"
+ */
+static p_goal_result p_builtin_unifiable_one_way
+    (p_context *context, p_term **args, p_term **error)
+{
+    void *marker = p_context_mark_trail(context);
+    if (p_term_unify(context, args[0], args[1], P_BIND_ONE_WAY)) {
         p_context_backtrack_trail(context, marker);
         return P_RESULT_TRUE;
     } else {
@@ -4084,7 +4127,7 @@ static p_goal_result p_builtin_unifiable
  * \par See Also
  * \ref unify_2 "(=)/2",
  * \ref not_unifiable_2 "(!=)/2",
- * \ref unifiable_2 "unifiable/2",
+ * \ref unifiable_one_way_2 "unifiable_one_way/2",
  * \ref syntax_input_only "Input-only arguments"
  */
 static p_goal_result p_builtin_unify_one_way
@@ -5238,6 +5281,7 @@ void _p_db_init_builtins(p_context *context)
         {"$$try", 2, p_builtin_catch},
         {"$$unbind", 1, p_builtin_unbind},
         {"unifiable", 2, p_builtin_unifiable},
+        {"unifiable_one_way", 2, p_builtin_unifiable_one_way},
         {"unify_one_way", 2, p_builtin_unify_one_way},
         {"unify_with_occurs_check", 2, p_builtin_unify},
         {"$$unique", 1, p_builtin_unique},

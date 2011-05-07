@@ -28,6 +28,15 @@ test(unify_one_way)
     verify((unify_one_way(X, Y), X == Y));
 }
 
+test(unifiable_one_way)
+{
+    verify(unifiable_one_way(X1, Y1 + Z1));
+    verify(X1 !== (Y1 + Z1));
+    verify(!unifiable_one_way(Y2 + Z2, X2));
+    verify(unifiable_one_way(X, Y));
+    verify(X !== Y);
+}
+
 foo(X + Y).
 bar(in X + Y).
 
