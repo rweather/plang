@@ -675,7 +675,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             if (context->fail_node) {
                 fputs("\tfail: ", stdout);
                 p_term_print
-                    (context, context->fail_node->goal,
+                    (context, context->fail_node->parent.goal,
                      p_term_stdio_print_func, stdout);
                 putc('\n', stdout);
             } else {
@@ -684,7 +684,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             if (context->current_node->cut_node) {
                 fputs("\tcut: ", stdout);
                 p_term_print
-                    (context, context->current_node->cut_node->goal,
+                    (context, context->current_node->cut_node->parent.goal,
                      p_term_stdio_print_func, stdout);
                 putc('\n', stdout);
             } else {
@@ -693,7 +693,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
             if (context->catch_node) {
                 fputs("\tcatch: ", stdout);
                 p_term_print
-                    (context, context->catch_node->goal,
+                    (context, context->catch_node->parent.parent.goal,
                      p_term_stdio_print_func, stdout);
                 putc('\n', stdout);
             }
