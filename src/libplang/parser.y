@@ -105,12 +105,12 @@ static p_term *make_ternary_term(p_context *context, const char *name, p_term *t
 
 /* Convert the term from left-recursive in the grammar
  * into right-recursive in the constructed tree */
-#define append_r_list(dest, src, new_term) \
+#define append_r_list(dest, src, new_term, oper) \
     do { \
         p_term *term; \
         if (src.r_hole) { \
             term = p_term_create_functor \
-                (context, p_term_create_atom(context, ","), 2); \
+                (context, p_term_create_atom(context, oper), 2); \
             p_term_bind_functor_arg(term, 0, src.r_tail); \
             p_term_bind_functor_arg(src.r_hole, 1, term); \
             dest.r_head = src.r_head; \
@@ -118,7 +118,7 @@ static p_term *make_ternary_term(p_context *context, const char *name, p_term *t
             dest.r_tail = new_term; \
         } else { \
             term = p_term_create_functor \
-                (context, p_term_create_atom(context, ","), 2); \
+                (context, p_term_create_atom(context, oper), 2); \
             p_term_bind_functor_arg(term, 0, src.r_tail); \
             dest.r_head = term; \
             dest.r_hole = term; \
@@ -827,8 +827,8 @@ if_term
     ;
 
 and_term
-    : and_term K_AND not_term   { append_r_list($$, $1, $3); }
-    | and_term ',' not_term     { append_r_list($$, $1, $3); }
+    : and_term K_AND not_term   { append_r_list($$, $1, $3, "&&"); }
+    | and_term ',' not_term     { append_r_list($$, $1, $3, ","); }
     | not_term                  { create_r_list($$, $1); }
     ;
 
@@ -854,7 +854,7 @@ argument_or_term
     ;
 
 argument_and_term
-    : argument_and_term K_AND not_term { append_r_list($$, $1, $3); }
+    : argument_and_term K_AND not_term { append_r_list($$, $1, $3, "&&"); }
     | not_term                  { create_r_list($$, $1); }
     ;
 
@@ -1108,7 +1108,7 @@ new_term
 statements
     : statements statement  {
             p_term *stmt = add_debug(@2, $2);
-            append_r_list($$, $1, stmt);
+            append_r_list($$, $1, stmt, ",");
         }
     | statement             {
             p_term *stmt = add_debug(@1, $1);
@@ -1564,7 +1564,7 @@ dcg_body
     ;
 
 dcg_term
-    : dcg_term ',' dcg_unary_term   { append_r_list($$, $1, $3); }
+    : dcg_term ',' dcg_unary_term   { append_r_list($$, $1, $3, ","); }
     | dcg_unary_term                { create_r_list($$, $1); }
     ;
 

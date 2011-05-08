@@ -1968,6 +1968,23 @@ static p_goal_result p_builtin_load_library
  * \ref not_provable_1 "(!)/1",
  * \ref fuzzy_and_2 "fuzzy_and/2"
  */
+static p_goal_result p_builtin_logical_and
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_exec_node *current = context->current_node;
+    p_exec_node *next = GC_NEW(p_exec_node);
+    p_exec_node *new_current = GC_NEW(p_exec_node);
+    if (!next || !new_current)
+        return P_RESULT_FAIL;
+    new_current->goal = args[0];
+    new_current->success_node = next;
+    new_current->cut_node = current->cut_node;
+    next->goal = args[1];
+    next->success_node = current->success_node;
+    next->cut_node = current->cut_node;
+    context->current_node = new_current;
+    return P_RESULT_TREE_CHANGE;
+}
 
 /**
  * \addtogroup logic_and_control
@@ -5263,6 +5280,8 @@ void _p_db_init_builtins(p_context *context)
         {"@>", 2, p_builtin_term_gt},
         {"@>=", 2, p_builtin_term_ge},
         {"!", 0, p_builtin_commit},
+        {",", 2, p_builtin_logical_and},
+        {"&&", 2, p_builtin_logical_and},
         {"||", 2, p_builtin_logical_or},
         {"->", 2, p_builtin_if},
         {"?-", 1, p_builtin_call},
