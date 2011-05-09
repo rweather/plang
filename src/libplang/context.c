@@ -57,6 +57,7 @@ p_context *p_context_create(void)
     context->class_name_atom = p_term_create_atom(context, "className");
     context->dot_atom = p_term_create_atom(context, ".");
     context->clause_atom = p_term_create_atom(context, ":-");
+    context->dcg_atom = p_term_create_atom(context, "-->");
     context->comma_atom = p_term_create_atom(context, ",");
     context->line_atom = p_term_create_atom(context, "$$line");
     context->if_atom = p_term_create_atom(context, "->");

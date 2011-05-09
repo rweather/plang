@@ -99,6 +99,7 @@ struct p_context
     p_term *class_name_atom;
     p_term *dot_atom;
     p_term *clause_atom;
+    p_term *dcg_atom;
     p_term *comma_atom;
     p_term *line_atom;
     p_term *if_atom;

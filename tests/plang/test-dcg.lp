@@ -143,3 +143,11 @@ test(string_rule)
     verify(string3(["a", "c", "d", "b", "f"], []));
     verify(string3(["a", "c", "e", "b", "f"], []));
 }
+
+test(assert)
+{
+    assertz((dt --> "the"));
+    verify(dt(["the"], []));
+    retract((dt --> "the"));
+    verify_error(dt(["the"], []), existence_error(procedure, dt/2));
+}

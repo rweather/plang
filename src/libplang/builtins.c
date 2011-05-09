@@ -1034,8 +1034,12 @@ static p_goal_result p_builtin_abolish
  *
  * \par Description
  * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
- * then break it down into \em Head :- \em Body.  Otherwise, let
- * \em Head be \em Clause and \em Body be \b true.
+ * then break it down into \em Head :- \em Body.  If the \em Clause
+ * has <b>(--&gt;)/2</b> as its top-level functor, then expand
+ * the clause according to the
+ * \ref syntax_dcg "Definite clause grammar" rules and then break it
+ * down into \em Head :- \em Body.  Otherwise, let \em Head be
+ * \em Clause and \em Body be \b true.
  * \par
  * A freshly renamed version of the clause \em Head :- \em Body is
  * added to the predicate database at the start (<b>asserta/1</b>)
@@ -1066,12 +1070,14 @@ static p_goal_result p_builtin_abolish
  * assertz((a :- true))         succeeds
  * asserta((a(X) :- b(X,Y)))    succeeds
  * assertz(a(X))                succeeds
- * asserta((a :- X))            type_error(callable, X) when executed
- * assertz(asserta(X))          permission_error(modify, static_procedure, asserta/1)
+ * asserta((det --> "the"))     succeeds
+ * assertz((a :- X))            type_error(callable, X) when executed
+ * asserta(asserta(X))          permission_error(modify, static_procedure, asserta/1)
  * \endcode
  *
  * \par Compatibility
- * \ref standard "Standard Prolog"
+ * \ref standard "Standard Prolog", with the addition of the handling
+ * for <b>(--&gt;)/2</b>.
  *
  * \par See Also
  * \ref abolish_1 "abolish/1",
@@ -1087,6 +1093,12 @@ static p_goal_result p_builtin_assert
     if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
+    }
+    if (clause->header.type == P_TERM_FUNCTOR &&
+            clause->header.size == 2 &&
+            clause->functor.functor_name == context->dcg_atom) {
+        /* Expand DCG rules into their normal clause form */
+        clause = p_term_expand_dcg(context, clause);
     }
     if (clause->header.type == P_TERM_FUNCTOR &&
             clause->header.size == 2 &&
@@ -1351,8 +1363,12 @@ static p_goal_result p_builtin_clause
  *
  * \par Description
  * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
- * then break it down into \em Head :- \em Body.  Otherwise, let
- * \em Head be \em Clause and \em Body be \b true.
+ * then break it down into \em Head :- \em Body.  If the \em Clause
+ * has <b>(--&gt;)/2</b> as its top-level functor, then expand
+ * the clause according to the
+ * \ref syntax_dcg "Definite clause grammar" rules and then break it
+ * down into \em Head :- \em Body.  Otherwise, let \em Head be
+ * \em Clause and \em Body be \b true.
  * \par
  * The <b>retract/1</b> predicate finds the first clause in
  * the predicate database that unifies with \em Head :- \em Body,
@@ -1410,6 +1426,12 @@ static p_goal_result p_builtin_retract
     if (!clause || (clause->header.type & P_TERM_VARIABLE) != 0) {
         *error = p_create_instantiation_error(context);
         return P_RESULT_ERROR;
+    }
+    if (clause->header.type == P_TERM_FUNCTOR &&
+            clause->header.size == 2 &&
+            clause->functor.functor_name == context->dcg_atom) {
+        /* Expand DCG rules into their normal clause form */
+        clause = p_term_expand_dcg(context, clause);
     }
     if (clause->header.type == P_TERM_FUNCTOR &&
             clause->header.size == 2 &&
