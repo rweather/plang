@@ -7,6 +7,7 @@ PLANG_TESTS = \
 	test-dcg.lp \
 	test-findall.lp \
 	test-fuzzy.lp \
+	test-index.lp \
         test-one-way.lp \
 	test-sort.lp \
 	test-type.lp \

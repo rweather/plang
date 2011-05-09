@@ -467,7 +467,8 @@ void _p_context_clause_fail_func
     (p_context *context, p_exec_fail_node *node)
 {
     p_exec_clause_node *current = (p_exec_clause_node *)node;
-    p_term *clause_list;
+    p_term_clause_iter clause_iter;
+    p_term *clause;
     p_term *body;
     p_exec_node *new_current;
 
@@ -477,18 +478,16 @@ void _p_context_clause_fail_func
     /* We have backtracked into a new clause of a predicate.
      * See if the clause, or one of the following clauses
      * matches the current goal.  If no match, then fail */
-    clause_list = current->next_clause;
+    clause_iter = current->clause_iter;
     body = 0;
-    while (clause_list != 0) {
+    while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
         body = p_term_unify_clause
-            (context, current->parent.parent.goal, clause_list->list.head);
+            (context, current->parent.parent.goal, clause);
         if (body)
             break;
-        clause_list = clause_list->list.tail;
     }
     if (body) {
-        clause_list = clause_list->list.tail;
-        if (clause_list) {
+        if (p_term_clauses_has_more(&clause_iter)) {
             p_exec_clause_node *next = GC_NEW(p_exec_clause_node);
             if (next) {
                 next->parent.parent.goal = current->parent.parent.goal;
@@ -497,7 +496,7 @@ void _p_context_clause_fail_func
                 _p_context_init_fail_node
                     (context, &(next->parent), _p_context_clause_fail_func);
                 next->parent.fail_marker = current->parent.fail_marker;
-                next->next_clause = clause_list;
+                next->clause_iter = clause_iter;
                 context->fail_node = &(next->parent);
             } else {
                 body = context->fail_atom;
@@ -592,16 +591,16 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
 
     /* Look for a user-defined predicate to handle the functor */
     if (info && info->predicate) {
-        p_term *clause_list = info->predicate->predicate.clauses_head;
+        p_term_clause_iter clause_iter;
+        p_term_clauses_begin(info->predicate, goal, &clause_iter);
+        p_term *clause;
         p_term *body;
-        while (clause_list != 0) {
+        while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
             /* Find the first clause whose head unifies with the goal */
-            body = p_term_unify_clause
-                (context, goal, clause_list->list.head);
+            body = p_term_unify_clause(context, goal, clause);
             if (body) {
                 current = context->current_node;
-                clause_list = clause_list->list.tail;
-                if (clause_list) {
+                if (p_term_clauses_has_more(&clause_iter)) {
                     p_exec_clause_node *next = GC_NEW(p_exec_clause_node);
                     new_current = GC_NEW(p_exec_node);
                     if (!next || !new_current)
@@ -611,7 +610,7 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                     next->parent.parent.cut_node = context->fail_node;
                     _p_context_init_fail_node
                         (context, &(next->parent), _p_context_clause_fail_func);
-                    next->next_clause = clause_list;
+                    next->clause_iter = clause_iter;
                     new_current->goal = body;
                     new_current->success_node = current->success_node;
                     new_current->cut_node = context->fail_node;
@@ -628,7 +627,6 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
                 }
                 return P_RESULT_TREE_CHANGE;
             }
-            clause_list = clause_list->list.tail;
         }
         return P_RESULT_FAIL;
     }

@@ -53,6 +53,14 @@ enum {
     P_TERM_RENAME       = P_TERM_INVALID
 };
 
+/* Forward declarations for rbtree-priv.h */
+typedef struct p_rbnode p_rbnode;
+typedef struct p_rbtree p_rbtree;
+struct p_rbtree
+{
+    p_rbnode *root;
+};
+
 struct p_term_header {
 #if defined(P_TERM_64BIT)
     unsigned int type;
@@ -126,11 +134,38 @@ struct p_term_object {
     struct p_term_property properties[P_TERM_MAX_PROPS];
 };
 
+#define P_TERM_INDEX_TRIGGER    4
+
+struct p_term_clause_list
+{
+    struct p_term_clause *head;
+    struct p_term_clause *tail;
+};
+
 struct p_term_predicate {
     struct p_term_header header;
     p_term *name;                       /* Must be an atom */
-    p_term *clauses_head;
-    p_term *clauses_tail;
+    struct p_term_clause_list clauses;
+    struct p_term_clause_list var_clauses;
+    unsigned int clause_count;
+    unsigned int index_arg : 30;
+    unsigned int is_indexed : 1;
+    unsigned int dont_index : 1;
+    p_rbtree index;
+};
+
+#if defined(P_TERM_64BIT)
+#define P_TERM_DEFAULT_CLAUSE_NUM   (((unsigned int)1) << 31)
+#else
+#define P_TERM_DEFAULT_CLAUSE_NUM   (((unsigned int)1) << 23)
+#endif
+
+struct p_term_clause {
+    struct p_term_header header;
+    struct p_term_clause *next_clause;
+    struct p_term_clause *next_index;
+    p_term *head;
+    p_term *body;
 };
 
 struct p_term_rename {
@@ -150,6 +185,7 @@ union p_term {
     struct p_term_real          real;
     struct p_term_object        object;
     struct p_term_predicate     predicate;
+    struct p_term_clause        clause;
     struct p_term_rename        rename;
 };
 
@@ -157,6 +193,10 @@ union p_term {
 #define p_term_new(context, type)           (GC_NEW(type))
 
 int _p_term_next_utf8(const char *str, size_t len, size_t *size);
+
+int _p_term_retract_clause
+    (p_context *context, p_term *predicate,
+     struct p_term_clause *clause, p_term *clause2);
 
 /** @endcond */
 

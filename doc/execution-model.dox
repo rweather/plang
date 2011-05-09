@@ -21,6 +21,8 @@
 \file execution-model.dox
 \page execution_model Plang execution model
 
+\section execution_model_goals Goal exectution
+
 Plang uses a continuation-based model for implementing
 p_context_execute_goal().  The mathematical foundations we
 adopted can be found in section 2 of the following paper:
@@ -85,6 +87,8 @@ to "fail point", and "fail point" to the "cut fail point" of the
 new current node.  All solutions are exhausted once "fail point"
 becomes NULL on a top-level goal.
 
+\section execution_model_exceptions Exceptions
+
 The paper above does not describe the handling of
 \ref catch_3 "catch/3" and \ref throw_1 "throw/1" in a Prolog
 environment.  We extend the mechanism by adding a "catch point"
@@ -105,5 +109,60 @@ be restored upon backtracking.  The "catch point" also needs
 to be restored when the body of the catch/3 succeeds.  We handle
 this by inserting a special <tt>$$pop_catch</tt> goal as the
 success continuation for the body goal.
+
+\section execution_model_indexing Clause indexing
+
+The standard semantics for predicate execution is to try each
+clause in turn until one succeeds.  Upon backtracking, the next
+succeeding clause is chosen, until there are no more clauses.
+This can be very inefficient if there are lots of clauses
+associated with a predicate.  For example, evaluating <tt>X == Y</tt>
+with the following predicate will involve trying a lot of
+irrelevant clauses first:
+
+\code
+eval(A + B, Result)  { ... }    // clause 1
+eval(A - B, Result)  { ... }    // clause 2
+eval(A * B, Result)  { ... }    // clause 3
+eval(A / B, Result)  { ... }    // clause 4
+eval(-A, Result)     { ... }    // clause 5
+eval(A && B, Result) { ... }    // clause 6
+eval(A || B, Result) { ... }    // clause 7
+eval(!A, Result)     { ... }    // clause 8
+eval(A == B, Result) { ... }    // clause 9
+...
+eval(A, Result)      { ... }    // clause N
+\endcode
+
+The usual solution to this performance problem is \em indexing.
+One of the arguments is used to create an index that maps
+an incoming value to a list of clauses that are most likely to
+match that kind of value.  In the case of <b>(==)/2</b>,
+the index will list clauses 9 and N (a variable matches
+any incoming value).  Now only those two clauses need to be tried
+when we evaluate <tt>X == Y</tt>; we can safely assume that all
+other clauses will fail without trying them explicitly.
+
+Plang indexes predicates with more than four clauses.  When the
+fifth clause is added, Plang inspects the current clauses to
+determine the best argument for indexing.  The best argument is
+that which changes the most from clause to clause; usually
+the first, but could be the second for class member predicates
+(the first argument to class member predicates is the
+\c Self variable).
+
+After the index argument has been chosen all of the clauses are
+inserted into a red-black tree.  The tree maps the top-level
+functor, atom, string, or number in the index argument to a list
+of clauses that matches that top-level type.  Clauses without a
+top-level type (usually those that have a variable in the
+index argument) are added to a separate list.
+
+When a predicate is called, the top-level type of the incoming
+argument value is used to look up the relevant clause list
+in the red-black tree.  This list is merged with the separate
+variable clause list to produce the list of clauses to be
+tried in order.  If the incoming argument value is a variable,
+then all clauses in the predicate are tried in order.
 
 */

@@ -28,7 +28,6 @@ extern "C" {
 
 /** @cond */
 
-typedef struct p_rbnode p_rbnode;
 struct p_rbnode
 {
 #if defined(P_TERM_64BIT)
@@ -41,7 +40,10 @@ struct p_rbnode
     unsigned int size : 24;
 #endif
     const p_term *name;
-    p_term *value;
+    union {
+        p_term *value;
+        struct p_term_clause_list clauses;
+    };
     p_rbnode *parent;
     p_rbnode *left;
     p_rbnode *right;
@@ -57,12 +59,6 @@ struct p_rbkey
 
 enum {
     P_TERM_LIST_OF  = 64
-};
-
-typedef struct p_rbtree p_rbtree;
-struct p_rbtree
-{
-    p_rbnode *root;
 };
 
 int _p_rbkey_init(p_rbkey *key, const p_term *term);

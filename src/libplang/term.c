@@ -21,6 +21,7 @@
 #include <plang/database.h>
 #include "term-priv.h"
 #include "context-priv.h"
+#include "rbtree-priv.h"
 #include <string.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -139,6 +140,13 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  * predicate.  Predicate terms typically arise in references
  * to class members.
  * \sa p_term_create_predicate()
+ */
+
+/**
+ * \var P_TERM_CLAUSE
+ * \ingroup term
+ * The term is a reference to a single clause from a predicate.
+ * \sa p_term_create_clause()
  */
 
 /**
@@ -1446,7 +1454,8 @@ int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term 
  *
  * \ingroup term
  * \sa p_term_create_class_object(), p_term_add_clause_first()
- * \sa p_term_add_clause_last(), p_term_clauses()
+ * \sa p_term_add_clause_last(), p_term_create_clause()
+ * \sa p_term_clauses_begin()
  */
 p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
 {
@@ -1472,30 +1481,243 @@ p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
 }
 
 /**
+ * \brief Creates a new clause within \a context with the
+ * specified \a head and \a body.
+ *
+ * \ingroup term
+ * \sa p_term_create_predicate(), p_term_add_clause_first()
+ */
+p_term *p_term_create_clause(p_context *context, p_term *head, p_term *body)
+{
+    struct p_term_clause *term =
+        p_term_new(context, struct p_term_clause);
+    if (!term)
+        return 0;
+    term->header.type = P_TERM_CLAUSE;
+    term->head = head;
+    term->body = body;
+    return (p_term *)term;
+}
+
+/* Add a clause to an indexed clause list */
+P_INLINE void p_term_add_indexed_clause
+    (p_context *context, struct p_term_clause_list *list,
+     struct p_term_clause *clause, int first)
+{
+    if (!list->head) {
+        list->head = clause;
+        list->tail = clause;
+        clause->next_index = 0;
+    } else if (!first) {
+        list->tail->next_index = clause;
+        clause->next_index = 0;
+        list->tail = clause;
+    } else {
+        clause->next_index = list->head;
+        list->head = clause;
+    }
+}
+
+/* Add a clause to a regular (non-indexed) clause list */
+P_INLINE void p_term_add_regular_clause
+    (p_context *context, struct p_term_clause_list *list,
+     p_term *clause, int first)
+{
+    if (!list->head) {
+        list->head = &(clause->clause);
+        list->tail = &(clause->clause);
+        clause->clause.next_clause = 0;
+    } else if (!first) {
+        list->tail->next_clause = &(clause->clause);
+        clause->clause.next_clause = 0;
+        list->tail = &(clause->clause);
+    } else {
+        clause->clause.next_clause = list->head;
+        list->head = &(clause->clause);
+    }
+}
+
+/* Convert a functor argument into an indexable value */
+P_INLINE p_term *p_term_index_arg
+    (p_context *context, p_term *head, unsigned int arg_num)
+{
+    p_term *index_arg = p_term_deref(p_term_arg(head, arg_num));
+    if (index_arg && index_arg->header.type == P_TERM_FUNCTOR &&
+            index_arg->header.size == 1 &&
+            index_arg->functor.functor_name == context->in_atom) {
+        /* Remove the "in/1" declaration because it isn't relevant */
+        index_arg = p_term_arg(index_arg, 0);
+    }
+    return index_arg;
+}
+
+/* Initialize a key, but disallow list-of keys (FIXME) */
+P_INLINE int _p_rbkey_init_no_listof(p_rbkey *key, const p_term *term)
+{
+    if (!_p_rbkey_init(key, term))
+        return 0;
+    if (key->type & P_TERM_LIST_OF) {
+        key->type = P_TERM_LIST;
+        key->size = 0;
+        key->name = 0;
+    }
+    return 1;
+}
+
+/* Add a specific clause to a predicate's index */
+static void p_term_index_clause
+    (p_context *context, p_term *predicate,
+     struct p_term_clause *clause, int first)
+{
+    p_term *index_arg;
+    p_rbkey key;
+    p_rbnode *node;
+
+    /* Fetch the head argument to be indexed */
+    index_arg = p_term_index_arg
+        (context, clause->head, predicate->predicate.index_arg);
+    if (!index_arg)
+        return;
+
+    /* Turn the index argument into a key.  If that isn't possible
+     * (usually because the argument is a variable), then add it
+     * to the list of "variable clauses" */
+    if (!_p_rbkey_init_no_listof(&key, index_arg)) {
+        p_term_add_indexed_clause
+            (context, &(predicate->predicate.var_clauses),
+             clause, first);
+        return;
+    }
+
+    /* Add the clause to the list associated with the key */
+    node = _p_rbtree_insert(&(predicate->predicate.index), &key);
+    if (!node)
+        return;
+    p_term_add_indexed_clause(context, &(node->clauses), clause, first);
+}
+
+/* Add all clauses within a predicate to its index */
+static void p_term_index_all_clauses
+    (p_context *context, p_term *predicate)
+{
+    struct p_term_clause *clause;
+    p_term *head;
+    p_rbkey key;
+    p_rbkey keys[4];
+    unsigned int counts[4];
+    unsigned int arg;
+    unsigned int max_count;
+
+    /* Cannot index arity-0 predicates */
+    if (predicate->header.size == 0) {
+        predicate->predicate.dont_index = 1;
+        return;
+    }
+
+    /* Determine the best argument to use for indexing by counting
+     * the number of key changes in each argument.  The argument
+     * with the most key changes is used for indexing */
+    clause = predicate->predicate.clauses.head;
+    head = clause->head;
+    for (arg = 0; arg < 4 && arg < predicate->header.size; ++arg) {
+        if (!_p_rbkey_init_no_listof
+                (&(keys[arg]), p_term_index_arg(context, head, arg))) {
+            keys[arg].type = P_TERM_VARIABLE;
+            keys[arg].size = 0;
+            keys[arg].name = 0;
+        }
+        counts[arg] = 0;
+    }
+    while ((clause = clause->next_clause) != 0) {
+        head = clause->head;
+        for (arg = 0; arg < 4 && arg < predicate->header.size; ++arg) {
+            if (!_p_rbkey_init_no_listof
+                    (&key, p_term_index_arg(context, head, arg))) {
+                key.type = P_TERM_VARIABLE;
+                key.size = 0;
+                key.name = 0;
+            }
+            if (_p_rbkey_compare_keys(&(keys[arg]), &key) != 0) {
+                ++(counts[arg]);
+                keys[arg] = key;
+            }
+        }
+    }
+    max_count = counts[0];
+    predicate->predicate.index_arg = 0;
+    for (arg = 1; arg < 4 && arg < predicate->header.size; ++arg) {
+        if (counts[arg] > max_count) {
+            max_count = counts[arg];
+            predicate->predicate.index_arg = arg;
+        }
+    }
+    if (predicate->predicate.index_arg == 0 &&
+            keys[0].type == P_TERM_VARIABLE && !(counts[arg]) &&
+            predicate->header.size >= 2) {
+        /* Probably a class member predicate.  For some reason the
+         * first argument was chosen for indexing, but the second
+         * is more likely to be what we wanted */
+        predicate->predicate.index_arg = 1;
+    }
+
+    /* Add all existing clauses to the index */
+    clause = predicate->predicate.clauses.head;
+    while (clause != 0) {
+        p_term_index_clause(context, predicate, clause, 0);
+        clause = clause->next_clause;
+    }
+
+    /* The predicate is now indexed */
+    predicate->predicate.is_indexed = 1;
+}
+
+/* Renumber the clauses on a predicate because the clause number
+ * has wrapped around to zero */
+static void p_term_renumber_clauses(p_term *predicate)
+{
+    unsigned int clause_num = P_TERM_DEFAULT_CLAUSE_NUM -
+        predicate->predicate.clause_count / 2;
+    struct p_term_clause *clause = predicate->predicate.clauses.head;
+    while (clause != 0) {
+        clause->header.size = clause_num++;
+        clause = clause->next_clause;
+    }
+}
+
+/**
  * \brief Adds \a clause to \a predicate within \a context at
  * the front of the predicate's clause list.
  *
  * The \a predicate is assumed to be of type P_TERM_PREDICATE
  * and already dereferenced.
  *
- * The \a clause is assumed to have functor <b>(:-)/2</b> and
+ * The \a clause is assumed to be of type P_TERM_CLAUSE
  * to have the same number of arguments as \a predicate.
  *
  * \ingroup term
  * \sa p_term_create_predicate(), p_term_add_clause_last()
- * \sa p_term_clauses()
+ * \sa p_term_clauses_begin()
  */
 void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause)
 {
-    p_term *list;
-    if (predicate->predicate.clauses_head) {
-        list = p_term_create_list
-            (context, clause, predicate->predicate.clauses_head);
-        predicate->predicate.clauses_head = list;
+    unsigned int clause_num;
+    if (predicate->predicate.clauses.head) {
+        struct p_term_clause *first = predicate->predicate.clauses.head;
+        clause_num = first->header.size - 1;
     } else {
-        list = p_term_create_list(context, clause, 0);
-        predicate->predicate.clauses_head = list;
-        predicate->predicate.clauses_tail = list;
+        clause_num = P_TERM_DEFAULT_CLAUSE_NUM;
+    }
+    clause->header.size = clause_num;
+    p_term_add_regular_clause
+        (context, &(predicate->predicate.clauses), clause, 1);
+    ++(predicate->predicate.clause_count);
+    if (!clause->header.size)
+        p_term_renumber_clauses(predicate);
+    if (predicate->predicate.is_indexed) {
+        p_term_index_clause(context, predicate, &(clause->clause), 1);
+    } else if (!(predicate->predicate.dont_index) &&
+               predicate->predicate.clause_count > P_TERM_INDEX_TRIGGER) {
+        p_term_index_all_clauses(context, predicate);
     }
 }
 
@@ -1506,72 +1728,187 @@ void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clau
  * The \a predicate is assumed to be of type P_TERM_PREDICATE
  * and already dereferenced.
  *
- * The \a clause is assumed to have functor <b>(:-)/2</b> and
+ * The \a clause is assumed to be of type P_TERM_CLAUSE
  * to have the same number of arguments as \a predicate.
  *
  * \ingroup term
  * \sa p_term_create_predicate(), p_term_add_clause_first()
- * \sa p_term_clauses()
+ * \sa p_term_clauses_begin()
  */
 void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause)
 {
-    p_term *list;
-    if (predicate->predicate.clauses_head) {
-        list = p_term_create_list(context, clause, 0);
-        p_term_set_tail(predicate->predicate.clauses_tail, list);
-        predicate->predicate.clauses_tail = list;
+    unsigned int clause_num;
+    if (predicate->predicate.clauses.tail) {
+        struct p_term_clause *last = predicate->predicate.clauses.tail;
+        clause_num = last->header.size + 1;
     } else {
-        list = p_term_create_list(context, clause, 0);
-        predicate->predicate.clauses_head = list;
-        predicate->predicate.clauses_tail = list;
+        clause_num = P_TERM_DEFAULT_CLAUSE_NUM;
+    }
+    clause->header.size = clause_num;
+    p_term_add_regular_clause
+        (context, &(predicate->predicate.clauses), clause, 0);
+    ++(predicate->predicate.clause_count);
+    if (!clause->header.size)
+        p_term_renumber_clauses(predicate);
+    if (predicate->predicate.is_indexed) {
+        p_term_index_clause(context, predicate, &(clause->clause), 0);
+    } else if (!(predicate->predicate.dont_index) &&
+               predicate->predicate.clause_count > P_TERM_INDEX_TRIGGER) {
+        p_term_index_all_clauses(context, predicate);
     }
 }
 
-/**
- * \brief Returns the list of clauses associated with \a predicate;
- * or null if \a predicate does not have any clauses.
- *
- * Use p_term_next_clause() to iterate through the list.
- *
- * \ingroup term
- * \sa p_term_create_predicate(), \sa p_term_next_clause()
- */
-p_term *p_term_clauses(const p_term *predicate)
+/* Retract "clause" if it can be unified with "clause2" */
+int _p_term_retract_clause
+    (p_context *context, p_term *predicate,
+     struct p_term_clause *clause, p_term *clause2)
 {
-    if (!predicate)
+    p_rbkey key;
+    p_rbnode *node;
+    void *marker;
+    struct p_term_clause_list *list;
+    struct p_term_clause *current;
+    struct p_term_clause *prev;
+
+    /* Compute the indexing key before we unify the clause */
+    if (!predicate->predicate.is_indexed ||
+            !_p_rbkey_init_no_listof
+                (&key, p_term_arg(clause->head,
+                                  predicate->predicate.index_arg))) {
+        key.type = P_TERM_VARIABLE;
+        key.size = 0;
+        key.name = 0;
+    }
+
+    /* Unify against the clause to see if this is the one we wanted */
+    marker = p_context_mark_trail(context);
+    if (!p_term_unify(context, clause->head,
+                      p_term_arg(clause2, 0), P_BIND_DEFAULT))
         return 0;
-    /* Short-cut: avoid the dereference if already a predicate */
-    if (predicate->header.type == P_TERM_PREDICATE)
-        return predicate->predicate.clauses_head;
-    predicate = p_term_deref_non_null(predicate);
-    if (predicate->header.type == P_TERM_PREDICATE)
-        return predicate->predicate.clauses_head;
-    else
+    if (!p_term_unify(context, clause->body,
+                      p_term_arg(clause2, 1), P_BIND_DEFAULT)) {
+        p_context_backtrack_trail(context, marker);
         return 0;
+    }
+
+    /* If the predicate is not indexed, then nothing more to do */
+    if (!predicate->predicate.is_indexed)
+        return 1;
+
+    /* Remove the clause from the index list it is a member of */
+    if (key.type != P_TERM_VARIABLE) {
+        node = _p_rbtree_lookup(&(predicate->predicate.index), &key);
+        list = &(node->clauses);
+    } else {
+        list = &(predicate->predicate.var_clauses);
+    }
+    current = list->head;
+    prev = 0;
+    while (current != 0 && current != clause) {
+        prev = current;
+        current = current->next_index;
+    }
+    if (!current)
+        return 1;
+    if (prev) {
+        prev->next_index = current->next_index;
+        if (!current->next_index)
+            list->tail = prev;
+    } else {
+        list->head = current->next_index;
+        if (!(list->head)) {
+            list->tail = 0;
+            if (key.type != P_TERM_VARIABLE)
+                _p_rbtree_remove(&(predicate->predicate.index), &key);
+        }
+    }
+    return 1;
 }
 
 /**
- * \brief Returns the next clause in the specified \a clauses list.
+ * \brief Starts an iteration over the clauses of \a predicate,
+ * using \a iter as the iteration control information.
  *
- * The value at \a clauses is updated to point to the tail portion
- * of the \a clauses list.
+ * If \a head is not null and the \a predicate is indexed,
+ * then iterate over the best list of clauses that match \a head
+ * according to the index.
  *
- * The behavior is undefined if the list of clauses is modified
- * with p_term_add_clause_first() or p_term_add_clause_last()
- * while the list is being traversed.
+ * Use p_term_clauses_next() to iterate through the returned list.
  *
  * \ingroup term
- * \sa p_term_create_predicate(), p_term_clauses()
+ * \sa p_term_create_predicate(), p_term_clauses_next()
+ * \sa p_term_clauses_has_more()
  */
-p_term *p_term_next_clause(p_term **clauses)
+void p_term_clauses_begin(const p_term *predicate, const p_term *head, p_term_clause_iter *iter)
 {
-    p_term *list = *clauses;
-    if (list) {
-        p_term *head = list->list.head;
-        *clauses = list->list.tail;
-        return head;
+    iter->next1 = 0;
+    iter->next2 = 0;
+    iter->next3 = 0;
+    if (!predicate)
+        return;
+    if (predicate->header.type != P_TERM_PREDICATE) {
+        predicate = p_term_deref_non_null(predicate);
+        if (predicate->header.type != P_TERM_PREDICATE)
+            return;
+    }
+    if (head && predicate->predicate.is_indexed) {
+        p_rbkey key;
+        p_rbnode *node;
+        p_term *arg = p_term_arg(head, predicate->predicate.index_arg);
+        if (_p_rbkey_init_no_listof(&key, arg)) {
+            node = _p_rbtree_lookup
+                (&(predicate->predicate.index), &key);
+            if (node) {
+                iter->next1 = node->clauses.head;
+                iter->next2 = predicate->predicate.var_clauses.head;
+                return;
+            }
+        }
+    }
+    iter->next3 = predicate->predicate.clauses.head;
+}
+
+/**
+ * \brief Returns the next clause for the iteration control
+ * block \a iter.
+ *
+ * \ingroup term
+ * \sa p_term_clauses_begin(), p_term_clauses_has_more()
+ */
+p_term *p_term_clauses_next(p_term_clause_iter *iter)
+{
+    struct p_term_clause *clause;
+    if (iter->next1) {
+        clause = iter->next1;
+        if (iter->next2 && iter->next2->header.size < clause->header.size) {
+            clause = iter->next2;
+            iter->next2 = clause->next_index;
+        } else {
+            iter->next1 = clause->next_index;
+            if (!(iter->next1)) {
+                iter->next1 = iter->next2;
+                iter->next2 = 0;
+            }
+        }
+        return (p_term *)clause;
+    } else if (iter->next3) {
+        clause = iter->next3;
+        iter->next3 = clause->next_clause;
+        return (p_term *)clause;
     }
     return 0;
+}
+
+/**
+ * \brief Returns non-zero if \a iter has more clauses yet
+ * to be iterated.
+ *
+ * \ingroup term
+ * \sa p_term_clauses_begin(), p_term_clauses_next()
+ */
+int p_term_clauses_has_more(const p_term_clause_iter *iter)
+{
+    return iter->next1 != 0 || iter->next3 != 0;
 }
 
 /**
@@ -1892,6 +2229,7 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
         break;
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
+    case P_TERM_CLAUSE:
         /* Objects and predicates can unify only if their
          * pointers are identical.  Identity has already been
          * checked, so fail */
@@ -2241,6 +2579,9 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
         p_term_print_atom(term->predicate.name, print_func, print_data);
         (*print_func)(print_data, "/%d", (int)(term->header.size));
         break;
+    case P_TERM_CLAUSE:
+        (*print_func)(print_data, "clause %lx", (long)term);
+        break;
     case P_TERM_VARIABLE: {
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
@@ -2365,7 +2706,8 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
         2, /* 6: P_TERM_REAL */
         7, /* 7: P_TERM_OBJECT */
         8, /* 8: P_TERM_PREDICATE */
-        0, 0, 0, 0, 0, 0, 0,
+        9, /* 9: P_TERM_CLAUSE */
+        0, 0, 0, 0, 0, 0,
         1, /* 16: P_TERM_VARIABLE */
         1  /* 17: P_TERM_MEMBER_VARIABLE */
     };
@@ -2473,6 +2815,7 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
         break;
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
+    case P_TERM_CLAUSE:
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
         return (term1 < term2) ? -1 : 1;
@@ -2520,6 +2863,7 @@ int p_term_is_ground(const p_term *term)
     case P_TERM_REAL:
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
+    case P_TERM_CLAUSE:
         return 1;
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
@@ -2588,6 +2932,20 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
     case P_TERM_PREDICATE:
         /* Constant and object terms are cloned as themselves */
         break;
+    case P_TERM_CLAUSE: {
+        /* Clone a clause into (:-)/2 form */
+        clone = p_term_create_functor(context, context->clause_atom, 2);
+        if (!clone)
+            return 0;
+        p_term *arg = p_term_clone_inner(context, term->clause.head);
+        if (!arg)
+            return 0;
+        p_term_bind_functor_arg(clone, 0, arg);
+        arg = p_term_clone_inner(context, term->clause.body);
+        if (!arg)
+            return 0;
+        p_term_bind_functor_arg(clone, 1, arg);
+        return clone; }
     case P_TERM_VARIABLE:
         /* Create a new variable and bind the current one
          * to a rename term so that future references can

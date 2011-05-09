@@ -38,6 +38,7 @@ enum {
     P_TERM_REAL,
     P_TERM_OBJECT,
     P_TERM_PREDICATE,
+    P_TERM_CLAUSE,
 
     P_TERM_VARIABLE         = 16,   /* Used as a flag for all vars */
     P_TERM_MEMBER_VARIABLE,
@@ -101,10 +102,22 @@ int p_term_inherits(p_context *context, const p_term *term1, const p_term *term2
 int p_term_is_instance_of(p_context *context, const p_term *term1, const p_term *term2);
 
 p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count);
+p_term *p_term_create_clause(p_context *context, p_term *head, p_term *body);
 void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause);
 void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause);
-p_term *p_term_clauses(const p_term *predicate);
-p_term *p_term_next_clause(p_term **clauses);
+
+/** @cond */
+typedef struct p_term_clause_iter p_term_clause_iter;
+struct p_term_clause_iter
+{
+    struct p_term_clause *next1;
+    struct p_term_clause *next2;
+    struct p_term_clause *next3;
+};
+/** @endcond */
+void p_term_clauses_begin(const p_term *predicate, const p_term *head, p_term_clause_iter *iter);
+p_term *p_term_clauses_next(p_term_clause_iter *iter);
+int p_term_clauses_has_more(const p_term_clause_iter *iter);
 
 p_term *p_term_create_member_name(p_context *context, p_term *class_name, p_term *name);
 

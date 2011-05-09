@@ -797,7 +797,8 @@ static p_goal_result p_builtin_call_member
     p_term *object;
     p_term *predicate;
     p_term *list;
-    p_term *clause_list;
+    p_term_clause_iter clause_iter;
+    p_term *clause;
     p_term *body;
     p_exec_node *current;
     p_exec_node *new_current;
@@ -851,14 +852,12 @@ static p_goal_result p_builtin_call_member
     }
 
     /* Search for the first predicate clause that matches */
-    clause_list = predicate->predicate.clauses_head;
-    while (clause_list != 0) {
-        body = p_term_unify_clause
-            (context, arg_head, clause_list->list.head);
+    p_term_clauses_begin(predicate, arg_head, &clause_iter);
+    while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
+        body = p_term_unify_clause(context, arg_head, clause);
         if (body) {
             current = context->current_node;
-            clause_list = clause_list->list.tail;
-            if (clause_list) {
+            if (p_term_clauses_has_more(&clause_iter)) {
                 next = GC_NEW(p_exec_clause_node);
                 new_current = GC_NEW(p_exec_node);
                 if (!next || !new_current)
@@ -868,7 +867,7 @@ static p_goal_result p_builtin_call_member
                 next->parent.parent.cut_node = context->fail_node;
                 _p_context_init_fail_node
                     (context, &(next->parent), _p_context_clause_fail_func);
-                next->next_clause = clause_list;
+                next->clause_iter = clause_iter;
                 new_current->goal = body;
                 new_current->success_node = current->success_node;
                 new_current->cut_node = context->fail_node;
@@ -885,7 +884,6 @@ static p_goal_result p_builtin_call_member
             }
             return P_RESULT_TREE_CHANGE;
         }
-        clause_list = clause_list->list.tail;
     }
     return P_RESULT_FAIL;
 }
@@ -1161,7 +1159,7 @@ struct p_exec_clause_fetch_node
     p_exec_fail_node parent;
     p_term *head;
     p_term *body;
-    p_term *next_clause;
+    p_term_clause_iter clause_iter;
 };
 /** @endcond */
 
@@ -1170,19 +1168,18 @@ static void _p_context_fetch_clause_fail_func
     (p_context *context, p_exec_fail_node *node)
 {
     p_exec_clause_fetch_node *current = (p_exec_clause_fetch_node *)node;
-    p_term *clause = current->next_clause;
+    p_term_clause_iter clause_iter = current->clause_iter;
+    p_term *clause;
     p_term *body;
     p_exec_node *next;
     p_exec_clause_fetch_node *retry;
     void *marker;
     _p_context_basic_fail_func(context, node);
-    while (clause != 0) {
+    while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
         marker = p_context_mark_trail(context);
-        body = p_term_unify_clause
-            (context, current->head, clause->list.head);
+        body = p_term_unify_clause(context, current->head, clause);
         if (body && p_term_unify(context, current->body, body, P_BIND_DEFAULT)) {
-            clause = clause->list.tail;
-            if (clause) {
+            if (p_term_clauses_has_more(&clause_iter)) {
                 next = GC_NEW(p_exec_node);
                 retry = GC_NEW(p_exec_clause_fetch_node);
                 if (!next || !retry) {
@@ -1199,7 +1196,7 @@ static void _p_context_fetch_clause_fail_func
                         current->parent.parent.cut_node;
                 retry->head = current->head;
                 retry->body = current->body;
-                retry->next_clause = clause;
+                retry->clause_iter = clause_iter;
                 _p_context_init_fail_node
                     (context, &(retry->parent),
                      _p_context_fetch_clause_fail_func);
@@ -1220,7 +1217,6 @@ static void _p_context_fetch_clause_fail_func
             return;
         }
         p_context_backtrack_trail(context, marker);
-        clause = clause->list.tail;
     }
     next = GC_NEW(p_exec_node);
     if (next) {
@@ -1272,6 +1268,7 @@ static p_goal_result p_builtin_clause
     unsigned int arity;
     p_database_info *info;
     p_term *pred;
+    p_term_clause_iter clause_iter;
     p_term *clause;
     p_term *body;
     void *marker;
@@ -1312,15 +1309,12 @@ static p_goal_result p_builtin_clause
     }
 
     /* Find the first clause that matches */
-    clause = info->predicate->predicate.clauses_head;
-    if (!clause)
-        return P_RESULT_FAIL;
-    while (clause != 0) {
+    p_term_clauses_begin(info->predicate, head, &clause_iter);
+    while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
         marker = p_context_mark_trail(context);
-        body = p_term_unify_clause(context, head, clause->list.head);
+        body = p_term_unify_clause(context, head, clause);
         if (body && p_term_unify(context, args[1], body, P_BIND_DEFAULT)) {
-            clause = clause->list.tail;
-            if (clause) {
+            if (p_term_clauses_has_more(&clause_iter)) {
                 current = context->current_node;
                 next = GC_NEW(p_exec_node);
                 retry = GC_NEW(p_exec_clause_fetch_node);
@@ -1335,7 +1329,7 @@ static p_goal_result p_builtin_clause
                 retry->parent.parent.cut_node = context->fail_node;
                 retry->head = head;
                 retry->body = args[1];
-                retry->next_clause = clause;
+                retry->clause_iter = clause_iter;
                 _p_context_init_fail_node
                     (context, &(retry->parent),
                      _p_context_fetch_clause_fail_func);
@@ -1346,7 +1340,6 @@ static p_goal_result p_builtin_clause
             return P_RESULT_TRUE;
         }
         p_context_backtrack_trail(context, marker);
-        clause = clause->list.tail;
     }
     return P_RESULT_FAIL;
 }
@@ -3610,6 +3603,7 @@ static p_goal_result p_builtin_univ
         case P_TERM_STRING:
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
+        case P_TERM_CLAUSE:
             new_term = p_term_create_list
                 (context, term, context->nil_atom);
             break;
@@ -3671,6 +3665,7 @@ static p_goal_result p_builtin_univ
             case P_TERM_STRING:
             case P_TERM_OBJECT:
             case P_TERM_PREDICATE:
+            case P_TERM_CLAUSE:
                 new_term = functor;
                 break;
             default:
@@ -3928,6 +3923,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_STRING:
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
+        case P_TERM_CLAUSE:
             if (!p_term_unify(context, name, term, P_BIND_DEFAULT))
                 return P_RESULT_FAIL;
             if (!p_term_unify(context, arity,
@@ -3972,6 +3968,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_STRING:
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
+        case P_TERM_CLAUSE:
             break;
         default:
             *error = p_create_type_error(context, "atomic", name);

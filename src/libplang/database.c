@@ -516,6 +516,13 @@ static p_term *p_db_predicate_name
     return 0;
 }
 
+/* Convert a clause from (:-)/2 form into P_TERM_CLAUSE form */
+P_INLINE p_term *p_db_convert_clause(p_context *context, p_term *clause)
+{
+    return p_term_create_clause
+        (context, p_term_arg(clause, 0), p_term_arg(clause, 1));
+}
+
 /**
  * \brief Asserts \a clause as the first clause in a database
  * predicate on \a context.
@@ -558,7 +565,8 @@ int p_db_clause_assert_first(p_context *context, p_term *clause)
             return 0;
         info->predicate = predicate;
     }
-    p_term_add_clause_first(context, predicate, clause);
+    p_term_add_clause_first
+        (context, predicate, p_db_convert_clause(context, clause));
     return 1;
 }
 
@@ -592,7 +600,8 @@ p_term *_p_db_clause_assert_last(p_context *context, p_term *clause)
             return 0;
         info->predicate = predicate;
     }
-    p_term_add_clause_last(context, predicate, clause);
+    p_term_add_clause_last
+        (context, predicate, p_db_convert_clause(context, clause));
     return predicate;
 }
 
@@ -632,8 +641,8 @@ int p_db_clause_retract(p_context *context, p_term *clause)
     p_database_info *info;
     p_term *name;
     int arity;
-    p_term *list;
-    p_term *prev;
+    struct p_term_clause *list;
+    struct p_term_clause *prev;
     p_term *predicate;
 
     /* Fetch the clause name and arity */
@@ -654,23 +663,23 @@ int p_db_clause_retract(p_context *context, p_term *clause)
     predicate = info->predicate;
     if (!predicate)
         return -1;
-    list = predicate->predicate.clauses_head;
+    list = predicate->predicate.clauses.head;
     prev = 0;
     while (list) {
-        if (p_term_unify(context, clause, list->list.head,
-                         P_BIND_DEFAULT)) {
+        if (_p_term_retract_clause(context, predicate, list, clause)) {
             if (prev)
-                p_term_set_tail(prev, list->list.tail);
+                prev->next_clause = list->next_clause;
             else
-                predicate->predicate.clauses_head = list->list.tail;
-            if (!list->list.tail)
-                predicate->predicate.clauses_tail = prev;
-            if (!predicate->predicate.clauses_head)
+                predicate->predicate.clauses.head = list->next_clause;
+            --(predicate->predicate.clause_count);
+            if (!list->next_clause)
+                predicate->predicate.clauses.tail = prev;
+            if (!predicate->predicate.clauses.head)
                 info->predicate = 0;    /* Completely removed */
             return 1;
         }
         prev = list;
-        list = list->list.tail;
+        list = list->next_clause;
     }
     return -1;
 }

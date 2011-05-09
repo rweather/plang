@@ -70,7 +70,7 @@ struct p_exec_fail_node
 struct p_exec_clause_node
 {
     p_exec_fail_node parent;
-    p_term *next_clause;
+    p_term_clause_iter clause_iter;
 };
 struct p_exec_catch_node
 {
