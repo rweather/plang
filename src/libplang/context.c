@@ -68,6 +68,7 @@ p_context *p_context_create(void)
     context->call_member_atom = p_term_create_atom(context, "$$call_member");
     context->call_args_atom = p_term_create_atom(context, "$$");
     context->unify_atom = p_term_create_atom(context, "=");
+    context->pop_catch_atom = p_term_create_atom(context, "$$pop_catch");
     context->trail_top = P_TRACE_SIZE;
     context->confidence = 1.0;
     _p_db_init(context);

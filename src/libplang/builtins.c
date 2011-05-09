@@ -2324,7 +2324,8 @@ static p_goal_result p_builtin_catch
     p_exec_node *current = context->current_node;
     p_exec_catch_node *catcher = GC_NEW(p_exec_catch_node);
     p_exec_node *new_current = GC_NEW(p_exec_node);
-    if (!catcher || !new_current)
+    p_exec_pop_catch_node *pop_catch = GC_NEW(p_exec_pop_catch_node);
+    if (!catcher || !new_current || !pop_catch)
         return P_RESULT_FAIL;
     catcher->parent.parent.goal = current->goal;
     catcher->parent.parent.success_node = current->success_node;
@@ -2333,11 +2334,26 @@ static p_goal_result p_builtin_catch
     _p_context_init_fail_node
         (context, &(catcher->parent), _p_context_basic_fail_func);
     new_current->goal = args[0];
-    new_current->success_node = current->success_node;
+    new_current->success_node = &(pop_catch->parent);
     new_current->cut_node = context->fail_node;
+    pop_catch->parent.goal = context->pop_catch_atom;
+    pop_catch->parent.success_node = current->success_node;
+    pop_catch->parent.cut_node = context->fail_node;
+    pop_catch->catch_node = context->catch_node;
     context->current_node = new_current;
     context->catch_node = catcher;
     return P_RESULT_TREE_CHANGE;
+}
+
+/* $$pop_catch predicate - pops the current catch context
+ * when a success continuation occurs */
+static p_goal_result p_builtin_pop_catch
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_exec_pop_catch_node *pop_catch;
+    pop_catch = (p_exec_pop_catch_node *)(context->current_node);
+    context->catch_node = pop_catch->catch_node;
+    return P_RESULT_TRUE;
 }
 
 /**
@@ -5326,6 +5342,7 @@ void _p_db_init_builtins(p_context *context)
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
+        {"$$pop_catch", 0, p_builtin_pop_catch},
         {"predicate", 1, p_builtin_predicate_1},
         {"predicate", 2, p_builtin_predicate_2},
         {"retract", 1, p_builtin_retract},

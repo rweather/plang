@@ -101,6 +101,9 @@ to find the next-outer "catch point" node.  If the "catch point"
 is NULL, then the top-level goal has finished with a thrown error.
 
 The current "catch point" is saved in fail nodes so that it can
-be restored upon backtracking.
+be restored upon backtracking.  The "catch point" also needs
+to be restored when the body of the catch/3 succeeds.  We handle
+this by inserting a special <tt>$$pop_catch</tt> goal as the
+success continuation for the body goal.
 
 */

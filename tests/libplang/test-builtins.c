@@ -215,6 +215,10 @@ static void test_logic_catch()
     P_COMPARE(run_stmt("try { try { throw(a); } catch(X) { throw(b); } } catch(Z) { Y = caught; } Y == caught;"), P_RESULT_TRUE);
 
     P_COMPARE(run_stmt_error("X = f(d); throw(type_error(list, X));", "type_error(list, f(d))"), P_RESULT_ERROR);
+
+    P_COMPARE(run_goal("catch(true, X, fail), throw(t)"), P_RESULT_ERROR);
+    P_COMPARE(run_goal("catch(throw(t), X, fail)"), P_RESULT_FAIL);
+    P_COMPARE(run_goal_error("catch(throw(t), X, throw(u))", "u"), P_RESULT_ERROR);
 }
 
 static void test_logic_do()
