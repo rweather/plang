@@ -221,7 +221,7 @@ p_term *p_term_expand_dcg(p_context *context, p_term *term)
 
     /* Create atoms for the main DCG control structures */
     info.or_atom = p_term_create_atom(context, "||");
-    info.compound_atom = p_term_create_atom(context, "$$compound");
+    info.compound_atom = p_term_create_atom(context, "{}");
     info.unify_atom = p_term_create_atom(context, "=");
     info.not_atom = p_term_create_atom(context, "!");
 

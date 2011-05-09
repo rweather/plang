@@ -1546,8 +1546,7 @@ dcg_clause
         }
     | callable_term K_DARROW dcg_body K_SHIFT_LEFT confidence
         K_SHIFT_RIGHT K_DOT_TERMINATOR {
-            p_term *body = unary_term
-                ("$$compound", unary_term("$$fuzzy", $5));
+            p_term *body = unary_term("{}", unary_term("$$fuzzy", $5));
             body = binary_term(",", $3, body);
             $$ = p_term_expand_dcg
                 (context, binary_term("-->", $1, body));
@@ -1575,7 +1574,7 @@ dcg_unary_term
 
 dcg_primitive_term
     : callable_term             { $$ = $1; }
-    | compound_statement        { $$ = unary_term("$$compound", $1); }
+    | compound_statement        { $$ = unary_term("{}", $1); }
     | '[' ']'                   { $$ = context->nil_atom; }
     | '[' list_members ']'      { $$ = finalize_list($2); }
     | K_STRING                  { $$ = $1; }
