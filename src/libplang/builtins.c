@@ -50,10 +50,17 @@
  *
  * \par Clause handling
  * \ref abolish_1 "abolish/1",
+ * \ref abolish_2 "abolish/2",
+ * \ref abolish_database_1 "abolish_database/1",
  * \ref asserta_1 "asserta/1",
+ * \ref asserta_2 "asserta/2",
  * \ref assertz_1 "assertz/1",
+ * \ref assertz_2 "assertz/2",
  * \ref clause_2 "clause/2",
- * \ref retract_1 "retract/1"
+ * \ref clause_3 "clause/3",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_1 "retract/1",
+ * \ref retract_2 "retract/2"
  *
  * \par Directives
  * \ref directive_1 "(:-)/1",
@@ -70,6 +77,7 @@
  * \ref logical_implies_2 "(=&gt;)/2",
  * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref call_1 "call/1",
+ * \ref call_2 "call/2",
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
  * \ref cut_0 "(!)/0",
@@ -132,6 +140,7 @@
  * \ref class_1 "class/1",
  * \ref class_2 "class/2",
  * \ref compound_1 "compound/1",
+ * \ref database_1 "database/1",
  * \ref float_1 "float/1",
  * \ref integer_1 "integer/1",
  * \ref nonvar_1 "nonvar/1",
@@ -894,13 +903,112 @@ static p_goal_result p_builtin_call_member
  * \defgroup clause_handling Builtin predicates - Clause handling
  *
  * Predicates in this group are used to add and remove clauses
- * from the predicate database.
+ * from the predicate database dynamically.  There are two types
+ * of databases in the Plang system: \em global and \em local.
+ *
+ * The global database is shared between all parts of the Plang
+ * system and contains the following:
+ *
+ * \li \ref predicates "Builtin predicates".
+ * \li Predicates and class member predicates from imported
+ *     \ref modules "modules".
+ * \li User-defined predicates from the application source code.
+ * \li Dynamic predicates defined at runtime with
+ *     \ref asserta_1 "asserta/1" and \ref assertz_1 "assertz/1".
+ *
+ * As an example, we consider a theorem prover for propositional
+ * logic.  The prover needs simplification rules to convert complex
+ * logical expressions into simpler ones.  Rather than fix the set
+ * of rules at compile time, the theorem prover allows the user to
+ * add new rules at runtime.  To support this, we declare the
+ * <b>simplify/2</b> predicate as dynamic and add the predefined
+ * rules as follows:
+ *
+ * \code
+ * :- dynamic(simplify/2).
+ * add_rules()
+ * {
+ *     assertz(simplify(in A && A, A));
+ *     assertz(simplify(in B || true, true));
+ *     ...
+ * }
+ * \endcode
+ *
+ * To use the rules to simplify a logical expression, the application
+ * calls the <b>simplify/2</b> predicate in the usual fashion:
+ *
+ * \code
+ * simplify(Expr, Simplified);
+ * \endcode
+ *
+ * When the user supplies a new rule, the application can call
+ * \ref asserta_1 "asserta/1" or \ref assertz_1 "assertz/1" to
+ * add the new rule to the start or end of the existing dynamic
+ * clause list.  Rules that are no longer needed can be removed
+ * with \ref retract_1 "retract/1".
+ *
+ * In practice, theorem provers rarely implement a single theory
+ * of logic.  We want our prover to be extensible from propositional
+ * logic to first order logic, higher order logic, and so on.
+ * Each logical theory will need its own simplification rules.
+ * We could define separate global predicates for each theory:
+ * <b>prop_simplify/2</b>, <b>fo_simplify/2</b>, etc.  An alternative
+ * is to use local databases.
+ *
+ * The application creates local databases with
+ * \ref new_database_1 "new_database/1" to store additional
+ * predicates that are generated at runtime.  Each local database
+ * defines a separate scope - the same predicate name can have
+ * different purposes in different local databases.
+ *
+ * Returning to our example, we will create a generic class to
+ * hold information about a logical theory.  The constructor
+ * creates a new local database to hold the rules that make
+ * up the theory:
+ *
+ * \code
+ * class theory
+ * {
+ *     var rules;
+ *     new() { new_database(Self.rules); }
+ * }
+ * \endcode
+ *
+ * We can then create our theory object for propositional
+ * logic as follows:
+ *
+ * \code
+ * new theory(Prop);
+ * assertz(simplify(in A && A, A), Prop.rules);
+ * assertz(simplify(in B || true, true), Prop.rules);
+ * ...
+ * \endcode
+ *
+ * To use the simplification rules, we need to call the local
+ * predicate with \ref call_2 "call/2":
+ *
+ * \code
+ * call(simplify(Expr, Simplified), Prop.rules);
+ * \endcode
+ *
+ * The local predicate is executed in a context where the
+ * <i>current database</i> is set to <tt>Prop.rules</tt>.
+ * If the local predicate calls other predicates, they will
+ * first be looked up in the local database, and then the
+ * global database.
  *
  * \ref abolish_1 "abolish/1",
+ * \ref abolish_2 "abolish/2",
+ * \ref abolish_database_1 "abolish_database/1",
  * \ref asserta_1 "asserta/1",
+ * \ref asserta_2 "asserta/2",
  * \ref assertz_1 "assertz/1",
+ * \ref assertz_2 "assertz/2",
  * \ref clause_2 "clause/2",
- * \ref retract_1 "retract/1"
+ * \ref clause_3 "clause/3",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_1 "retract/1",
+ * \ref retract_2 "retract/2"
  */
 /*\@{*/
 
@@ -998,6 +1106,7 @@ static p_term *p_builtin_parse_indicator
  * \ref standard "Standard Prolog"
  *
  * \par See Also
+ * \ref abolish_2 "abolish/2",
  * \ref asserta_1 "asserta/1",
  * \ref retract_1 "retract/1"
  */
@@ -1014,6 +1123,136 @@ static p_goal_result p_builtin_abolish
             (context, "modify", "static_procedure", args[0]);
         return P_RESULT_ERROR;
     }
+    return P_RESULT_TRUE;
+}
+
+static p_term *p_builtin_verify_database
+    (p_context *context, p_term *arg, p_term **error)
+{
+    p_term *database = p_term_deref_member(context, arg);
+    if (!database || (database->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return 0;
+    }
+    if (database->header.type != P_TERM_DATABASE) {
+        *error = p_create_type_error(context, "database", database);
+        return 0;
+    }
+    return database;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor abolish_2
+ * <b>abolish/2</b> - removes a user-defined predicate from
+ * a local predicate database.
+ *
+ * \par Usage
+ * \b abolish(\em Pred, \em Database)
+ *
+ * \par Description
+ * Removes all clauses from the specified local predicate \em Database
+ * that are associated with the predicate indicator \em Pred and
+ * succeeds.  The indicator should have the form \em Name / \em Arity.
+ * If the predicate does not exist, then succeeds.
+ * \par
+ * Removing a predicate that is in the process of being executed
+ * leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ * \li <tt>instantiation_error</tt> - one of \em Pred, \em Name,
+ *     or \em Arity, is a variable.
+ * \li <tt>type_error(predicate_indicator, \em Pred)</tt> - \em Pred
+ *     does not have the form \em Name / \em Arity.
+ * \li <tt>type_error(integer, \em Arity)</tt> - \em Arity is not
+ *     an integer.
+ * \li <tt>type_error(atom, \em Name)</tt> - \em Name is not an atom.
+ * \li <tt>domain_error(not_less_than_zero, \em Arity)</tt> - \em Arity
+ *     is less than zero.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * assertz(userdef(a, b, c), DB);
+ * abolish(userdef/3, DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_1 "abolish/1",
+ * \ref abolish_database_1 "abolish_database/1",
+ * \ref asserta_2 "asserta/2",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_2 "retract/2"
+ */
+static p_goal_result p_builtin_abolish_2
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *database;
+    p_term *name;
+    int arity;
+    database = p_builtin_verify_database(context, args[1], error);
+    if (!database)
+        return P_RESULT_ERROR;
+    name = p_builtin_parse_indicator(context, args[0], &arity, error);
+    if (!name)
+        return P_RESULT_ERROR;
+    p_db_local_clause_abolish(context, database, name, arity);
+    return P_RESULT_TRUE;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor abolish_database_1
+ * <b>abolish_database/1</b> - removes all predicates from a
+ * local predicate database.
+ *
+ * \par Usage
+ * \b abolish_database(\em Database)
+ *
+ * \par Description
+ * Removes all predicates from the specified local predicate
+ * \em Database and succeeds.
+ * \par
+ * Removing predicates that are in the process of being executed
+ * leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * assertz(userdef(a, b, c), DB);
+ * assertz(simplify(in A && A, A), DB);
+ * abolish_database(DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_2 "abolish/2",
+ * \ref asserta_2 "asserta/2",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_2 "retract/2"
+ */
+static p_goal_result p_builtin_abolish_database
+    (p_context *context, p_term **args, p_term **error)
+{
+    /* Validate the database argument */
+    p_term *database = p_builtin_verify_database(context, args[0], error);
+    if (!database)
+        return P_RESULT_ERROR;
+
+    /* Null out the predicate tree, and let the garbage collector
+     * clean up all of the associated nodes and predicates */
+    database->database.predicates.root = 0;
     return P_RESULT_TRUE;
 }
 
@@ -1079,11 +1318,13 @@ static p_goal_result p_builtin_abolish
  *
  * \par See Also
  * \ref abolish_1 "abolish/1",
+ * \ref asserta_2 "asserta/2",
  * \ref retract_1 "retract/1",
  * \ref dynamic_1 "dynamic/1"
  */
 static p_goal_result p_builtin_assert
-    (p_context *context, p_term **args, p_term **error, int at_start)
+    (p_context *context, p_term **args, p_term **error,
+     int at_start, p_term *database)
 {
     p_term *clause = p_term_deref_member(context, args[0]);
     p_term *head;
@@ -1119,12 +1360,22 @@ static p_goal_result p_builtin_assert
         return P_RESULT_ERROR;
     }
     clause = p_term_clone(context, clause);
-    if (at_start) {
-        if (p_db_clause_assert_first(context, clause))
-            return P_RESULT_TRUE;
+    if (database) {
+        if (at_start) {
+            if (p_db_local_clause_assert_first(context, database, clause))
+                return P_RESULT_TRUE;
+        } else {
+            if (p_db_local_clause_assert_last(context, database, clause))
+                return P_RESULT_TRUE;
+        }
     } else {
-        if (p_db_clause_assert_last(context, clause))
-            return P_RESULT_TRUE;
+        if (at_start) {
+            if (p_db_clause_assert_first(context, clause))
+                return P_RESULT_TRUE;
+        } else {
+            if (p_db_clause_assert_last(context, clause))
+                return P_RESULT_TRUE;
+        }
     }
     pred = p_term_create_functor(context, context->slash_atom, 2);
     if (head->header.type == P_TERM_ATOM) {
@@ -1144,12 +1395,88 @@ static p_goal_result p_builtin_assert
 static p_goal_result p_builtin_asserta
     (p_context *context, p_term **args, p_term **error)
 {
-    return p_builtin_assert(context, args, error, 1);
+    return p_builtin_assert(context, args, error, 1, 0);
 }
 static p_goal_result p_builtin_assertz
     (p_context *context, p_term **args, p_term **error)
 {
-    return p_builtin_assert(context, args, error, 0);
+    return p_builtin_assert(context, args, error, 0, 0);
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor asserta_2
+ * \anchor assertz_2
+ * <b>asserta/2</b>, <b>assertz/2</b> - adds a clause to the
+ * start/end of a user-defined predicate in a local predicate database.
+ *
+ * \par Usage
+ * \b asserta(\em Clause, \em Database)
+ * \par
+ * \b assertz(\em Clause, \em Database)
+ *
+ * \par Description
+ * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
+ * then break it down into \em Head :- \em Body.  If the \em Clause
+ * has <b>(--&gt;)/2</b> as its top-level functor, then expand
+ * the clause according to the
+ * \ref syntax_dcg "Definite clause grammar" rules and then break it
+ * down into \em Head :- \em Body.  Otherwise, let \em Head be
+ * \em Clause and \em Body be \b true.
+ * \par
+ * A freshly renamed version of the clause \em Head :- \em Body is
+ * added to the specified local predicate \em Database at the start
+ * (<b>asserta/2</b>) or end (<b>assertz/2</b>) of the predicate
+ * defined by \em Head.
+ * \par
+ * Adding a clause to a predicate that is in the process of being
+ * executed leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ * \li <tt>instantiation_error</tt> - \em Clause or \em Head
+ *     is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ * \li <tt>type_error(callable, \em Body)</tt> - \em Body is not a
+ *     callable term.  In a departure from \ref standard "Standard Prolog",
+ *     this error is thrown when the \em Body is executed, not when
+ *     the \em Clause is asserted into the database.
+ * \li <tt>permission_error(modify, static_procedure, \em Pred)</tt> -
+ *     \em Pred is a builtin predicate in the global database that
+ *     cannot be overridden by local databases.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * assertz(userdef(a, b, c), DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_2 "abolish/2",
+ * \ref asserta_1 "asserta/1",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_2 "retract/2"
+ */
+static p_goal_result p_builtin_asserta_2
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *database = p_builtin_verify_database(context, args[1], error);
+    if (!database)
+        return P_RESULT_ERROR;
+    return p_builtin_assert(context, args, error, 1, database);
+}
+static p_goal_result p_builtin_assertz_2
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *database = p_builtin_verify_database(context, args[1], error);
+    if (!database)
+        return P_RESULT_ERROR;
+    return p_builtin_assert(context, args, error, 0, database);
 }
 
 /** @cond */
@@ -1258,7 +1585,8 @@ static void _p_context_fetch_clause_fail_func
  * \ref standard "Standard Prolog"
  *
  * \par See Also
- * \ref asserta_1 "asserta/1"
+ * \ref asserta_1 "asserta/1",
+ * \ref clause_3 "clause/3"
  */
 static p_goal_result p_builtin_clause
     (p_context *context, p_term **args, p_term **error)
@@ -1347,6 +1675,160 @@ static p_goal_result p_builtin_clause
 /**
  * \addtogroup clause_handling
  * <hr>
+ * \anchor clause_3
+ * <b>clause/3</b> - searches for clauses in a local predicate database.
+ *
+ * \par Usage
+ * \b clause(\em Head, \em Body, \em Database)
+ *
+ * \par Description
+ * Succeeds if \em Head <tt>:-</tt> \em Body unifies with a
+ * clause in the specified local predicate \em Database.
+ * If there are multiple clauses that unify, then backtrack
+ * through the alternatives.  Fails immediately if no
+ * clauses unify.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ * \li <tt>instantiation_error</tt> - \em Head is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ *
+ * \par See Also
+ * \ref asserta_2 "asserta/2",
+ * \ref new_database_1 "new_database/1"
+ */
+static p_goal_result p_builtin_clause_3
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *database;
+    p_term *head = p_term_deref_member(context, args[0]);
+    p_term *name;
+    unsigned int arity;
+    p_term_clause_iter clause_iter;
+    p_term *clause;
+    p_term *body;
+    p_term *predicate;
+    void *marker;
+    p_exec_node *current;
+    p_exec_node *next;
+    p_exec_clause_fetch_node *retry;
+
+    /* Validate the local database */
+    database = p_builtin_verify_database(context, args[2], error);
+    if (!database)
+        return P_RESULT_ERROR;
+
+    /* Validate the head */
+    if (!head || (head->header.type & P_TERM_VARIABLE) != 0) {
+        *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (head->header.type == P_TERM_ATOM) {
+        name = head;
+        arity = 0;
+    } else if (head->header.type == P_TERM_FUNCTOR) {
+        name = head->functor.functor_name;
+        arity = head->header.size;
+    } else {
+        *error = p_create_type_error(context, "callable", head);
+        return P_RESULT_ERROR;
+    }
+
+    /* Find the predicate associated with the head */
+    predicate = p_term_database_lookup_predicate
+        (database, name, arity);
+    if (!predicate)
+        return P_RESULT_FAIL;
+
+    /* Find the first clause that matches */
+    p_term_clauses_begin(predicate, head, &clause_iter);
+    while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
+        marker = p_context_mark_trail(context);
+        body = p_term_unify_clause(context, head, clause);
+        if (body && p_term_unify(context, args[1], body, P_BIND_DEFAULT)) {
+            if (p_term_clauses_has_more(&clause_iter)) {
+                current = context->current_node;
+                next = GC_NEW(p_exec_node);
+                retry = GC_NEW(p_exec_clause_fetch_node);
+                if (!next || !retry)
+                    return P_RESULT_FAIL;
+                next->goal = context->true_atom;
+                next->success_node = current->success_node;
+                next->cut_node = context->fail_node;
+                retry->parent.parent.goal = current->goal;
+                retry->parent.parent.success_node =
+                        current->success_node;
+                retry->parent.parent.cut_node = context->fail_node;
+                retry->head = head;
+                retry->body = args[1];
+                retry->clause_iter = clause_iter;
+                _p_context_init_fail_node
+                    (context, &(retry->parent),
+                     _p_context_fetch_clause_fail_func);
+                context->current_node = next;
+                context->fail_node = &(retry->parent);
+                return P_RESULT_TREE_CHANGE;
+            }
+            return P_RESULT_TRUE;
+        }
+        p_context_backtrack_trail(context, marker);
+    }
+    return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor new_database_1
+ * <b>new_database/1</b> - creates a new local predicate database.
+ *
+ * \par Usage
+ * \b new_database(\em Database)
+ *
+ * \par Description
+ * Creates a new local predicate database and unifies it with
+ * \em Database.
+ *
+ * \par Errors
+ *
+ * \li <tt>type_error(variable, \em Database)</tt> - \em Database
+ *     is not a variable.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_2 "abolish/2",
+ * \ref asserta_2 "asserta/2",
+ * \ref clause_3 "clause/3",
+ * \ref database_1 "database/1",
+ * \ref retract_2 "retract/2"
+ */
+static p_goal_result p_builtin_new_database
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *var = p_term_deref_member(context, args[0]);
+    p_term *database;
+    if (!var || (var->header.type & P_TERM_VARIABLE) == 0) {
+        *error = p_create_type_error(context, "variable", var);
+        return P_RESULT_ERROR;
+    }
+    database = p_term_create_database(context);
+    if (p_term_unify(context, var, database, P_BIND_DEFAULT))
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
  * \anchor retract_1
  * <b>retract/1</b> - removes a clause from a user-defined
  * predicate in the predicate database.
@@ -1410,7 +1892,8 @@ static p_goal_result p_builtin_clause
  * \ref asserta_1 "asserta/1"
  */
 static p_goal_result p_builtin_retract
-    (p_context *context, p_term **args, p_term **error)
+    (p_context *context, p_term **args, p_term **error,
+     p_term *database)
 {
     p_term *clause = p_term_deref_member(context, args[0]);
     p_term *head;
@@ -1446,7 +1929,10 @@ static p_goal_result p_builtin_retract
         *error = p_create_type_error(context, "callable", head);
         return P_RESULT_ERROR;
     }
-    result = p_db_clause_retract(context, clause);
+    if (database)
+        result = p_db_local_clause_retract(context, database, clause);
+    else
+        result = p_db_clause_retract(context, clause);
     if (result > 0)
         return P_RESULT_TRUE;
     else if (result < 0)
@@ -1465,6 +1951,74 @@ static p_goal_result p_builtin_retract
     *error = p_create_permission_error
         (context, "modify", "static_procedure", pred);
     return P_RESULT_ERROR;
+}
+static p_goal_result p_builtin_retract_1
+    (p_context *context, p_term **args, p_term **error)
+{
+    return p_builtin_retract(context, args, error, 0);
+}
+
+/**
+ * \addtogroup clause_handling
+ * <hr>
+ * \anchor retract_2
+ * <b>retract/2</b> - removes a clause from a user-defined
+ * predicate in a local predicate database.
+ *
+ * \par Usage
+ * \b retract(\em Clause, \em Database)
+ *
+ * \par Description
+ * If the \em Clause has <b>(:-)/2</b> as its top-level functor,
+ * then break it down into \em Head :- \em Body.  If the \em Clause
+ * has <b>(--&gt;)/2</b> as its top-level functor, then expand
+ * the clause according to the
+ * \ref syntax_dcg "Definite clause grammar" rules and then break it
+ * down into \em Head :- \em Body.  Otherwise, let \em Head be
+ * \em Clause and \em Body be \b true.
+ * \par
+ * The <b>retract/2</b> predicate finds the first clause in
+ * the specified local predicate \em Database that unifies with
+ * \em Head :- \em Body, removes it, and then succeeds.
+ * If \em Head :- \em Body does not unify with any clause in
+ * \em Database, then <b>retract/2</b> fails.
+ * \par
+ * Upon success, \em Clause is unified with the clause that was
+ * removed.
+ * \par
+ * Removing a clause from a predicate that is in the process of
+ * being executed leads to undefined behavior.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ * \li <tt>instantiation_error</tt> - \em Clause or \em Head
+ *     is a variable.
+ * \li <tt>type_error(callable, \em Head)</tt> - \em Head is not a
+ *     callable term (atom or functor).
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * assertz(userdef(a, b, c), DB);
+ * retract(userdef(A, B, C), DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref abolish_2 "abolish/2",
+ * \ref asserta_2 "asserta/2",
+ * \ref new_database_1 "new_database/1",
+ * \ref retract_1 "retract/1"
+ */
+static p_goal_result p_builtin_retract_2
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_term *database = p_builtin_verify_database(context, args[1], error);
+    if (!database)
+        return P_RESULT_ERROR;
+    return p_builtin_retract(context, args, error, database);
 }
 
 /*\@}*/
@@ -1915,6 +2469,7 @@ static p_goal_result p_builtin_load_library
  * \ref logical_implies_2 "(=&gt;)/2",
  * \ref logical_equiv_2 "(&lt;=&gt;)/2",
  * \ref call_1 "call/1",
+ * \ref call_2 "call/2",
  * \ref catch_3 "catch/3",
  * \ref logical_and_2 "(,)/2",
  * \ref cut_0 "(!)/0",
@@ -2231,6 +2786,7 @@ static char const p_builtin_logical_equiv[] =
  * layer of \em Goal is checked before execution begins.
  *
  * \par See Also
+ * \ref call_2 "call/2",
  * \ref commit_0 "commit/0",
  * \ref once_1 "once/1"
  */
@@ -2246,6 +2802,90 @@ static p_goal_result p_builtin_call
     new_current->cut_node = context->fail_node;
     context->current_node = new_current;
     return P_RESULT_TREE_CHANGE;
+}
+
+/**
+ * \addtogroup logic_and_control
+ * <hr>
+ * \anchor call_2
+ * <b>call/2</b> - meta-execution of a goal within the scope of a
+ * local database.
+ *
+ * \par Usage
+ * \b call(\em Goal, \em Database)
+ *
+ * \par Description
+ * If \em Goal is a callable term, then execute it as though it
+ * had been compiled normally.  If \em Goal is not a callable term,
+ * then throw an error as described below.
+ * \par
+ * \em Goal is executed within a context where \em Database is set
+ * as the current database.  Predicates that are called by \em Goal
+ * will be looked up in \em Database before the global database.
+ * Builtin predicates implemented in C will always override the
+ * local database; for example, it isn't possible to redefine
+ * <b>call/2</b> within a local database.
+ * \par
+ * The effect of a \ref commit_0 "commit/0" inside \em Goal is limited
+ * to the goal itself and does not affect control flow outside
+ * the <b>call/2</b> term.
+ *
+ * \par Errors
+ *
+ * \li <tt>instantiation_error</tt> - \em Database is a variable.
+ * \li <tt>type_error(database, \em Database)</tt> - \em Database
+ *     is not a local database.
+ * \li <tt>instantiation_error</tt> - if \em Goal is a variable.
+ * \li <tt>type_error(callable, </tt>\em Goal<tt>)</tt> - if \em Goal
+ *     is not a variable and not callable.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB);
+ * assertz(userdef(a, b, c), DB);
+ * call(userdef(A, B, C), DB);
+ * \endcode
+ *
+ * \par See Also
+ * \ref assertz_2 "assertz/2",
+ * \ref call_1 "call/1",
+ * \ref commit_0 "commit/0",
+ * \ref new_database_1 "new_database/1"
+ */
+static p_goal_result p_builtin_call_2
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_exec_node *current = context->current_node;
+    p_exec_node *new_current;
+    p_exec_pop_database_node *pop_database;
+    p_term *database = p_builtin_verify_database(context, args[1], error);
+    if (!database)
+        return P_RESULT_ERROR;
+    new_current = GC_NEW(p_exec_node);
+    pop_database = GC_NEW(p_exec_pop_database_node);
+    if (!new_current || !pop_database)
+        return P_RESULT_FAIL;
+    new_current->goal = args[0];
+    new_current->success_node = &(pop_database->parent);
+    new_current->cut_node = context->fail_node;
+    pop_database->parent.goal = context->pop_database_atom;
+    pop_database->parent.success_node = current->success_node;
+    pop_database->parent.cut_node = context->fail_node;
+    pop_database->database = context->database;
+    context->current_node = new_current;
+    context->database = database;
+    return P_RESULT_TREE_CHANGE;
+}
+
+/* $$pop_database predicate - pops the current database context
+ * when a success continuation occurs */
+static p_goal_result p_builtin_pop_database
+    (p_context *context, p_term **args, p_term **error)
+{
+    p_exec_pop_database_node *pop_database;
+    pop_database = (p_exec_pop_database_node *)(context->current_node);
+    context->database = pop_database->database;
+    return P_RESULT_TRUE;
 }
 
 /**
@@ -3604,6 +4244,7 @@ static p_goal_result p_builtin_univ
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
         case P_TERM_CLAUSE:
+        case P_TERM_DATABASE:
             new_term = p_term_create_list
                 (context, term, context->nil_atom);
             break;
@@ -3666,6 +4307,7 @@ static p_goal_result p_builtin_univ
             case P_TERM_OBJECT:
             case P_TERM_PREDICATE:
             case P_TERM_CLAUSE:
+            case P_TERM_DATABASE:
                 new_term = functor;
                 break;
             default:
@@ -3924,6 +4566,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
         case P_TERM_CLAUSE:
+        case P_TERM_DATABASE:
             if (!p_term_unify(context, name, term, P_BIND_DEFAULT))
                 return P_RESULT_FAIL;
             if (!p_term_unify(context, arity,
@@ -3969,6 +4612,7 @@ static p_goal_result p_builtin_functor
         case P_TERM_OBJECT:
         case P_TERM_PREDICATE:
         case P_TERM_CLAUSE:
+        case P_TERM_DATABASE:
             break;
         default:
             *error = p_create_type_error(context, "atomic", name);
@@ -4240,6 +4884,7 @@ static p_goal_result p_builtin_unify_one_way
  * \ref class_1 "class/1",
  * \ref class_2 "class/2",
  * \ref compound_1 "compound/1",
+ * \ref database_1 "database/1",
  * \ref float_1 "float/1",
  * \ref integer_1 "integer/1",
  * \ref nonvar_1 "nonvar/1",
@@ -4486,6 +5131,36 @@ static p_goal_result p_builtin_compound
 {
     int type = p_term_type(args[0]);
     if (type == P_TERM_FUNCTOR || type == P_TERM_LIST)
+        return P_RESULT_TRUE;
+    else
+        return P_RESULT_FAIL;
+}
+
+/**
+ * \addtogroup type_testing
+ * <hr>
+ * \anchor database_1
+ * \b database/1 - tests if a term is a local predicate database.
+ *
+ * \par Usage
+ * \b database(\em Term)
+ *
+ * \par Description
+ * If \em Term is a local predicate database, then
+ * \b database(\em Term) succeeds.  Fails otherwise.
+ *
+ * \par Examples
+ * \code
+ * new_database(DB); database(DB)       succeeds
+ * \endcode
+ *
+ * \par See Also
+ * \ref new_database_1 "new_database/1"
+ */
+static p_goal_result p_builtin_database
+    (p_context *context, p_term **args, p_term **error)
+{
+    if (p_term_type(args[0]) == P_TERM_DATABASE)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5327,21 +6002,28 @@ void _p_db_init_builtins(p_context *context)
         {":==", 2, p_builtin_bt_assign},
         {"::==", 2, p_builtin_bt_num_assign},
         {"abolish", 1, p_builtin_abolish},
+        {"abolish", 2, p_builtin_abolish_2},
+        {"abolish_database", 1, p_builtin_abolish_database},
         {"arg", 3, p_builtin_arg},
         {"asserta", 1, p_builtin_asserta},
+        {"asserta", 2, p_builtin_asserta_2},
         {"assertz", 1, p_builtin_assertz},
+        {"assertz", 2, p_builtin_assertz_2},
         {"atom", 1, p_builtin_atom},
         {"atomic", 1, p_builtin_atomic},
         {"call", 1, p_builtin_call},
+        {"call", 2, p_builtin_call_2},
         {"$$call_member", 2, p_builtin_call_member},
         {"catch", 3, p_builtin_catch},
         {"class", 1, p_builtin_class_1},
         {"class", 2, p_builtin_class_2},
         {"clause", 2, p_builtin_clause},
+        {"clause", 3, p_builtin_clause_3},
         {"commit", 0, p_builtin_commit},
         {"compound", 1, p_builtin_compound},
         {"consult", 1, p_builtin_consult},
         {"copy_term", 2, p_builtin_copy_term},
+        {"database", 1, p_builtin_database},
         {"dynamic", 1, p_builtin_dynamic},
         {"fail", 0, p_builtin_fail},
         {"false", 0, p_builtin_fail},
@@ -5356,15 +6038,18 @@ void _p_db_init_builtins(p_context *context)
         {"load_library", 1, p_builtin_load_library},
         {"$$new", 2, p_builtin_new},
         {"new_class", 4, p_builtin_new_class},
+        {"new_database", 1, p_builtin_new_database},
         {"new_object", 3, p_builtin_new_object},
         {"nonvar", 1, p_builtin_nonvar},
         {"number", 1, p_builtin_number},
         {"object", 1, p_builtin_object_1},
         {"object", 2, p_builtin_object_2},
         {"$$pop_catch", 0, p_builtin_pop_catch},
+        {"$$pop_database", 0, p_builtin_pop_database},
         {"predicate", 1, p_builtin_predicate_1},
         {"predicate", 2, p_builtin_predicate_2},
-        {"retract", 1, p_builtin_retract},
+        {"retract", 1, p_builtin_retract_1},
+        {"retract", 2, p_builtin_retract_2},
         {"$$set_loop_var", 2, p_builtin_set_loop_var},
         {"string", 1, p_builtin_string},
         {"throw", 1, p_builtin_throw},

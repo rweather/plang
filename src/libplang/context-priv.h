@@ -50,6 +50,7 @@ typedef struct p_exec_fail_node p_exec_fail_node;
 typedef struct p_exec_clause_node p_exec_clause_node;
 typedef struct p_exec_catch_node p_exec_catch_node;
 typedef struct p_exec_pop_catch_node p_exec_pop_catch_node;
+typedef struct p_exec_pop_database_node p_exec_pop_database_node;
 typedef void (*p_exec_fail_func)
     (p_context *context, p_exec_fail_node *node);
 
@@ -66,6 +67,7 @@ struct p_exec_fail_node
     void *fail_marker;
     double confidence;
     p_exec_catch_node *catch_node;
+    p_term *database;
 };
 struct p_exec_clause_node
 {
@@ -81,6 +83,11 @@ struct p_exec_pop_catch_node
 {
     p_exec_node parent;
     p_exec_catch_node *catch_node;
+};
+struct p_exec_pop_database_node
+{
+    p_exec_node parent;
+    p_term *database;
 };
 
 typedef void (*p_library_entry_func)(p_context *context);
@@ -112,6 +119,7 @@ struct p_context
     p_term *call_args_atom;
     p_term *unify_atom;
     p_term *pop_catch_atom;
+    p_term *pop_database_atom;
     p_term *atom_hash[P_CONTEXT_HASH_SIZE];
 
     p_trail *trail;
@@ -127,6 +135,7 @@ struct p_context
     p_exec_catch_node *catch_node;
     void *fail_marker;
     double confidence;
+    p_term *database;
 
     int allow_test_goals;
     p_term *test_goal;

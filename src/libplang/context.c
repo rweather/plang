@@ -70,6 +70,7 @@ p_context *p_context_create(void)
     context->call_args_atom = p_term_create_atom(context, "$$");
     context->unify_atom = p_term_create_atom(context, "=");
     context->pop_catch_atom = p_term_create_atom(context, "$$pop_catch");
+    context->pop_database_atom = p_term_create_atom(context, "$$pop_database");
     context->trail_top = P_TRACE_SIZE;
     context->confidence = 1.0;
     _p_db_init(context);
@@ -459,6 +460,7 @@ void _p_context_basic_fail_func
     p_context_backtrack_trail(context, node->fail_marker);
     context->confidence = node->confidence;
     context->catch_node = node->catch_node;
+    context->database = node->database;
 }
 
 /* Fail handling function for going to the next clause of a
@@ -524,6 +526,7 @@ void _p_context_init_fail_node
     node->fail_marker = context->fail_marker;
     node->confidence = context->confidence;
     node->catch_node = context->catch_node;
+    node->database = context->database;
 }
 
 /* Inner execution of goals - performs an operation deterministically
@@ -538,6 +541,7 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
     p_exec_node *current;
     p_exec_node *next;
     p_exec_node *new_current;
+    p_term *predicate;
 
     /* Bail out if the goal is a variable.  It is assumed that
      * the goal has already been dereferenced by the caller */
@@ -589,10 +593,19 @@ static p_goal_result p_goal_execute_inner(p_context *context, p_term *goal, p_te
             return (*builtin)(context, 0, error);
     }
 
-    /* Look for a user-defined predicate to handle the functor */
-    if (info && info->predicate) {
+    /* Look for a user-defined predicate in the local or global db */
+    predicate = info ? info->predicate : 0;
+    if (context->database) {
+        p_term *pred = p_term_database_lookup_predicate
+            (context->database, name, arity);
+        if (pred)
+            predicate = pred;
+    }
+
+    /* Use a user-defined predicate to handle the functor */
+    if (predicate) {
         p_term_clause_iter clause_iter;
-        p_term_clauses_begin(info->predicate, goal, &clause_iter);
+        p_term_clauses_begin(predicate, goal, &clause_iter);
         p_term *clause;
         p_term *body;
         while ((clause = p_term_clauses_next(&clause_iter)) != 0) {
@@ -798,6 +811,7 @@ p_goal_result p_context_execute_goal
     context->fail_node = 0;
     context->catch_node = 0;
     context->confidence = 1.0;
+    context->database = 0;
     context->goal_active = 1;
     context->goal_marker = p_context_mark_trail(context);
     result = p_goal_execute(context, &error_term);
@@ -846,6 +860,7 @@ p_goal_result p_context_reexecute_goal(p_context *context, p_term **error)
         context->current_node = 0;
         context->fail_node = 0;
         context->confidence = 0.0;
+        context->database = 0;
     }
     return result;
 }
@@ -870,6 +885,7 @@ void p_context_abandon_goal(p_context *context)
         context->fail_node = 0;
         context->catch_node = 0;
         context->confidence = 1.0;
+        context->database = 0;
     }
 }
 
@@ -939,6 +955,7 @@ p_goal_result p_context_call_once
     p_exec_fail_node *fail = context->fail_node;
     p_exec_catch_node *catch_node = context->catch_node;
     double confidence = context->confidence;
+    p_term *database = context->database;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     p_term *error_node = 0;
     if (goal_node) {
@@ -947,6 +964,7 @@ p_goal_result p_context_call_once
         context->fail_node = 0;
         context->catch_node = 0;
         context->confidence = 1.0;
+        context->database = 0;
         result = p_goal_execute(context, &error_node);
         if (result == P_RESULT_TRUE && context->confidence != 1.0) {
             // Propagate the goal's fuzzy confidence to the parent.
@@ -957,6 +975,7 @@ p_goal_result p_context_call_once
         context->fail_node = fail;
         context->catch_node = catch_node;
         context->confidence = confidence;
+        context->database = database;
     } else {
         result = P_RESULT_FAIL;
     }
@@ -976,6 +995,7 @@ p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal)
     p_exec_fail_node *fail = context->fail_node;
     p_exec_catch_node *catch_node = context->catch_node;
     double confidence = context->confidence;
+    p_term *database = context->database;
     p_exec_node *goal_node = GC_NEW(p_exec_node);
     if (goal_node) {
         goal_node->goal = goal;
@@ -983,11 +1003,13 @@ p_goal_result p_goal_call_from_parser(p_context *context, p_term *goal)
         context->fail_node = 0;
         context->catch_node = 0;
         context->confidence = 1.0;
+        context->database = 0;
         result = p_goal_execute(context, &error);
         context->current_node = current;
         context->fail_node = fail;
         context->catch_node = catch_node;
         context->confidence = confidence;
+        context->database = database;
     } else {
         result = P_RESULT_FAIL;
     }

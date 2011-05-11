@@ -5,9 +5,9 @@ PLANG_TESTS = \
 	test-compare.lp \
 	test-compose.lp \
 	test-dcg.lp \
+	test-dynamic.lp \
 	test-findall.lp \
 	test-fuzzy.lp \
-	test-index.lp \
         test-one-way.lp \
 	test-sort.lp \
 	test-type.lp \

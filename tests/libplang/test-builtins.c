@@ -68,61 +68,6 @@ static p_goal_result execute_goal(const char *source, const char *expected_error
 #define run_stmt_error(x,error)     \
     execute_goal("\?\?-- { " x " }\n", "\?\?-- " error ".\n")
 
-static void test_clause_abolish()
-{
-    P_COMPARE(run_goal("abolish(userdef/3)"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("abolish(userdef/3)"), P_RESULT_TRUE);
-    P_COMPARE(run_goal_error("abolish(Pred)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(Name/3)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(userdef/Arity)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(1.5)", "type_error(predicate_indicator, 1.5)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(userdef/a)", "type_error(integer, a)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(1/a)", "type_error(integer, a)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(1/3)", "type_error(atom, 1)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(userdef/-3)", "domain_error(not_less_than_zero, -3)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("abolish(abolish/1)", "permission_error(modify, static_procedure, abolish/1)"), P_RESULT_ERROR);
-}
-
-static void test_clause_assert()
-{
-    P_COMPARE(run_goal_error("asserta(Clause)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("assertz((Head :- true))", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("asserta((1.5 :- true))", "type_error(callable, 1.5)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal("asserta((a :- true))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("asserta((a(X) :- b(X,Y)))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("assertz(a(X))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("asserta((a :- X))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal_error("assertz(asserta(X))", "permission_error(modify, static_procedure, asserta/1)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("assertz(true)", "permission_error(modify, static_procedure, true/0)"), P_RESULT_ERROR);
-}
-
-static void test_clause_retract()
-{
-    P_COMPARE(run_goal_error("retract(Clause)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("retract((Head :- true))", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("retract((1.5 :- true))", "type_error(callable, 1.5)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal("retract((b(X) :- c(X, Y)))"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("assertz((b(X) :- c(X, Y))), retract((b(Z) :- c(Z, W)))"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("retract((b(X) :- c(X, Y)))"), P_RESULT_FAIL);
-    P_COMPARE(run_goal("assertz((b(X) :- c(X, Y))), retract((b(Z) :- c(Z, W))), X !== Z, Y !== W"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("assertz((b(a) :- c(a, d))), retract((b(Z) :- c(Z, W))), Z == a, W == d"), P_RESULT_TRUE);
-}
-
-static void test_directive_dynamic()
-{
-    P_COMPARE(run_goal("dynamic(userdef/3)"), P_RESULT_TRUE);
-    P_COMPARE(run_goal("dynamic(userdef/3)"), P_RESULT_TRUE);
-    P_COMPARE(run_goal_error("dynamic(Pred)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(Name/3)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(userdef/Arity)", "instantiation_error"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(1.5)", "type_error(predicate_indicator, 1.5)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(userdef/a)", "type_error(integer, a)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(1/a)", "type_error(integer, a)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(1/3)", "type_error(atom, 1)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(userdef/-3)", "domain_error(not_less_than_zero, -3)"), P_RESULT_ERROR);
-    P_COMPARE(run_goal_error("dynamic(dynamic/1)", "permission_error(modify, static_procedure, dynamic/1)"), P_RESULT_ERROR);
-}
-
 static void test_logic_values()
 {
     P_COMPARE(run_goal("true"), P_RESULT_TRUE);
@@ -426,10 +371,6 @@ int main(int argc, char *argv[])
     P_TEST_INIT("test-builtins");
     P_TEST_CREATE_CONTEXT();
 
-    P_TEST_RUN(clause_abolish);
-    P_TEST_RUN(clause_assert);
-    P_TEST_RUN(clause_retract);
-    P_TEST_RUN(directive_dynamic);
     P_TEST_RUN(logic_values);
     P_TEST_RUN(logic_and);
     P_TEST_RUN(logic_or);

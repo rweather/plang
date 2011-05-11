@@ -39,6 +39,7 @@ enum {
     P_TERM_OBJECT,
     P_TERM_PREDICATE,
     P_TERM_CLAUSE,
+    P_TERM_DATABASE,
 
     P_TERM_VARIABLE         = 16,   /* Used as a flag for all vars */
     P_TERM_MEMBER_VARIABLE,
@@ -118,6 +119,10 @@ struct p_term_clause_iter
 void p_term_clauses_begin(const p_term *predicate, const p_term *head, p_term_clause_iter *iter);
 p_term *p_term_clauses_next(p_term_clause_iter *iter);
 int p_term_clauses_has_more(const p_term_clause_iter *iter);
+
+p_term *p_term_create_database(p_context *context);
+void p_term_database_add_predicate(p_term *database, p_term *predicate);
+p_term *p_term_database_lookup_predicate(p_term *database, p_term *name, int arity);
 
 p_term *p_term_create_member_name(p_context *context, p_term *class_name, p_term *name);
 

@@ -150,6 +150,14 @@ P_INLINE p_term *p_term_deref_non_null(const p_term *term)
  */
 
 /**
+ * \var P_TERM_DATABASE
+ * \ingroup term
+ * The term is a reference to a database of predicates that are
+ * in a different scope than the global database.
+ * \sa p_term_create_database()
+ */
+
+/**
  * \brief Creates a functor term within \a ontext with the specified
  * \a name and \a arg_count.  Returns the new functor.
  *
@@ -1912,6 +1920,78 @@ int p_term_clauses_has_more(const p_term_clause_iter *iter)
 }
 
 /**
+ * \brief Returns a new database term within \a context.
+ *
+ * \ingroup term
+ * \sa p_term_database_add_predicate(), p_term_database_lookup_predicate()
+ */
+p_term *p_term_create_database(p_context *context)
+{
+    struct p_term_database *term =
+        p_term_new(context, struct p_term_database);
+    if (!term)
+        return 0;
+    term->header.type = P_TERM_DATABASE;
+    return (p_term *)term;
+}
+
+/**
+ * \brief Adds \a predicate to \a database.
+ *
+ * \ingroup term
+ * \sa p_term_database_lookup_predicate(), p_term_create_database()
+ * \sa p_term_create_predicate()
+ */
+void p_term_database_add_predicate(p_term *database, p_term *predicate)
+{
+    p_rbkey key;
+    p_rbnode *node;
+    database = p_term_deref(database);
+    predicate = p_term_deref(predicate);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return;
+    if (!predicate || predicate->header.type != P_TERM_PREDICATE)
+        return;
+    key.type = P_TERM_FUNCTOR;
+    key.size = predicate->header.size;
+    key.name = predicate->predicate.name;
+    node = _p_rbtree_insert(&(database->database.predicates), &key);
+    if (!node)
+        return;
+    node->value = predicate;
+}
+
+/**
+ * \brief Returns the predicate in \a database that is associated
+ * with \a name and \a arity.
+ *
+ * Returns null if the predicate is not present in the local database.
+ *
+ * \ingroup term
+ * \sa p_term_database_add_predicate(), p_term_create_database()
+ */
+p_term *p_term_database_lookup_predicate
+    (p_term *database, p_term *name, int arity)
+{
+    p_rbkey key;
+    p_rbnode *node;
+    database = p_term_deref(database);
+    name = p_term_deref(name);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return 0;
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 0;
+    key.type = P_TERM_FUNCTOR;
+    key.size = arity;
+    key.name = name;
+    node = _p_rbtree_lookup(&(database->database.predicates), &key);
+    if (node)
+        return node->value;
+    else
+        return 0;
+}
+
+/**
  * \brief Returns an atom which is the concatenation of
  * \a class_name, <tt>::</tt>, and \a name.  The atom is
  * created within \a context.
@@ -2230,6 +2310,7 @@ static int p_term_unify_inner(p_context *context, p_term *term1, p_term *term2, 
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
     case P_TERM_CLAUSE:
+    case P_TERM_DATABASE:
         /* Objects and predicates can unify only if their
          * pointers are identical.  Identity has already been
          * checked, so fail */
@@ -2582,6 +2663,9 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
     case P_TERM_CLAUSE:
         (*print_func)(print_data, "clause %lx", (long)term);
         break;
+    case P_TERM_DATABASE:
+        (*print_func)(print_data, "database %lx", (long)term);
+        break;
     case P_TERM_VARIABLE: {
         if (term->var.value) {
             p_term_print_inner(context, term->var.value, print_func,
@@ -2697,19 +2781,20 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
 {
     int group1, group2, cmp;
     static unsigned char const precedes_ordering[] = {
-        0, /* 0: P_TERM_INVALID */
-        6, /* 1: P_TERM_FUNCTOR */
-        6, /* 2: P_TERM_LIST */
-        5, /* 3: P_TERM_ATOM */
-        4, /* 4: P_TERM_STRING */
-        3, /* 5: P_TERM_INTEGER */
-        2, /* 6: P_TERM_REAL */
-        7, /* 7: P_TERM_OBJECT */
-        8, /* 8: P_TERM_PREDICATE */
-        9, /* 9: P_TERM_CLAUSE */
-        0, 0, 0, 0, 0, 0,
-        1, /* 16: P_TERM_VARIABLE */
-        1  /* 17: P_TERM_MEMBER_VARIABLE */
+        0,  /*  0: P_TERM_INVALID */
+        6,  /*  1: P_TERM_FUNCTOR */
+        6,  /*  2: P_TERM_LIST */
+        5,  /*  3: P_TERM_ATOM */
+        4,  /*  4: P_TERM_STRING */
+        3,  /*  5: P_TERM_INTEGER */
+        2,  /*  6: P_TERM_REAL */
+        7,  /*  7: P_TERM_OBJECT */
+        8,  /*  8: P_TERM_PREDICATE */
+        9,  /*  9: P_TERM_CLAUSE */
+        10, /* 10: P_TERM_DATABASE */
+        0, 0, 0, 0, 0,
+        1,  /* 16: P_TERM_VARIABLE */
+        1   /* 17: P_TERM_MEMBER_VARIABLE */
     };
 
     /* Dereference the terms */
@@ -2816,6 +2901,7 @@ int p_term_precedes(p_context *context, const p_term *term1, const p_term *term2
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
     case P_TERM_CLAUSE:
+    case P_TERM_DATABASE:
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
         return (term1 < term2) ? -1 : 1;
@@ -2864,6 +2950,7 @@ int p_term_is_ground(const p_term *term)
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
     case P_TERM_CLAUSE:
+    case P_TERM_DATABASE:
         return 1;
     case P_TERM_VARIABLE:
     case P_TERM_MEMBER_VARIABLE:
@@ -2930,6 +3017,7 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
     case P_TERM_REAL:
     case P_TERM_OBJECT:
     case P_TERM_PREDICATE:
+    case P_TERM_DATABASE:
         /* Constant and object terms are cloned as themselves */
         break;
     case P_TERM_CLAUSE: {

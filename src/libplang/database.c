@@ -20,6 +20,7 @@
 #include <plang/database.h>
 #include "database-priv.h"
 #include "context-priv.h"
+#include "rbtree-priv.h"
 
 /**
  * \defgroup database Native C API - Database
@@ -534,7 +535,7 @@ P_INLINE p_term *p_db_convert_clause(p_context *context, p_term *clause)
  *
  * \ingroup database
  * \sa p_db_clause_assert_last(), p_db_clause_retract()
- * \sa p_db_clause_abolish()
+ * \sa p_db_clause_abolish(), p_db_local_clause_assert_first()
  */
 int p_db_clause_assert_first(p_context *context, p_term *clause)
 {
@@ -616,7 +617,7 @@ p_term *_p_db_clause_assert_last(p_context *context, p_term *clause)
  *
  * \ingroup database
  * \sa p_db_clause_assert_first(), p_db_clause_retract()
- * \sa p_db_clause_abolish()
+ * \sa p_db_clause_abolish(), p_db_local_clause_assert_last()
  */
 int p_db_clause_assert_last(p_context *context, p_term *clause)
 {
@@ -634,7 +635,7 @@ int p_db_clause_assert_last(p_context *context, p_term *clause)
  *
  * \ingroup database
  * \sa p_db_clause_assert_first(), p_db_clause_assert_last()
- * \sa p_db_clause_abolish()
+ * \sa p_db_clause_abolish(), p_db_local_clause_retract()
  */
 int p_db_clause_retract(p_context *context, p_term *clause)
 {
@@ -693,7 +694,7 @@ int p_db_clause_retract(p_context *context, p_term *clause)
  *
  * \ingroup database
  * \sa p_db_clause_assert_first(), p_db_clause_assert_last()
- * \sa p_db_clause_retract()
+ * \sa p_db_clause_retract(), p_db_local_clause_abolish()
  */
 int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
 {
@@ -715,6 +716,228 @@ int p_db_clause_abolish(p_context *context, const p_term *name, int arity)
 
     /* Retract all of the clauses */
     info->predicate = 0;
+    return 1;
+}
+
+/**
+ * \brief Asserts \a clause as the first clause in a database
+ * predicate on \a context within the specified local \a database.
+ *
+ * Returns non-zero if the clause was added, or zero if
+ * \a database is not a local database.  It is assumed that \a clause
+ * is a freshly renamed term, is well-formed, and the top-level
+ * functor is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_local_clause_assert_last(), p_db_local_clause_retract()
+ * \sa p_db_local_clause_abolish(), p_db_clause_assert_first()
+ */
+int p_db_local_clause_assert_first(p_context *context, p_term *database, p_term *clause)
+{
+    p_database_info *info;
+    p_term *name;
+    int arity;
+    p_term *predicate;
+    p_rbkey key;
+    p_rbnode *node;
+
+    /* Check that we have a valid local database */
+    database = p_term_deref(database);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return 0;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find the information block for the arity and check that
+     * the predicate is not builtin */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (info && (info->flags & P_PREDICATE_BUILTIN) != 0)
+        return 0;
+
+    /* Find the name within the local database's predicate tree */
+    key.type = P_TERM_FUNCTOR;
+    key.size = arity;
+    key.name = name;
+    node = _p_rbtree_insert(&(database->database.predicates), &key);
+    if (!node)
+        return 0;
+    predicate = node->value;
+    if (!predicate) {
+        predicate = p_term_create_predicate(context, name, arity);
+        if (!predicate)
+            return 0;
+        node->value = predicate;
+    }
+
+    /* Add the clause to the head of the list */
+    p_term_add_clause_first
+        (context, predicate, p_db_convert_clause(context, clause));
+    return 1;
+}
+
+/**
+ * \brief Asserts \a clause as the last clause in a database
+ * predicate on \a context within the specified local \a database.
+ *
+ * Returns non-zero if the clause was added, or zero if
+ * \a database is not a local database.  It is assumed that \a clause
+ * is a freshly renamed term, is well-formed, and the top-level
+ * functor is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_local_clause_assert_first(), p_db_local_clause_retract()
+ * \sa p_db_local_clause_abolish(), p_db_clause_assert_last()
+ */
+int p_db_local_clause_assert_last(p_context *context, p_term *database, p_term *clause)
+{
+    p_database_info *info;
+    p_term *name;
+    int arity;
+    p_term *predicate;
+    p_rbkey key;
+    p_rbnode *node;
+
+    /* Check that we have a valid local database */
+    database = p_term_deref(database);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return 0;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find the information block for the arity and check that
+     * the predicate is not builtin */
+    info = p_db_find_arity(name, (unsigned int)arity);
+    if (info && (info->flags & P_PREDICATE_BUILTIN) != 0)
+        return 0;
+
+    /* Find the name within the local database's predicate tree */
+    key.type = P_TERM_FUNCTOR;
+    key.size = arity;
+    key.name = name;
+    node = _p_rbtree_insert(&(database->database.predicates), &key);
+    if (!node)
+        return 1;   /* Absolishing a non-existent clause succeeds */
+    predicate = node->value;
+    if (!predicate) {
+        predicate = p_term_create_predicate(context, name, arity);
+        if (!predicate)
+            return 0;
+        node->value = predicate;
+    }
+
+    /* Add the clause to the tail of the list */
+    p_term_add_clause_last
+        (context, predicate, p_db_convert_clause(context, clause));
+    return 1;
+}
+
+/**
+ * \brief Retracts \a clause from a local \a database
+ * on \a context.
+ *
+ * Returns a positive value if the clause was retracted, zero if
+ * \a database is not a local database, or a negative value if there
+ * are no more matching clauses.  It is assumed that the top-level
+ * functor of \a clause is "(:-)/2".
+ *
+ * \ingroup database
+ * \sa p_db_local_clause_assert_first(), p_db_local_clause_assert_last()
+ * \sa p_db_local_clause_abolish(), p_db_clause_retract()
+ */
+int p_db_local_clause_retract(p_context *context, p_term *database, p_term *clause)
+{
+    p_term *name;
+    int arity;
+    p_term *predicate;
+    p_rbkey key;
+    p_rbnode *node;
+    struct p_term_clause *list;
+    struct p_term_clause *prev;
+
+    /* Check that we have a valid local database */
+    database = p_term_deref(database);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return 0;
+
+    /* Fetch the clause name and arity */
+    name = p_db_predicate_name(context, clause, &arity);
+    if (!name)
+        return 0;
+
+    /* Find the name within the local database's predicate tree */
+    key.type = P_TERM_FUNCTOR;
+    key.size = arity;
+    key.name = name;
+    node = _p_rbtree_lookup(&(database->database.predicates), &key);
+    if (!node)
+        return -1;
+
+    /* Retract the first clause that unifies */
+    predicate = node->value;
+    list = predicate->predicate.clauses.head;
+    prev = 0;
+    while (list) {
+        if (_p_term_retract_clause(context, predicate, list, clause)) {
+            if (prev)
+                prev->next_clause = list->next_clause;
+            else
+                predicate->predicate.clauses.head = list->next_clause;
+            --(predicate->predicate.clause_count);
+            if (!list->next_clause)
+                predicate->predicate.clauses.tail = prev;
+            if (!predicate->predicate.clauses.head) {
+                /* The predicate has been completely removed */
+                _p_rbtree_remove
+                    (&(database->database.predicates), &key);
+            }
+            return 1;
+        }
+        prev = list;
+        list = list->next_clause;
+    }
+    return -1;
+}
+
+/**
+ * \brief Abolishes all clauses from a local \a database
+ * on \a context that match \a name and \a arity.
+ *
+ * Returns non-zero if the clauses were abolished, or zero if
+ * \a database is not a local database.
+ *
+ * \ingroup database
+ * \sa p_db_local_clause_assert_first(), p_db_local_clause_assert_last()
+ * \sa p_db_local_clause_retract(), p_db_clause_abolish()
+ */
+int p_db_local_clause_abolish(p_context *context, p_term *database, const p_term *name, int arity)
+{
+    p_rbkey key;
+
+    /* Check that we have a valid local database */
+    database = p_term_deref(database);
+    if (!database || database->header.type != P_TERM_DATABASE)
+        return 0;
+
+    /* Check that the name is actually an atom */
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 1;   /* Absolishing a non-existent clause succeeds */
+
+    /* Find the name within the local database's predicate tree */
+    key.type = P_TERM_FUNCTOR;
+    key.size = arity;
+    key.name = name;
+    if (!_p_rbtree_lookup(&(database->database.predicates), &key))
+        return 1;   /* Absolishing a non-existent clause succeeds */
+
+    /* Remove the predicate from the tree, which abolishs all clauses */
+    _p_rbtree_remove(&(database->database.predicates), &key);
     return 1;
 }
 

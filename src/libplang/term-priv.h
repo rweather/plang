@@ -168,6 +168,11 @@ struct p_term_clause {
     p_term *body;
 };
 
+struct p_term_database {
+    struct p_term_header header;
+    p_rbtree predicates;
+};
+
 struct p_term_rename {
     struct p_term_header header;
     p_term *var;
@@ -186,6 +191,7 @@ union p_term {
     struct p_term_object        object;
     struct p_term_predicate     predicate;
     struct p_term_clause        clause;
+    struct p_term_database      database;
     struct p_term_rename        rename;
 };
 
