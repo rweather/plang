@@ -308,7 +308,9 @@ and a right-parenthesis.
 \code
 functor --> atom, "(", arguments, ")".
 arguments --> term.
+arguments --> "in", term.
 arguments --> arguments, ",", term.
+arguments --> arguments, ",", "in", term.
 \endcode
 
 It is typical to refer to a functor by both its atom name and its
@@ -772,14 +774,8 @@ predicate --> predicate_head, confidence, ".".
 predicate --> predicate_head, confidence, compound_statement.
 
 predicate_head --> atom.
-predicate_head --> atom, "(", head_arguments, ")".
+predicate_head --> atom, "(", arguments, ")".
 predicate_head --> atom, "(", ")".
-
-head_arguments --> head_argument.
-head_arguments --> head_arguments, ",", head_argument.
-
-head_argument --> term.
-head_argument --> "in", term.
 
 confidence --> [].
 confidence --> "<<", integer, ">>".
@@ -797,7 +793,7 @@ member_predicate --> constructor_head, confidence, ".".
 member_predicate --> constructor_head, confidence, compound_statement.
 
 constructor_head --> "new".
-constructor_head --> "new", "(", head_arguments, ")".
+constructor_head --> "new", "(", arguments, ")".
 constructor_head --> "new", "(", ")".
 \endcode
 

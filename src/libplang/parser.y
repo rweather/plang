@@ -598,7 +598,7 @@ static p_term *create_clause_head
 %type <list>        list_members declaration_list
 %type <list>        member_vars unbind_var_list catch_clauses
 
-%type <arg_list>    arguments head_arguments
+%type <arg_list>    arguments
 %type <r_list>      statements and_term argument_and_term dcg_term
 %type <class_body>  class_body
 %type <member_list> class_members class_member
@@ -733,7 +733,7 @@ confidence
 callable_term
     : atom                          { $$ = $1; }
     | atom '(' ')'                  { $$ = $1; }
-    | atom '(' head_arguments ')'   {
+    | atom '(' arguments ')'   {
             if ($1 == context->dot_atom && $3.num_args == 2) {
                 yyerror_printf
                     (&(@1), context, input_stream,
@@ -756,24 +756,7 @@ atom
     ;
 
 arguments
-    : arguments ',' argument_term   {
-            $$ = $1;
-            if ($$.num_args > $$.max_args) {
-                $$.max_args *= 2;
-                $$.args = GC_REALLOC($$.args, sizeof(p_term *) * $$.max_args);
-            }
-            $$.args[($$.num_args)++] = $3;
-        }
-    | argument_term {
-            $$.args = GC_MALLOC(sizeof(p_term *) * 4);
-            $$.args[0] = $1;
-            $$.num_args = 1;
-            $$.max_args = 4;
-        }
-    ;
-
-head_arguments
-    : head_arguments ',' head_argument_term   {
+    : arguments ',' head_argument_term   {
             $$ = $1;
             if ($$.num_args > $$.max_args) {
                 $$.max_args *= 2;
@@ -1453,7 +1436,7 @@ member_clause_head
             $$.body = 0;
             $$.has_constructor = 0;
         }
-    | K_STATIC member_name '(' head_arguments ')'    {
+    | K_STATIC member_name '(' arguments ')'    {
             $$.name = $2;
             $$.kind = p_term_create_atom(context, "static");
             $$.head = create_clause_head
@@ -1479,7 +1462,7 @@ member_clause_head
             $$.body = 0;
             $$.has_constructor = 1;
         }
-    | K_NEW '(' head_arguments ')'                   {
+    | K_NEW '(' arguments ')'                   {
             $$.name = p_term_create_atom(context, "new");
             $$.kind = p_term_create_atom(context, "constructor");
             $$.head = create_clause_head
@@ -1508,7 +1491,7 @@ regular_member_clause_head
             $$.body = 0;
             $$.has_constructor = 0;
         }
-    | member_name '(' head_arguments ')'             {
+    | member_name '(' arguments ')'             {
             $$.name = $1;
             $$.kind = p_term_create_atom(context, "member");
             $$.head = create_clause_head
