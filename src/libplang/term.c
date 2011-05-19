@@ -650,7 +650,7 @@ p_term *p_term_deref_member(p_context *context, p_term *term)
             (context, object, term->member_var.name, value);
         p_term_bind_variable(context, term, value, P_BIND_DEFAULT);
     }
-    return term;
+    return p_term_deref(value);
 }
 
 /**
