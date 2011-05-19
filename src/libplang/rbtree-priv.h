@@ -57,10 +57,6 @@ struct p_rbkey
     const p_term *name;
 };
 
-enum {
-    P_TERM_LIST_OF  = 64
-};
-
 int _p_rbkey_init(p_rbkey *key, const p_term *term);
 int _p_rbkey_compare_keys(const p_rbkey *key1, const p_rbkey *key2);
 

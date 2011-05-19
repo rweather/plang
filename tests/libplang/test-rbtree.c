@@ -125,9 +125,9 @@ static void test_key_init()
 
     term = p_term_create_list(context, name, 0);
     P_VERIFY(_p_rbkey_init(&key, term));
-    P_COMPARE(key.type, P_TERM_ATOM | P_TERM_LIST_OF);
+    P_COMPARE(key.type, P_TERM_LIST);
     P_COMPARE(key.size, 0);
-    P_COMPARE(key.name, name);
+    P_COMPARE(key.name, 0);
 
     term = p_term_create_list
         (context, p_term_create_variable(context), 0);
@@ -139,9 +139,9 @@ static void test_key_init()
     term = p_term_create_list
         (context, p_term_create_functor(context, name, 2), 0);
     P_VERIFY(_p_rbkey_init(&key, term));
-    P_COMPARE(key.type, P_TERM_FUNCTOR | P_TERM_LIST_OF);
-    P_COMPARE(key.size, 2);
-    P_COMPARE(key.name, name);
+    P_COMPARE(key.type, P_TERM_LIST);
+    P_COMPARE(key.size, 0);
+    P_COMPARE(key.name, 0);
 
     term = p_term_create_string(context, "bar");
     P_VERIFY(_p_rbkey_init(&key, term));
@@ -251,30 +251,30 @@ static void test_key_compare()
         {"list_1", TERM("[H1|T1]"), TERM("[H2|T2]"), 0},
         {"list_2", TERM("[[a]|T1]"), TERM("[[b]|T2]"), 0},
 
-        {"list_of_atom_1", TERM("[a|T]"), TERM("[b|T]"), -2},
-        {"list_of_atom_2", TERM("[b|T]"), TERM("[a|T]"), -2},
+        {"list_of_atom_1", TERM("[a|T]"), TERM("[b|T]"), 0},
+        {"list_of_atom_2", TERM("[b|T]"), TERM("[a|T]"), 0},
         {"list_of_atom_3", TERM("[a|T]"), TERM("[a|T]"), 0},
 
         {"list_of_functor_1", TERM("[f(a)|T]"), TERM("[f(b)|T]"), 0},
-        {"list_of_functor_2", TERM("[f(a, b)|T]"), TERM("[f(b)|T]"), 1},
-        {"list_of_functor_3", TERM("[f(a)|T]"), TERM("[f(a, b)|T]"), -1},
-        {"list_of_functor_4", TERM("[f(a)|T]"), TERM("[g(a)|T]"), -2},
-        {"list_of_functor_5", TERM("[g(a)|T]"), TERM("[f(a)|T]"), -2},
+        {"list_of_functor_2", TERM("[f(a, b)|T]"), TERM("[f(b)|T]"), 0},
+        {"list_of_functor_3", TERM("[f(a)|T]"), TERM("[f(a, b)|T]"), 0},
+        {"list_of_functor_4", TERM("[f(a)|T]"), TERM("[g(a)|T]"), 0},
+        {"list_of_functor_5", TERM("[g(a)|T]"), TERM("[f(a)|T]"), 0},
 
-        {"list_of_string_1", TERM("[\"a\"|T]"), TERM("[\"b\"|T]"), -1},
-        {"list_of_string_2", TERM("[\"b\"|T]"), TERM("[\"a\"|T]"), 1},
+        {"list_of_string_1", TERM("[\"a\"|T]"), TERM("[\"b\"|T]"), 0},
+        {"list_of_string_2", TERM("[\"b\"|T]"), TERM("[\"a\"|T]"), 0},
         {"list_of_string_3", TERM("[\"a\"|T]"), TERM("[\"a\"|T]"), 0},
 
-        {"list_of_real_1", TERM("[1.5|T]"), TERM("[2.5|T]"), -1},
-        {"list_of_real_2", TERM("[2.5|T]"), TERM("[1.5|T]"), 1},
+        {"list_of_real_1", TERM("[1.5|T]"), TERM("[2.5|T]"), 0},
+        {"list_of_real_2", TERM("[2.5|T]"), TERM("[1.5|T]"), 0},
         {"list_of_real_3", TERM("[2.5|T]"), TERM("[2.5|T]"), 0},
 
-        {"list_of_integer_1", TERM("[1|T]"), TERM("[2|T]"), -1},
-        {"list_of_integer_2", TERM("[2|T]"), TERM("[1|T]"), 1},
+        {"list_of_integer_1", TERM("[1|T]"), TERM("[2|T]"), 0},
+        {"list_of_integer_2", TERM("[2|T]"), TERM("[1|T]"), 0},
         {"list_of_integer_3", TERM("[2|T]"), TERM("[2|T]"), 0},
 
-        {"list_of_atom_integer_1", TERM("[a|T]"), TERM("[2|T]"), -1},
-        {"list_of_atom_integer_2", TERM("[2|T]"), TERM("[a|T]"), 1},
+        {"list_of_atom_integer_1", TERM("[a|T]"), TERM("[2|T]"), 0},
+        {"list_of_atom_integer_2", TERM("[2|T]"), TERM("[a|T]"), 0},
     };
     #define compare_data_len (sizeof(compare_data) / sizeof(struct compare_type))
 

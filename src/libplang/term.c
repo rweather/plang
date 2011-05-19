@@ -1547,19 +1547,6 @@ P_INLINE void p_term_add_regular_clause
     }
 }
 
-/* Initialize a key, but disallow list-of keys (FIXME) */
-P_INLINE int _p_rbkey_init_no_listof(p_rbkey *key, const p_term *term)
-{
-    if (!_p_rbkey_init(key, term))
-        return 0;
-    if (key->type & P_TERM_LIST_OF) {
-        key->type = P_TERM_LIST;
-        key->size = 0;
-        key->name = 0;
-    }
-    return 1;
-}
-
 /* Add a specific clause to a predicate's index */
 static void p_term_index_clause
     (p_context *context, p_term *predicate,
@@ -1847,7 +1834,7 @@ void p_term_clauses_begin(const p_term *predicate, const p_term *head, p_term_cl
         p_rbkey key;
         p_rbnode *node;
         p_term *arg = p_term_arg(head, predicate->predicate.index_arg);
-        if (_p_rbkey_init_no_listof(&key, arg)) {
+        if (_p_rbkey_init(&key, arg)) {
             node = _p_rbtree_lookup
                 (&(predicate->predicate.index), &key);
             if (node) {

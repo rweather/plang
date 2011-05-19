@@ -50,21 +50,8 @@ int _p_rbkey_init(p_rbkey *key, const p_term *term)
         key->name = term->functor.functor_name;
         break;
     case P_TERM_LIST: {
-        /* Index lists on the head as well.  This is useful for
-         * indexing DCG terminal rules such as [a|T], [b|T], etc */
-        const p_term *head = p_term_deref(term->list.head);
-        if (head && head->header.type != P_TERM_LIST) {
-            if (_p_rbkey_init(key, term->list.head)) {
-                key->type |= P_TERM_LIST_OF;
-            } else {
-                key->type = P_TERM_LIST;
-                key->size = 0;
-                key->name = 0;
-            }
-        } else {
-            key->size = 0;
-            key->name = 0;
-        }
+        key->size = 0;
+        key->name = 0;
         break; }
     case P_TERM_ATOM:
     case P_TERM_STRING:
@@ -95,31 +82,26 @@ P_INLINE int _p_rbkey_compare(const p_rbkey *key, const p_rbnode *node)
         return 1;
     switch (key->type) {
     case P_TERM_FUNCTOR:
-    case P_TERM_FUNCTOR | P_TERM_LIST_OF:
         if (key->size < node->size)
             return -1;
         else if (key->size > node->size)
             return 1;
         /* Fall through to the next case */
     case P_TERM_ATOM:
-    case P_TERM_ATOM | P_TERM_LIST_OF:
         if (key->name < node->name)
             return -1;
         else if (key->name > node->name)
             return 1;
         break;
     case P_TERM_STRING:
-    case P_TERM_STRING | P_TERM_LIST_OF:
         return p_term_strcmp(key->name, node->name);
     case P_TERM_REAL:
-    case P_TERM_REAL | P_TERM_LIST_OF:
         if (key->name->real.value < node->name->real.value)
             return -1;
         else if (key->name->real.value > node->name->real.value)
             return 1;
         break;
     case P_TERM_INTEGER:
-    case P_TERM_INTEGER | P_TERM_LIST_OF:
 #if defined(P_TERM_64BIT)
         if (((int)(key->size)) < ((int)(node->size)))
             return -1;

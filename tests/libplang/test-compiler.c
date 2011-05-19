@@ -359,13 +359,7 @@ static void test_overflow()
 
 static void rbkey_init(p_rbkey *key, p_term *term)
 {
-    if (_p_rbkey_init(key, term)) {
-        if (key->type & P_TERM_LIST_OF) {
-            key->type = P_TERM_LIST;
-            key->size = 0;
-            key->name = 0;
-        }
-    } else {
+    if (!_p_rbkey_init(key, term)) {
         key->type = P_TERM_VARIABLE;
         key->size = 0;
         key->name = 0;
