@@ -4935,7 +4935,8 @@ static p_goal_result p_builtin_unify_one_way
 static p_goal_result p_builtin_atom
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_ATOM)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_ATOM)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -4978,7 +4979,8 @@ static p_goal_result p_builtin_atom
 static p_goal_result p_builtin_atomic
     (p_context *context, p_term **args, p_term **error)
 {
-    int type = p_term_type(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
+    int type = p_term_type(term);
     if (type == P_TERM_ATOM || type == P_TERM_INTEGER ||
             type == P_TERM_REAL || type == P_TERM_STRING)
         return P_RESULT_TRUE;
@@ -5077,17 +5079,18 @@ static p_goal_result p_builtin_class_2
     (p_context *context, p_term **args, p_term **error)
 {
     p_term *name = p_term_deref_member(context, args[0]);
+    p_term *class_object = p_term_deref_member(context, args[1]);
     int type = p_term_type(name);
     if (type == P_TERM_ATOM) {
         p_database_info *db_info = name->atom.db_info;
         if (!db_info || !(db_info->class_info))
             return P_RESULT_FAIL;
-        if (p_term_unify(context, args[1],
+        if (p_term_unify(context, class_object,
                          db_info->class_info->class_object,
                          P_BIND_DEFAULT))
             return P_RESULT_TRUE;
     } else if ((type & P_TERM_VARIABLE) &&
-               p_term_is_class_object(context, args[1])) {
+               p_term_is_class_object(context, class_object)) {
         p_term *class_name = p_term_property
             (context, args[1], p_term_class_name_atom(context));
         if (p_term_unify(context, name, class_name, P_BIND_DEFAULT))
@@ -5129,7 +5132,8 @@ static p_goal_result p_builtin_class_2
 static p_goal_result p_builtin_compound
     (p_context *context, p_term **args, p_term **error)
 {
-    int type = p_term_type(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
+    int type = p_term_type(term);
     if (type == P_TERM_FUNCTOR || type == P_TERM_LIST)
         return P_RESULT_TRUE;
     else
@@ -5160,7 +5164,8 @@ static p_goal_result p_builtin_compound
 static p_goal_result p_builtin_database
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_DATABASE)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_DATABASE)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5200,7 +5205,8 @@ static p_goal_result p_builtin_database
 static p_goal_result p_builtin_float
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_REAL)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_REAL)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5240,7 +5246,8 @@ static p_goal_result p_builtin_float
 static p_goal_result p_builtin_integer
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_INTEGER)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_INTEGER)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5280,7 +5287,8 @@ static p_goal_result p_builtin_integer
 static p_goal_result p_builtin_nonvar
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) & P_TERM_VARIABLE)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) & P_TERM_VARIABLE)
         return P_RESULT_FAIL;
     else
         return P_RESULT_TRUE;
@@ -5321,7 +5329,8 @@ static p_goal_result p_builtin_nonvar
 static p_goal_result p_builtin_number
     (p_context *context, p_term **args, p_term **error)
 {
-    int type = p_term_type(args[0]);
+    p_term *term = p_term_deref_member(context, args[0]);
+    int type = p_term_type(term);
     if (type == P_TERM_INTEGER || type == P_TERM_REAL)
         return P_RESULT_TRUE;
     else
@@ -5362,7 +5371,8 @@ static p_goal_result p_builtin_number
 static p_goal_result p_builtin_object_1
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_is_instance_object(context, args[0]))
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_is_instance_object(context, term))
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5407,6 +5417,7 @@ static p_goal_result p_builtin_object_1
 static p_goal_result p_builtin_object_2
     (p_context *context, p_term **args, p_term **error)
 {
+    p_term *term = p_term_deref_member(context, args[0]);
     p_term *class_object = p_term_deref_member(context, args[1]);
     if (p_term_type(class_object) == P_TERM_ATOM) {
         p_database_info *db_info = class_object->atom.db_info;
@@ -5414,7 +5425,7 @@ static p_goal_result p_builtin_object_2
             return P_RESULT_FAIL;
         class_object = db_info->class_info->class_object;
     }
-    if (p_term_is_instance_of(context, args[0], class_object))
+    if (p_term_is_instance_of(context, term, class_object))
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5453,7 +5464,8 @@ static p_goal_result p_builtin_object_2
 static p_goal_result p_builtin_predicate_1
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_PREDICATE)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_PREDICATE)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5585,7 +5597,8 @@ static p_goal_result p_builtin_predicate_2
 static p_goal_result p_builtin_string
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) == P_TERM_STRING)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) == P_TERM_STRING)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;
@@ -5624,7 +5637,8 @@ static p_goal_result p_builtin_string
 static p_goal_result p_builtin_var
     (p_context *context, p_term **args, p_term **error)
 {
-    if (p_term_type(args[0]) & P_TERM_VARIABLE)
+    p_term *term = p_term_deref_member(context, args[0]);
+    if (p_term_type(term) & P_TERM_VARIABLE)
         return P_RESULT_TRUE;
     else
         return P_RESULT_FAIL;

@@ -23,6 +23,13 @@
 foo(X, Y) {}
 bar(X, Y) {}
 
+class baz
+{
+    var member
+    new() {}
+    new(Value) { Self.member = Value; }
+}
+
 test(atom)
 {
     verify(atom(a));
@@ -36,6 +43,13 @@ test(atom)
 
     predicate(Foo, foo/2);
     verify(!atom(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, a);
+    new baz(Baz3, 1);
+    verify(!atom(Baz1.member));
+    verify(atom(Baz2.member));
+    verify(!atom(Baz3.member));
 }
 
 test(atomic)
@@ -51,6 +65,13 @@ test(atomic)
 
     predicate(Foo, foo/2);
     verify(!atomic(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, a);
+    new baz(Baz3, 1);
+    verify(!atomic(Baz1.member));
+    verify(atomic(Baz2.member));
+    verify(atomic(Baz3.member));
 }
 
 test(compound)
@@ -67,6 +88,13 @@ test(compound)
 
     predicate(Foo, foo/2);
     verify(!compound(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, f(Z));
+    new baz(Baz3, 1);
+    verify(!compound(Baz1.member));
+    verify(compound(Baz2.member));
+    verify(!compound(Baz3.member));
 }
 
 test(float)
@@ -81,6 +109,13 @@ test(float)
 
     predicate(Foo, foo/2);
     verify(!float(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, 1.5);
+    new baz(Baz3, 1);
+    verify(!float(Baz1.member));
+    verify(float(Baz2.member));
+    verify(!float(Baz3.member));
 }
 
 test(integer)
@@ -95,6 +130,13 @@ test(integer)
 
     predicate(Foo, foo/2);
     verify(!integer(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, 1);
+    new baz(Baz3, 1.5);
+    verify(!integer(Baz1.member));
+    verify(integer(Baz2.member));
+    verify(!integer(Baz3.member));
 }
 
 test(nonvar)
@@ -109,6 +151,13 @@ test(nonvar)
 
     predicate(Foo, foo/2);
     verify(nonvar(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, 1);
+    new baz(Baz3, Z);
+    verify(!nonvar(Baz1.member));
+    verify(nonvar(Baz2.member));
+    verify(!nonvar(Baz3.member));
 }
 
 test(number)
@@ -123,6 +172,13 @@ test(number)
 
     predicate(Foo, foo/2);
     verify(!number(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, 1);
+    new baz(Baz3, a);
+    verify(!number(Baz1.member));
+    verify(number(Baz2.member));
+    verify(!number(Baz3.member));
 }
 
 test(string)
@@ -137,6 +193,13 @@ test(string)
 
     predicate(Foo, foo/2);
     verify(!string(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, "a");
+    new baz(Baz3, a);
+    verify(!string(Baz1.member));
+    verify(string(Baz2.member));
+    verify(!string(Baz3.member));
 }
 
 test(var)
@@ -152,6 +215,13 @@ test(var)
 
     predicate(Foo, foo/2);
     verify(!var(Foo));
+
+    new baz(Baz1);
+    new baz(Baz2, Z);
+    new baz(Baz3, a);
+    verify(var(Baz1.member));
+    verify(var(Baz2.member));
+    verify(!var(Baz3.member));
 }
 
 test(predicate)
@@ -189,4 +259,11 @@ test(predicate)
     verify(!predicate(1.5));
     verify(!predicate([a]));
     verify(!predicate("foo"));
+
+    new baz(Baz1);
+    new baz(Baz2, T1);
+    new baz(Baz3, a);
+    verify(!predicate(Baz1.member));
+    verify(predicate(Baz2.member));
+    verify(!predicate(Baz3.member));
 }
