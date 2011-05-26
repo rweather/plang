@@ -4317,7 +4317,8 @@ static p_goal_result p_builtin_univ
             }
         } else if (functor == context->dot_atom && length == 3) {
             new_term = p_term_create_list
-                (context, list_args->list.head,
+                (context,
+                 p_term_deref_member(context, list_args->list.head),
                  p_term_deref_member
                     (context, list_args->list.tail)->list.head);
         } else if (functor->header.type != P_TERM_ATOM) {
@@ -4328,7 +4329,8 @@ static p_goal_result p_builtin_univ
                 (context, functor, length - 1);
             for (index = 0; index < (length - 1); ++index) {
                 p_term_bind_functor_arg
-                    (new_term, index, list_args->list.head);
+                    (new_term, index,
+                     p_term_deref_member(context, list_args->list.head));
                 list_args = p_term_deref_member
                     (context, list_args->list.tail);
             }
