@@ -2021,18 +2021,6 @@ int p_term_occurs_in(const p_term *var, const p_term *value)
         if (value->header.type != P_TERM_ATOM)
             return p_term_occurs_in(var, value);
         break;
-    case P_TERM_OBJECT:
-        /* Scan the object's property values */
-        do {
-            for (index = 0; index < value->header.size; ++index) {
-                if (p_term_occurs_in
-                        (var, value->object.properties[index].value))
-                    return 1;
-            }
-            value = value->object.next;
-        }
-        while (value);
-        break;
     case P_TERM_MEMBER_VARIABLE:
         return p_term_occurs_in(var, value->member_var.object);
     default: break;
