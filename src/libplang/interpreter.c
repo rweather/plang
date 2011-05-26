@@ -321,7 +321,7 @@ p_goal_result _p_code_run
      *      Unifies Xn against the functor Name/Arity and sets the
      *      "current put pointer" to the first functor argument */
     P_INST_BEGIN(P_OP_GET_FUNCTOR)
-        term = p_term_deref(xregs[inst->functor.reg1]);
+        term = p_term_deref_member(context, xregs[inst->functor.reg1]);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->functor.arity &&
                 term->functor.functor_name == inst->functor.name) {
@@ -337,7 +337,7 @@ p_goal_result _p_code_run
         }
     P_INST_END(functor)
     P_INST_BEGIN_LARGE(P_OP_GET_FUNCTOR)
-        term = p_term_deref(xregs[inst->large_functor.reg1]);
+        term = p_term_deref_member(context, xregs[inst->large_functor.reg1]);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->large_functor.arity &&
                 term->functor.functor_name ==
@@ -359,7 +359,7 @@ p_goal_result _p_code_run
      *      Unifies Xn against a list term and copies the term into Xm.
      *      The "current put pointer" is set to the list head */
     P_INST_BEGIN(P_OP_GET_LIST)
-        term = p_term_deref(xregs[inst->two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->two_reg.reg1]);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->two_reg.reg2] = term;
             put_ptr = &(term->list.head);
@@ -374,7 +374,7 @@ p_goal_result _p_code_run
         }
     P_INST_END(two_reg)
     P_INST_BEGIN_LARGE(P_OP_GET_LIST)
-        term = p_term_deref(xregs[inst->large_two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->large_two_reg.reg1]);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->large_two_reg.reg2] = term;
             put_ptr = &(term->list.head);
@@ -392,7 +392,7 @@ p_goal_result _p_code_run
     /* get_atom Value, Xn
      *      Unifies Xn against the atom Value */
     P_INST_BEGIN(P_OP_GET_ATOM)
-        term = p_term_deref(xregs[inst->constant.reg1]);
+        term = p_term_deref_member(context, xregs[inst->constant.reg1]);
         if (term->header.type == P_TERM_ATOM) {
             if (term != inst->constant.value)
                 P_INST_FAIL;
@@ -408,7 +408,7 @@ p_goal_result _p_code_run
     /* get_constant Value, Xn
      *      Unifies Xn against the specified constant Value */
     P_INST_BEGIN(P_OP_GET_CONSTANT)
-        term = p_term_deref(xregs[inst->constant.reg1]);
+        term = p_term_deref_member(context, xregs[inst->constant.reg1]);
         term2 = inst->constant.value;
         if (term->header.type == term2->header.type ||
                 (term->header.type & P_TERM_VARIABLE) != 0) {
@@ -454,7 +454,7 @@ p_goal_result _p_code_run
      *      "current put pointer" to the first functor argument.
      *      This instruction does not bind variables in Xn */
     P_INST_BEGIN(P_OP_GET_IN_FUNCTOR)
-        term = p_term_deref(xregs[inst->functor.reg1]);
+        term = p_term_deref_member(context, xregs[inst->functor.reg1]);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->functor.arity &&
                 term->functor.functor_name == inst->functor.name) {
@@ -464,7 +464,7 @@ p_goal_result _p_code_run
         }
     P_INST_END(functor)
     P_INST_BEGIN_LARGE(P_OP_GET_IN_FUNCTOR)
-        term = p_term_deref(xregs[inst->large_functor.reg1]);
+        term = p_term_deref_member(context, xregs[inst->large_functor.reg1]);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->large_functor.arity &&
                 term->functor.functor_name ==
@@ -480,7 +480,7 @@ p_goal_result _p_code_run
      *      The "current put pointer" is set to the list head.
      *      This instruction does not bind variables in Xn */
     P_INST_BEGIN(P_OP_GET_IN_LIST)
-        term = p_term_deref(xregs[inst->two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->two_reg.reg1]);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->two_reg.reg2] = term;
             put_ptr = &(term->list.head);
@@ -489,7 +489,7 @@ p_goal_result _p_code_run
         }
     P_INST_END(two_reg)
     P_INST_BEGIN_LARGE(P_OP_GET_IN_LIST)
-        term = p_term_deref(xregs[inst->large_two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->large_two_reg.reg1]);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->large_two_reg.reg2] = term;
             put_ptr = &(term->list.head);
@@ -502,7 +502,7 @@ p_goal_result _p_code_run
      *      Unifies Xn against the atom Value, without binding
      *      variables in Xn */
     P_INST_BEGIN(P_OP_GET_IN_ATOM)
-        term = p_term_deref(xregs[inst->constant.reg1]);
+        term = p_term_deref_member(context, xregs[inst->constant.reg1]);
         if (term->header.type == P_TERM_ATOM) {
             if (term != inst->constant.value)
                 P_INST_FAIL;
@@ -515,7 +515,7 @@ p_goal_result _p_code_run
      *      Unifies Xn against the specified constant Value,
      *      without binding variables in Xn */
     P_INST_BEGIN(P_OP_GET_IN_CONSTANT)
-        term = p_term_deref(xregs[inst->constant.reg1]);
+        term = p_term_deref_member(context, xregs[inst->constant.reg1]);
         term2 = inst->constant.value;
         if (term->header.type == term2->header.type) {
             if (!p_term_unify(context, term, term2, P_BIND_DEFAULT))
@@ -587,7 +587,7 @@ p_goal_result _p_code_run
     P_INST_BEGIN(P_OP_UNIFY_FUNCTOR)
         term = *put_ptr;
         if (term) {
-            term = p_term_deref(term);
+            term = p_term_deref_member(context, term);
             if (term->header.type == P_TERM_FUNCTOR &&
                     term->header.size == inst->functor.arity &&
                     term->functor.functor_name
@@ -615,7 +615,7 @@ p_goal_result _p_code_run
     P_INST_BEGIN_LARGE(P_OP_UNIFY_FUNCTOR)
         term = *put_ptr;
         if (term) {
-            term = p_term_deref(term);
+            term = p_term_deref_member(context, term);
             if (term->header.type == P_TERM_FUNCTOR &&
                     term->header.size == inst->large_functor.arity &&
                     term->functor.functor_name
@@ -649,7 +649,7 @@ p_goal_result _p_code_run
     P_INST_BEGIN(P_OP_UNIFY_LIST)
         term = *put_ptr;
         if (term) {
-            term = p_term_deref(term);
+            term = p_term_deref_member(context, term);
             if (term->header.type == P_TERM_LIST) {
                 xregs[inst->one_reg.reg1] = term;
                 put_ptr = &(term->list.head);
@@ -676,7 +676,7 @@ p_goal_result _p_code_run
     P_INST_BEGIN(P_OP_UNIFY_LIST_TAIL)
         term = xregs[inst->one_reg.reg1];
         if (term->list.tail) {
-            term = p_term_deref(term->list.tail);
+            term = p_term_deref_member(context, term->list.tail);
             if (term->header.type == P_TERM_LIST) {
                 xregs[inst->one_reg.reg1] = term;
                 put_ptr = &(term->list.head);
@@ -702,7 +702,7 @@ p_goal_result _p_code_run
     P_INST_BEGIN(P_OP_UNIFY_NIL_TAIL)
         term = xregs[inst->one_reg.reg1];
         if (term->list.tail) {
-            term = p_term_deref(term->list.tail);
+            term = p_term_deref_member(context, term->list.tail);
             if (term->header.type & P_TERM_VARIABLE) {
                 if (!p_term_unify(context, term, context->nil_atom,
                                   P_BIND_DEFAULT))
@@ -718,7 +718,7 @@ p_goal_result _p_code_run
     /* unify_atom Value
      *      Unifies the contents of the put pointer with Value */
     P_INST_BEGIN(P_OP_UNIFY_ATOM)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term == inst->constant.value) {
             ++put_ptr;
         } else if (term) {
@@ -781,7 +781,7 @@ p_goal_result _p_code_run
      *      function Name/Arity and copies the term into Xn.
      *      The put pointer's contents must not be modified */
     P_INST_BEGIN(P_OP_UNIFY_IN_FUNCTOR)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->functor.arity &&
                 term->functor.functor_name == inst->functor.name) {
@@ -792,7 +792,7 @@ p_goal_result _p_code_run
         }
     P_INST_END(functor)
     P_INST_BEGIN_LARGE(P_OP_UNIFY_IN_FUNCTOR)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term->header.type == P_TERM_FUNCTOR &&
                 term->header.size == inst->large_functor.arity &&
                 term->functor.functor_name
@@ -809,7 +809,7 @@ p_goal_result _p_code_run
      *      and copies the list term into Xn.  The contents of the
      *      put pointer must not be modified. */
     P_INST_BEGIN(P_OP_UNIFY_IN_LIST)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->one_reg.reg1] = term;
             put_ptr = &(term->list.head);
@@ -824,7 +824,7 @@ p_goal_result _p_code_run
      *      The put pointer's contents must not be modified */
     P_INST_BEGIN(P_OP_UNIFY_IN_LIST_TAIL)
         term = xregs[inst->one_reg.reg1];
-        term = p_term_deref(term->list.tail);
+        term = p_term_deref_member(context, term->list.tail);
         if (term->header.type == P_TERM_LIST) {
             xregs[inst->one_reg.reg1] = term;
             put_ptr = &(term->list.head);
@@ -838,7 +838,7 @@ p_goal_result _p_code_run
      *      the term pointed to by Xn */
     P_INST_BEGIN(P_OP_UNIFY_IN_NIL_TAIL)
         term = xregs[inst->one_reg.reg1];
-        term = p_term_deref(term->list.tail);
+        term = p_term_deref_member(context, term->list.tail);
         if (term != context->nil_atom)
             P_INST_FAIL;
     P_INST_END(one_reg)
@@ -847,7 +847,7 @@ p_goal_result _p_code_run
      *      Unifies the contents of the put pointer with Value,
      *      without modifying the contents of the put pointer */
     P_INST_BEGIN(P_OP_UNIFY_IN_ATOM)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term == inst->constant.value)
             ++put_ptr;
         else
@@ -858,7 +858,7 @@ p_goal_result _p_code_run
      *      Unifies the contents of the put pointer with Value,
      *      without modifying the contents of the put pointer */
     P_INST_BEGIN(P_OP_UNIFY_IN_CONSTANT)
-        term = p_term_deref(*put_ptr);
+        term = p_term_deref_member(context, *put_ptr);
         if (term->header.type == inst->constant.value->header.type) {
             if (!p_term_unify(context, term, inst->constant.value,
                               P_BIND_DEFAULT))
@@ -879,18 +879,18 @@ p_goal_result _p_code_run
     /* reset_argument Xn, ArgIndex
      *      Resets the put pointer to ArgIndex on functor Xn */
     P_INST_BEGIN(P_OP_RESET_ARGUMENT)
-        term = p_term_deref(xregs[inst->two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->two_reg.reg1]);
         put_ptr = &(term->functor.arg[inst->two_reg.reg2]);
     P_INST_END(two_reg)
     P_INST_BEGIN_LARGE(P_OP_RESET_ARGUMENT)
-        term = p_term_deref(xregs[inst->large_two_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->large_two_reg.reg1]);
         put_ptr = &(term->functor.arg[inst->large_two_reg.reg2]);
     P_INST_END(large_two_reg)
 
     /* reset_tail Xn
      *      Resets the put pointer to the tail of Xn */
     P_INST_BEGIN(P_OP_RESET_TAIL)
-        term = p_term_deref(xregs[inst->one_reg.reg1]);
+        term = p_term_deref_member(context, xregs[inst->one_reg.reg1]);
         put_ptr = &(term->list.tail);
     P_INST_END(one_reg)
 
