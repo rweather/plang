@@ -2586,33 +2586,15 @@ static void p_term_print_inner(p_context *context, const p_term *term, p_term_pr
     case P_TERM_OBJECT: {
         p_term *name = p_term_property
             (context, term, context->class_name_atom);
-        unsigned int index;
-        int first = 1;
         if (p_term_is_class_object(context, term))
             (*print_func)(print_data, "class ");
-        if (name)
-            (*print_func)(print_data, "%s {", p_term_name(name));
         else
-            (*print_func)(print_data, "unknown_class {");
-        do {
-            for (index = 0; index < term->header.size; ++index) {
-                name = term->object.properties[index].name;
-                if (name == context->class_name_atom)
-                    continue;
-                if (name == context->prototype_atom)
-                    continue;
-                if (!first)
-                    (*print_func)(print_data, ", ");
-                p_term_print_atom(name, print_func, print_data);
-                (*print_func)(print_data, ": ");
-                p_term_print_inner
-                    (context, term->object.properties[index].value,
-                     print_func, print_data, level - 1, 950, vars);
-                first = 0;
-            }
-            term = term->object.next;
-        } while (term != 0);
-        (*print_func)(print_data, "}");
+            (*print_func)(print_data, "object ");
+        if (name)
+            (*print_func)(print_data, "%s ", p_term_name(name));
+        else
+            (*print_func)(print_data, "unknown_class ");
+        (*print_func)(print_data, "%lx", (long)term);
         break; }
     case P_TERM_PREDICATE:
         (*print_func)(print_data, "predicate ");
