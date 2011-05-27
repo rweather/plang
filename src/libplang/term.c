@@ -2982,6 +2982,9 @@ static p_term *p_term_clone_inner(p_context *context, p_term *term)
         return clone;
     case P_TERM_MEMBER_VARIABLE:
         /* Clone a member variable reference */
+        clone = p_term_deref_member(context, term);
+        if (clone->header.type != P_TERM_MEMBER_VARIABLE)
+            return p_term_clone_inner(context, term);
         clone = p_term_clone_inner(context, term->member_var.object);
         if (!clone)
             return 0;
