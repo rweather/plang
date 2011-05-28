@@ -793,7 +793,7 @@ static p_term *p_create_member_existence_error
     p_term_bind_functor_arg(pred, 0, full_name);
     p_term_bind_functor_arg
         (pred, 1, p_term_create_integer
-            (context, (int)(arg_head->header.size)));
+            (context, p_term_arg_count(arg_head)));
     return p_create_existence_error(context, "member_predicate", pred);
 }
 

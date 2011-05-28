@@ -384,11 +384,14 @@ int _p_code_argument_key
                 if (inst->constant.reg1 != arg)
                     break;
                 key->type = inst->constant.value->header.type;
+#if defined(P_TERM_64BIT)
                 if (key->type == P_TERM_INTEGER) {
                     key->size = p_term_integer_value
                         (inst->constant.value);
                     key->name = 0;
-                } else {
+                } else
+#endif
+                {
                     key->size = 0;
                     key->name = inst->constant.value;
                 }
