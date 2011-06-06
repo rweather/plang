@@ -20,6 +20,8 @@
 #ifndef PLANG_CONTEXT_H
 #define PLANG_CONTEXT_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -66,6 +68,9 @@ void p_context_set_debug(p_context *context, int debug);
 
 void p_context_add_import_path(p_context *context, const char *path);
 void p_context_add_library_path(p_context *context, const char *path);
+
+void *p_context_gc_malloc(p_context *context, size_t size);
+void p_context_gc_free(p_context *context, void *ptr);
 
 #ifdef __cplusplus
 };

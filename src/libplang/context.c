@@ -1247,4 +1247,38 @@ static void p_context_find_system_imports(p_context *context)
 #endif
 }
 
+/**
+ * \brief Allocates \a size bytes of memory within \a context.
+ *
+ * The returned memory will be visible to the garbage collector,
+ * but will not be collected until an explicit call is made
+ * to p_context_gc_free().
+ *
+ * The purpose of this function is to allow native applications
+ * to store Plang terms for later use, without those terms being
+ * accidentally garbage-collected before the native application
+ * is ready.
+ *
+ * \ingroup context
+ * \sa p_context_gc_free()
+ */
+void *p_context_gc_malloc(p_context *context, size_t size)
+{
+    return GC_MALLOC(size);
+}
+
+/**
+ * \brief Frees the memory at \a ptr within \a context.
+ *
+ * It is assumed that \a ptr was returned by a previous call
+ * to p_context_gc_malloc().
+ *
+ * \ingroup context
+ * \sa p_context_gc_malloc()
+ */
+void p_context_gc_free(p_context *context, void *ptr)
+{
+    GC_FREE(ptr);
+}
+
 /*\@}*/
