@@ -790,7 +790,7 @@ static p_goal_result p_goal_execute(p_context *context, p_term **error)
  *
  * \ingroup context
  * \sa p_context_reexecute_goal(), p_context_abandon_goal(),
- * p_context_fuzzy, confidence(),
+ * p_context_fuzzy_confidence(), p_context_call_predicate(),
  * \ref execution_model "Plang execution model"
  */
 p_goal_result p_context_execute_goal
@@ -887,6 +887,143 @@ void p_context_abandon_goal(p_context *context)
         context->confidence = 1.0;
         context->database = 0;
     }
+}
+
+/**
+ * \brief Calls the predicate \a name within \a context with
+ * the \a num_args arguments from the \a args array.
+ *
+ * This is a convenience function that wraps p_context_execute_goal().
+ * Returns the result from executing the goal, and optionally
+ * returns an error term in \a error.
+ *
+ * If the predicate call goal succeeds, it can be re-executed like
+ * any other goal by calling p_context_reexecute_goal().
+ *
+ * \ingroup context
+ * \sa p_context_call_member_predicate(), p_context_new_object()
+ */
+p_goal_result p_context_call_predicate
+    (p_context *context, p_term *name, p_term **args,
+     int num_args, p_term **error)
+{
+    p_term *goal;
+    p_context_abandon_goal(context);
+    name = p_term_deref(name);
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        if (error)
+            *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM) {
+        if (error)
+            *error = p_create_type_error(context, "atom", name);
+        return P_RESULT_ERROR;
+    }
+    goal = p_term_create_functor_with_args
+        (context, name, args, num_args);
+    return p_context_execute_goal(context, goal, error);
+}
+
+/**
+ * \brief Calls the member predicate called \a name on \a object
+ * within \a context with the \a num_args arguments from
+ * the \a args array.
+ *
+ * This is a convenience function that wraps p_context_execute_goal().
+ * Returns the result from executing the goal, and optionally
+ * returns an error term in \a error.
+ *
+ * If the member predicate call goal succeeds, it can be re-executed
+ * like any other goal by calling p_context_reexecute_goal().
+ *
+ * \ingroup context
+ * \sa p_context_call_predicate(), p_context_new_object()
+ */
+p_goal_result p_context_call_member_predicate
+    (p_context *context, p_term *object, p_term *name,
+     p_term **args, int num_args, p_term **error)
+{
+    int index;
+    p_term *call_args;
+    p_term *goal;
+    p_context_abandon_goal(context);
+    name = p_term_deref(name);
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        if (error)
+            *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM) {
+        if (error)
+            *error = p_create_type_error(context, "atom", name);
+        return P_RESULT_ERROR;
+    }
+    call_args = p_term_create_functor
+        (context, context->call_args_atom, num_args + 1);
+    p_term_bind_functor_arg(call_args, 0, object);
+    for (index = 0; index < num_args; ++index)
+        p_term_bind_functor_arg(call_args, index + 1, args[index]);
+    goal = p_term_create_functor(context, context->call_member_atom, 2);
+    p_term_bind_functor_arg
+        (goal, 0, p_term_create_member_variable
+            (context, object, name, 0));
+    p_term_bind_functor_arg(goal, 1, call_args);
+    return p_context_execute_goal(context, goal, error);
+}
+
+/**
+ * \brief Constructs a new \a object within \a context that is an
+ * instance of the class \a name.  The constructor will be called
+ * with the \a num_args arguments from the \a args array.
+ *
+ * This is a convenience function that wraps p_context_execute_goal().
+ * Returns the result from executing the goal, and optionally
+ * returns an error term in \a error.
+ *
+ * If the object construction succeeds, the constructor call it can
+ * be re-executed like any other goal by calling
+ * p_context_reexecute_goal().
+ *
+ * \ingroup context
+ * \sa p_context_call_predicate(), p_context_call_member_predicate()
+ */
+p_goal_result p_context_new_object
+    (p_context *context, p_term *name, p_term **args, int num_args,
+     p_term **object, p_term **error)
+{
+    p_term *goal;
+    p_term *call_new;
+    p_term *ctor_name;
+    p_term *call_ctor;
+    int index;
+    p_context_abandon_goal(context);
+    name = p_term_deref(name);
+    if (!name || (name->header.type & P_TERM_VARIABLE) != 0) {
+        if (error)
+            *error = p_create_instantiation_error(context);
+        return P_RESULT_ERROR;
+    }
+    if (name->header.type != P_TERM_ATOM) {
+        if (error)
+            *error = p_create_type_error(context, "atom", name);
+        return P_RESULT_ERROR;
+    }
+    *object = p_term_create_variable(context);
+    call_new = p_term_create_functor
+        (context, p_term_create_atom(context, "$$new"), 2);
+    ctor_name = p_term_create_member_name
+        (context, name, p_term_create_atom(context, "new"));
+    call_ctor = p_term_create_functor(context, ctor_name, num_args + 1);
+    p_term_bind_functor_arg(call_ctor, 0, *object);
+    for (index = 0; index < num_args; ++index)
+        p_term_bind_functor_arg(call_ctor, index + 1, args[index]);
+    p_term_bind_functor_arg(call_new, 0, name);
+    p_term_bind_functor_arg(call_new, 1, *object);
+    goal = p_term_create_functor(context, context->comma_atom, 2);
+    p_term_bind_functor_arg(goal, 0, call_new);
+    p_term_bind_functor_arg(goal, 1, call_ctor);
+    return p_context_execute_goal(context, goal, error);
 }
 
 /**

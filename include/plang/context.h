@@ -57,6 +57,16 @@ p_goal_result p_context_reexecute_goal
     (p_context *context, p_term **error);
 void p_context_abandon_goal(p_context *context);
 
+p_goal_result p_context_call_predicate
+    (p_context *context, p_term *name, p_term **args,
+     int num_args, p_term **error);
+p_goal_result p_context_call_member_predicate
+    (p_context *context, p_term *object, p_term *name,
+     p_term **args, int num_args, p_term **error);
+p_goal_result p_context_new_object
+    (p_context *context, p_term *name, p_term **args, int num_args,
+     p_term **object, p_term **error);
+
 double p_context_fuzzy_confidence(p_context *context);
 void p_context_set_fuzzy_confidence(p_context *context, double value);
 
