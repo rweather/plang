@@ -1,6 +1,6 @@
 /*
  * plang logic programming language
- * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ * Copyright (C) 2011,2012  Southern Storm Software, Pty Ltd.
  *
  * The plang package is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
@@ -30,7 +30,7 @@ static const char shell_main[] =
     "shell::frontend_main(_)\n"
     "{\n"
     "    stdout::writeln(\"Plang version " VERSION "\");\n"
-    "    stdout::writeln(\"Copyright (c) 2011 Southern Storm Software, Pty Ltd.\");\n"
+    "    stdout::writeln(\"Copyright (c) 2011,2012 Southern Storm Software, Pty Ltd.\");\n"
     "    stdout::writeln(\"Type 'help.' for help\");\n"
     "    stdout::writeln();\n"
     "    shell::main(\"| ?- \");\n"

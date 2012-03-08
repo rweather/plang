@@ -1,7 +1,7 @@
 %{
 /*
  * plang logic programming language
- * Copyright (C) 2011  Southern Storm Software, Pty Ltd.
+ * Copyright (C) 2011,2012  Southern Storm Software, Pty Ltd.
  *
  * The plang package is free software: you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public License
