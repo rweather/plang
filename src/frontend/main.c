@@ -27,7 +27,7 @@
 static const char shell_main[] =
     ":- import(shell).\n"
     ":- import(stdout).\n"
-    "shell::frontend_main(_)\n"
+    "shell::frontend_main()\n"
     "{\n"
     "    stdout::writeln(\"Plang version " VERSION "\");\n"
     "    stdout::writeln(\"Copyright (c) 2011,2012 Southern Storm Software, Pty Ltd.\");\n"
@@ -43,6 +43,7 @@ int main(int argc, char *argv[])
     p_term *args;
     p_term *goal;
     p_term *error_term;
+    p_term *main_atom;
     int error, index;
     p_goal_result result;
     int exitval;
@@ -137,10 +138,18 @@ int main(int argc, char *argv[])
             (context, p_term_create_string(context, argv[index]), args);
     }
 
-    /* Create and execute the main(Args) goal */
-    goal = p_term_create_functor
-        (context, p_term_create_atom(context, main_pred), 1);
-    p_term_bind_functor_arg(goal, 0, args);
+    /* Create and execute the main(Args) or main() goal */
+    main_atom = p_term_create_atom(context, main_pred);
+    if (p_term_lookup_predicate(context, main_atom, 1)) {
+        goal = p_term_create_functor(context, main_atom, 1);
+        p_term_bind_functor_arg(goal, 0, args);
+    } else if (p_term_lookup_predicate(context, main_atom, 0)) {
+        goal = main_atom;
+    } else {
+        /* There is no main/1 or main/0 predicate, so force an error */
+        goal = p_term_create_functor(context, main_atom, 1);
+        p_term_bind_functor_arg(goal, 0, args);
+    }
     error_term = 0;
     result = p_context_execute_goal(context, goal, &error_term);
     if (result == P_RESULT_TRUE) {

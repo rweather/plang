@@ -20,7 +20,7 @@ descendent(GC, P)
     descendent(GC, C);
 }
 
-main(Args)
+main()
 {
     findall(D, descendent(D, "Frank"), Descendents);
     stdout::writeln("Frank's descendents: " + Descendents);

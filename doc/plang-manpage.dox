@@ -61,8 +61,8 @@ directories.
 <b>--main=</b>\em name
 \par
 Sets \em name as the main entry point predicate to be executed.
-The default is <tt>main</tt>.  The predicate is assumed to take a
-single parameter corresponding to the list
+The default is <tt>main</tt>.  If the predicate has a parameter,
+then it is passed the list
 [\em filename.lp, \em arguments, ...].
 
 \section manpage_shell SHELL MODE

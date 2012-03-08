@@ -1,6 +1,6 @@
 :- import(stdout).
 
-main(Args)
+main()
 {
     stdout::writeln("Hello World!");
 }

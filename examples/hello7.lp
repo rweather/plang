@@ -20,7 +20,7 @@ descendent(GC, P)
     descendent(GC, C);
 }
 
-main(Args)
+main()
 {
     findall(P, person(P), People);
     stdout::writeln("People: " + People);

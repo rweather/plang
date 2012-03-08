@@ -62,7 +62,8 @@ Bye World!
 \endcode
 
 As can be seen, the command-line arguments are passed to the
-Plang application.  Let's dump them to see what we get:
+Plang application as an optional argument to \c main.
+Let's dump them to see what we get:
 
 \include hello3.lp
 
@@ -215,17 +216,13 @@ no
 We can even run the \c main predicate directly:
 
 \code
-| ?- main(_).
+| ?- main().
 People: ["Frank", "Mary", "George", "Amy"]
 Frank's children: ["Mary", "George"]
 Frank's descendents: ["Mary", "George", "Amy"]
 
 yes
 \endcode
-
-The "_" variable is special - it indicates an anonymous variable
-with no specific name or value.  Since our \c main predicate does
-not process arguments, "_" is good enough for our purposes.
 
 Finally, we exit the shell:
 

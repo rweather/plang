@@ -21,6 +21,7 @@
 #include <plang/database.h>
 #include "term-priv.h"
 #include "context-priv.h"
+#include "database-priv.h"
 #include "rbtree-priv.h"
 #include "inst-priv.h"
 #include <string.h>
@@ -1730,6 +1731,31 @@ void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *claus
                predicate->predicate.clause_count > P_TERM_INDEX_TRIGGER) {
         p_term_index_all_clauses(context, predicate);
     }
+}
+
+/**
+ * \brief Returns the predicate in the global database that is
+ * associated with \a name and \a arity.
+ *
+ * Returns null if the predicate is not present in the global database,
+ * or it is a builtin predicate.
+ *
+ * \ingroup term
+ * \sa p_term_database_lookup_predicate()
+ */
+p_term *p_term_lookup_predicate
+    (p_context *context, p_term *name, int arity)
+{
+    p_database_info *info;
+    name = p_term_deref(name);
+    if (!name || name->header.type != P_TERM_ATOM)
+        return 0;
+    info = name->atom.db_info;
+    while (info && info->arity != arity)
+        info = info->next;
+    if (info)
+        return info->predicate;
+    return 0;
 }
 
 /* Retract "clause" if it can be unified with "clause2" */

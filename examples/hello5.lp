@@ -10,7 +10,7 @@ parent("Frank", "Mary").
 parent("Frank", "George").
 parent("Mary", "Amy").
 
-main(Args)
+main()
 {
     findall(C, parent("Frank", C), Children);
     stdout::writeln("Frank's children: " + Children);

@@ -6,7 +6,7 @@ person("Mary").
 person("George").
 person("Amy").
 
-main(Args)
+main()
 {
     findall(P, person(P), People);
     stdout::writeln("People: " + People);

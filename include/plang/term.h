@@ -106,6 +106,7 @@ p_term *p_term_create_predicate(p_context *context, p_term *name, int arg_count)
 p_term *p_term_create_dynamic_clause(p_context *context, p_term *head, p_term *body);
 void p_term_add_clause_first(p_context *context, p_term *predicate, p_term *clause);
 void p_term_add_clause_last(p_context *context, p_term *predicate, p_term *clause);
+p_term *p_term_lookup_predicate(p_context *context, p_term *name, int arity);
 
 /** @cond */
 typedef struct p_term_clause_iter p_term_clause_iter;

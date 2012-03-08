@@ -14,7 +14,7 @@
 .\" You should have received a copy of the GNU Lesser General Public
 .\" License along with the libcompiler library.  If not,
 .\" see <http://www.gnu.org/licenses/>.
-.TH plang 1 "April 2011" "Southern Storm Software" "Plang Language Tools"
+.TH plang 1 "March 2012" "Southern Storm Software" "Plang Language Tools"
 .SH NAME
 plang \- run applications in the Plang language
 .SH SYNOPSIS
@@ -44,8 +44,8 @@ before the predefined system import library directories.
 .TP
 .B \-m NAME, \-\-main=NAME
 Sets \fBNAME\fR as the main entry point predicate to be executed.
-The default is \fBmain\fR.  The predicate is assumed to take a
-single parameter corresponding to the list
+The default is \fBmain\fR.  If the predicate has a parameter,
+then it is passed the list
 \fB[\fIfilename.lp\fR, \fIarguments\fR, ...\fB]\fR.
 .SH "SHELL MODE"
 If the \fIfilename.lp\fR and \fIarguments\fR are omitted, then
